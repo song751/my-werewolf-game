@@ -100,11 +100,15 @@
             padding: 15px;
             border-radius: 8px;
         }
-        .link-item {
-            margin-bottom: 10px;
+        .link-template {
+            background-color: var(--secondary-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
         }
-        .link-item input {
-            width: calc(100% - 80px);
+        .link-template input {
+            width: calc(100% - 90px);
+            margin-top: 10px;
         }
         #game-status, #player-status {
             font-size: 20px;
@@ -192,6 +196,12 @@
         .ready-indicator.not-ready {
             background-color: #FFC107;
         }
+        .wolf-identity-note {
+            font-size: 14px;
+            color: #aaa;
+            font-style: italic;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -209,8 +219,15 @@
             
             <div id="links-section" class="hidden">
                 <h2>2. 分享链接</h2>
-                <p>请将以下专属链接通过私聊一对一发给对应玩家！</p>
-                <div id="links-container"></div>
+                <div id="links-container">
+                    <div class="link-template">
+                        <p><strong>通用链接模板：</strong></p>
+                        <p>将下方链接末尾的 [N] 替换为对应的玩家号码（1-<span id="max-player-num"></span>）后发送给对应玩家</p>
+                        <input type="text" id="link-template" readonly>
+                        <button onclick="App.copyToClipboard(document.getElementById('link-template').value)">复制模板</button>
+                    </div>
+                    <div id="individual-links"></div>
+                </div>
             </div>
 
             <div id="host-controls-section" class="hidden">
@@ -319,6 +336,7 @@
             wolfChatListener: null,
             currentIdentityOrder: null,
             isPreviewSwapped: false,
+            allPlayers: {},
 
             init() {
                 this.cacheDOMElements();
@@ -546,19 +564,27 @@
             },
 
             displayLinks(playerCount) {
-                let html = '';
                 const baseUrl = window.location.href.split('?')[0];
+                const templateLink = `${baseUrl}?game=${this.gameId}&player=[N]`;
+                
+                // 显示模板链接
+                document.getElementById('link-template').value = templateLink;
+                document.getElementById('max-player-num').textContent = playerCount;
+                
+                // 显示个别链接（可折叠）
+                let individualHtml = '<details><summary>查看各玩家专属链接</summary>';
                 for (let i = 1; i <= playerCount; i++) {
                     const playerLink = `${baseUrl}?game=${this.gameId}&player=${i}`;
-                    html += `
-                        <div class="link-item">
+                    individualHtml += `
+                        <div style="margin: 5px 0;">
                             <label>玩家 ${i}: </label>
-                            <input type="text" value="${playerLink}" readonly>
-                            <button onclick="App.copyToClipboard('${playerLink}')">复制</button>
+                            <input type="text" value="${playerLink}" readonly style="width: calc(100% - 140px);">
+                            <button onclick="App.copyToClipboard('${playerLink}')" style="padding: 5px 10px; font-size: 14px;">复制</button>
                         </div>
                     `;
                 }
-                this.dom.linksContainer.innerHTML = html;
+                individualHtml += '</details>';
+                document.getElementById('individual-links').innerHTML = individualHtml;
             },
 
             listenToGame(gameId) {
@@ -566,18 +592,21 @@
                     const gameData = snapshot.val();
                     if (!gameData) return;
                     this.gameState = gameData.state;
-                    this.renderHostPlayerList(gameData.players);
-                    this.updateReadyStatus(gameData.players);
+                    this.allPlayers = gameData.players || {};
+                    this.renderHostPlayerList(this.allPlayers);
+                    this.updateReadyStatus(this.allPlayers);
                     this.checkActionResponses(gameData.actionResponses || {});
                 });
             },
 
             updateReadyStatus(players) {
-                const totalPlayers = Object.keys(players).length;
-                const readyPlayers = Object.values(players).filter(p => p.isReady).length;
+                const playerArray = Object.values(players);
+                const totalPlayers = playerArray.length;
+                const readyPlayers = playerArray.filter(p => p.isReady === true).length;
+                
                 let html = '<h3>准备状态</h3>';
                 
-                Object.values(players).forEach(p => {
+                playerArray.forEach(p => {
                     const status = p.isReady ? 
                         '<span class="ready-status">已确定</span>' : 
                         '<span class="not-ready-status">未确定</span>';
@@ -632,7 +661,7 @@
             async startGame() {
                 const gameData = await db.ref(`games/${this.gameId}`).once('value');
                 const players = gameData.val().players;
-                const allReady = Object.values(players).every(p => p.isReady);
+                const allReady = Object.values(players).every(p => p.isReady === true);
                 
                 if (!allReady) {
                     alert('还有玩家未确定身份顺序！');
@@ -881,7 +910,7 @@
                 const hasWolfIdentity = this.hasWolfIdentityInAnyPosition();
                 
                 if (hasWolfIdentity) {
-                    // 显示所有狼人队友（包括已死亡的）
+                    // 显示所有狼人队友
                     const wolves = Object.values(this.allPlayers).filter(p => {
                         if (p.id == this.playerId) return false;
                         
@@ -892,13 +921,43 @@
                         });
                     });
                     
-                    const aliveWolves = wolves.filter(p => p.isAlive).map(p => `${p.id}号`).join(', ');
-                    const deadWolves = wolves.filter(p => !p.isAlive).map(p => `<s>${p.id}号</s>`).join(', ');
+                    // 将狼人按位置分类
+                    const wolvesWithPosition = wolves.map(p => {
+                        const wolfPositions = [];
+                        p.originalIdentities.forEach((id, index) => {
+                            const role = id.role || id;
+                            if (ROLES[role] && ROLES[role].faction === 'bad') {
+                                wolfPositions.push(index + 1);
+                            }
+                        });
+                        return { ...p, wolfPositions };
+                    });
                     
                     html += '<div><strong>狼人阵营:</strong></div>';
-                    if (aliveWolves) html += `<div>存活: ${aliveWolves}</div>`;
-                    if (deadWolves) html += `<div>已死亡: ${deadWolves}</div>`;
-                    if (!aliveWolves && !deadWolves) html += '<div>无其他狼人</div>';
+                    
+                    // 显示存活的狼人
+                    const aliveWolves = wolvesWithPosition.filter(p => p.isAlive);
+                    if (aliveWolves.length > 0) {
+                        html += '<div>存活: ';
+                        html += aliveWolves.map(p => {
+                            const posNote = p.wolfPositions.includes(2) && p.wolfPositions[0] !== 1 ? 
+                                '<span class="wolf-identity-note">(第2身份)</span>' : '';
+                            return `${p.id}号${posNote}`;
+                        }).join(', ');
+                        html += '</div>';
+                    }
+                    
+                    // 显示死亡的狼人
+                    const deadWolves = wolvesWithPosition.filter(p => !p.isAlive);
+                    if (deadWolves.length > 0) {
+                        html += '<div>已死亡: ';
+                        html += deadWolves.map(p => `<s>${p.id}号</s>`).join(', ');
+                        html += '</div>';
+                    }
+                    
+                    if (aliveWolves.length === 0 && deadWolves.length === 0) {
+                        html += '<div>无其他狼人</div>';
+                    }
                 }
                 
                 // 预言家查验结果（只有当前身份是预言家时才显示）
@@ -994,7 +1053,7 @@
 
             getWolfObserverHtml() {
                 return `<div class="wolf-observer">
-                    <p>你的狼人身份尚未激活，暂时只能观看狼人频道</p>
+                    <p>你的狼人身份在第二张牌，暂时只能观看狼人频道</p>
                 </div>
                 <h3>狼人频道（仅观看）</h3>
                 <div id="wolf-chat"></div>`;

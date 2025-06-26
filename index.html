@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双身份狼人杀 - 电子法官</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --primary-color: #16213e;
+            --secondary-color: #0f3460;
+            --accent-color: #e94560;
+            --text-color: #dcdcdc;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        #app-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--primary-color);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1, h2, h3 {
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--secondary-color);
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .hidden { display: none !important; }
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.2s;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #ff6681;
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+        input[type="number"], input[type="text"] {
+            width: 60px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid var(--secondary-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            text-align: center;
+        }
+        .role-setup-item, .player-list-item, .action-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--secondary-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .player-list-item.dead .player-name, .dead-identity {
+            text-decoration: line-through;
+            color: #ff6b6b;
+        }
+        .player-list-item.dead-all {
+            opacity: 0.5;
+        }
+        .player-list-item.dead-all .player-name{
+             text-decoration: line-through;
+             color: #ff6b6b;
+        }
+        .thief-copy {
+            color: #aaa;
+            font-style: italic;
+        }
+        #links-container {
+            margin-top: 20px;
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .link-item {
+            margin-bottom: 10px;
+        }
+        .link-item input {
+            width: calc(100% - 80px);
+        }
+        #game-status, #player-status {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            background-color: var(--secondary-color);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: var(--accent-color);
+        }
+        #persistent-info {
+            background-color: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        #wolf-chat {
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--secondary-color);
+            padding: 10px;
+            margin-bottom: 10px;
+            background: var(--bg-color);
+            border-radius: 5px;
+        }
+        #wolf-chat-input {
+            width: calc(100% - 90px);
+        }
+        .wolf-msg { margin-bottom: 5px; }
+        .wolf-msg strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- 主持人创建视图 -->
+        <div id="host-view">
+            <h1>双身份狼人杀 - 主持端</h1>
+            <div id="setup-section">
+                <h2>1. 身份配置</h2>
+                <div id="role-setup-container"></div>
+                <p>总身份数: <span id="total-roles">0</span> | 预计玩家数: <span id="player-count">0</span></p>
+                <button id="create-game-btn">创建游戏</button>
+            </div>
+            
+            <div id="links-section" class="hidden">
+                <h2>2. 分享链接</h2>
+                <p>请将以下专属链接通过私聊一对一发给对应玩家！</p>
+                <div id="links-container"></div>
+            </div>
+
+            <div id="host-controls-section" class="hidden">
+                <h2>3. 游戏控制</h2>
+                <div id="host-game-status"></div>
+                <button id="start-game-btn">锁定身份，开始游戏</button>
+                <button id="night-btn">天黑请闭眼</button>
+                <button id="day-btn">天亮了</button>
+                <hr>
+                <h3>夜晚行动</h3>
+                <button class="host-action-btn" data-action="WOLF_ACTION">狼人行动</button>
+                <button class="host-action-btn" data-action="WITCH_ACTION">女巫行动</button>
+                <button class="host-action-btn" data-action="SEER_ACTION">预言家行动</button>
+                <button class="host-action-btn" data-action="GUARD_ACTION">守卫行动</button>
+                 <hr>
+                <h3>游戏管理</h3>
+                <button id="reveal-all-btn">复盘：显示所有身份</button>
+                <div id="host-player-list"></div>
+            </div>
+        </div>
+
+        <!-- 玩家视图 -->
+        <div id="player-view" class="hidden">
+            <h1>双身份狼人杀</h1>
+            <div id="player-info">
+                <h2 id="player-id-display"></h2>
+                <h3>你的身份是:</h3>
+                <div id="my-identities" class="player-list-item"></div>
+                <button id="swap-identities-btn">交换身份顺序</button>
+            </div>
+            <hr>
+            <div id="game-view">
+                <div id="player-status">等待游戏开始...</div>
+                <div id="persistent-info" class="hidden"></div>
+                <div id="action-panel"></div>
+                <h3>玩家列表</h3>
+                <div id="player-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        const firebaseConfig = {
+               apiKey: "AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",
+               authDomain: "werewolf-game-master-1f37f.firebaseapp.com",
+               databaseURL: "https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",
+               projectId: "werewolf-game-master-1f37f",
+               storageBucket: "werewolf-game-master-1f37f.firebasestorage.app",
+               messagingSenderId: "626014452910",
+               appId: "1:626014452910:web:35b6eba412f95f1878013f"
+        };
+
+
+        // --- 主应用逻辑 ---
+        if (firebaseConfig.apiKey) {
+            firebase.initializeApp(firebaseConfig);
+        } else {
+            alert("请先在JS代码中配置您的Firebase项目信息！");
+        }
+        
+        const db = firebase.database();
+
+        const ROLES = {
+            '平民': { name: '平民', faction: 'good', isGod: false },
+            '守卫': { name: '守卫', faction: 'good', isGod: true },
+            '白痴': { name: '白痴', faction: 'good', isGod: true },
+            '预言家': { name: '预言家', faction: 'good', isGod: true },
+            '骑士': { name: '骑士', faction: 'good', isGod: true },
+            '女巫': { name: '女巫', faction: 'good', isGod: true },
+            '猎人': { name: '猎人', faction: 'good', isGod: true },
+            '狼人': { name: '狼人', faction: 'bad', isGod: false },
+            '隐狼': { name: '隐狼', faction: 'bad', isGod: false, isInvisible: true },
+            '盗贼': { name: '盗贼', faction: 'neutral', isGod: false, isThief: true }
+        };
+
+        const DEFAULT_SETUP = {
+            '平民': 6, '守卫': 1, '白痴': 1, '预言家': 1, '骑士': 1, 
+            '女巫': 1, '猎人': 1, '狼人': 2, '隐狼': 1, '盗贼': 1
+        };
+
+        const FORBIDDEN_PAIRS = [
+            ['预言家', '狼人'], ['预言家', '隐狼'], ['盗贼', '狼人'],
+            ['盗贼', '隐狼'], ['隐狼', '狼人']
+        ];
+
+        const App = {
+            gameId: null,
+            playerId: null,
+            playerData: null,
+            gameState: null,
+            isHost: false,
+
+            init() {
+                this.cacheDOMElements();
+                const urlParams = new URLSearchParams(window.location.search);
+                this.gameId = urlParams.get('game');
+                this.playerId = urlParams.get('player');
+
+                if (this.gameId && this.playerId) {
+                    this.isHost = false;
+                    this.showView('player');
+                    this.initPlayerView();
+                } else {
+                    this.isHost = true;
+                    this.showView('host');
+                    this.initHostView();
+                }
+            },
+
+            cacheDOMElements() {
+                // ... 缓存所有DOM元素 ...
+                this.dom = {
+                    hostView: document.getElementById('host-view'),
+                    playerView: document.getElementById('player-view'),
+                    roleSetupContainer: document.getElementById('role-setup-container'),
+                    totalRoles: document.getElementById('total-roles'),
+                    playerCount: document.getElementById('player-count'),
+                    createGameBtn: document.getElementById('create-game-btn'),
+                    linksSection: document.getElementById('links-section'),
+                    linksContainer: document.getElementById('links-container'),
+                    hostControlsSection: document.getElementById('host-controls-section'),
+                    startGameBtn: document.getElementById('start-game-btn'),
+                    nightBtn: document.getElementById('night-btn'),
+                    dayBtn: document.getElementById('day-btn'),
+                    hostActionBtns: document.querySelectorAll('.host-action-btn'),
+                    hostPlayerList: document.getElementById('host-player-list'),
+                    revealAllBtn: document.getElementById('reveal-all-btn'),
+                    playerIdDisplay: document.getElementById('player-id-display'),
+                    myIdentities: document.getElementById('my-identities'),
+                    swapIdentitiesBtn: document.getElementById('swap-identities-btn'),
+                    playerStatus: document.getElementById('player-status'),
+                    persistentInfo: document.getElementById('persistent-info'),
+                    actionPanel: document.getElementById('action-panel'),
+                    playerList: document.getElementById('player-list'),
+                };
+            },
+            
+            showView(viewName) {
+                this.dom.hostView.classList.add('hidden');
+                this.dom.playerView.classList.add('hidden');
+                if (viewName === 'host') this.dom.hostView.classList.remove('hidden');
+                if (viewName === 'player') this.dom.playerView.classList.remove('hidden');
+            },
+
+            // --- 主持人逻辑 ---
+            initHostView() {
+                this.renderRoleSetup();
+                this.dom.createGameBtn.addEventListener('click', () => this.createGame());
+                this.dom.startGameBtn.addEventListener('click', () => this.setGameState({ phase: 'NIGHT_START', round: 1 }));
+                this.dom.nightBtn.addEventListener('click', () => this.setGameState({ phase: 'NIGHT_START' }));
+                this.dom.dayBtn.addEventListener('click', () => this.processDay());
+                this.dom.hostActionBtns.forEach(btn => {
+                    btn.addEventListener('click', () => this.setGameState({ phase: btn.dataset.action }));
+                });
+            },
+
+            renderRoleSetup() {
+                let html = '';
+                for (const role in DEFAULT_SETUP) {
+                    html += `
+                        <div class="role-setup-item">
+                            <span>${role}</span>
+                            <input type="number" id="role-${role}" value="${DEFAULT_SETUP[role]}" min="0">
+                        </div>
+                    `;
+                }
+                this.dom.roleSetupContainer.innerHTML = html;
+                this.dom.roleSetupContainer.addEventListener('input', () => this.updateRoleCount());
+                this.updateRoleCount();
+            },
+
+            updateRoleCount() {
+                let total = 0;
+                document.querySelectorAll('#role-setup-container input').forEach(input => {
+                    total += parseInt(input.value) || 0;
+                });
+                this.dom.totalRoles.textContent = total;
+                this.dom.playerCount.textContent = total % 2 === 0 ? total / 2 : '无效';
+            },
+
+            async createGame() {
+                this.dom.createGameBtn.disabled = true;
+                this.dom.createGameBtn.textContent = '正在生成牌组...';
+
+                let rolesToDeal = [];
+                document.querySelectorAll('#role-setup-container input').forEach(input => {
+                    const roleName = input.id.replace('role-', '');
+                    const count = parseInt(input.value) || 0;
+                    for (let i = 0; i < count; i++) {
+                        rolesToDeal.push(roleName);
+                    }
+                });
+
+                if (rolesToDeal.length === 0 || rolesToDeal.length % 2 !== 0) {
+                    alert('身份总数必须为偶数且大于0！');
+                    this.dom.createGameBtn.disabled = false;
+                    this.dom.createGameBtn.textContent = '创建游戏';
+                    return;
+                }
+
+                let distribution;
+                let attempts = 0;
+                do {
+                    distribution = this.dealAndCheck(rolesToDeal);
+                    attempts++;
+                    if (attempts > 1000) {
+                        alert('无法在1000次尝试内生成符合规则的牌组，请检查您的身份配置！');
+                        this.dom.createGameBtn.disabled = false;
+                        this.dom.createGameBtn.textContent = '创建游戏';
+                        return;
+                    }
+                } while (!distribution);
+                
+                this.gameId = db.ref('games').push().key;
+                const playerCount = rolesToDeal.length / 2;
+                const players = {};
+                for (let i = 1; i <= playerCount; i++) {
+                    players[i] = {
+                        id: i,
+                        identities: distribution[i-1],
+                        originalIdentities: [...distribution[i-1]],
+                        deaths: 0,
+                        isAlive: true,
+                        seerResults: {}, // 预言家结果
+                        wolfChat: [], // 狼人聊天
+                    };
+                }
+
+                const newGame = {
+                    state: { phase: 'SETUP', round: 0 },
+                    players: players,
+                    config: { playerCount }
+                };
+
+                await db.ref(`games/${this.gameId}`).set(newGame);
+                this.listenToGame(this.gameId);
+                this.displayLinks(playerCount);
+                this.dom.createGameBtn.classList.add('hidden');
+                this.dom.linksSection.classList.remove('hidden');
+                this.dom.hostControlsSection.classList.remove('hidden');
+            },
+            
+            dealAndCheck(roles) {
+                // 洗牌
+                let shuffled = [...roles].sort(() => 0.5 - Math.random());
+                // 分组
+                let pairs = [];
+                for (let i = 0; i < shuffled.length; i += 2) {
+                    pairs.push([shuffled[i], shuffled[i+1]]);
+                }
+                
+                // 检查禁忌组合
+                for (const pair of pairs) {
+                    for (const forbidden of FORBIDDEN_PAIRS) {
+                        if (pair.includes(forbidden[0]) && pair.includes(forbidden[1])) {
+                            return null; // 无效组合
+                        }
+                    }
+                }
+
+                // 处理盗贼并统计金宝宝
+                let goldenBabyCount = 0;
+                for (let i = 0; i < pairs.length; i++) {
+                    let pair = pairs[i];
+                    if (pair.includes('盗贼')) {
+                        const otherRole = pair.find(r => r !== '盗贼');
+                        if (otherRole) {
+                            pair = [otherRole, otherRole]; // 盗贼复制
+                        }
+                    }
+                    if (pair[0] === '平民' && pair[1] === '平民') {
+                        goldenBabyCount++;
+                    }
+                }
+
+                if (goldenBabyCount < 1 || goldenBabyCount > 2) {
+                    return null; // 金宝宝数量不符
+                }
+                
+                return pairs;
+            },
+
+            displayLinks(playerCount) {
+                let html = '';
+                const baseUrl = window.location.href.split('?')[0];
+                for (let i = 1; i <= playerCount; i++) {
+                    const playerLink = `${baseUrl}?game=${this.gameId}&player=${i}`;
+                    html += `
+                        <div class="link-item">
+                            <label>玩家 ${i}: </label>
+                            <input type="text" value="${playerLink}" readonly>
+                            <button onclick="App.copyToClipboard('${playerLink}')">复制</button>
+                        </div>
+                    `;
+                }
+                this.dom.linksContainer.innerHTML = html;
+            },
+
+            listenToGame(gameId) {
+                db.ref(`games/${gameId}`).on('value', snapshot => {
+                    const gameData = snapshot.val();
+                    if (!gameData) return;
+                    this.gameState = gameData.state;
+                    this.renderHostPlayerList(gameData.players);
+                });
+            },
+
+            renderHostPlayerList(players, reveal = false) {
+                 let html = '';
+                 for(const id in players) {
+                     const p = players[id];
+                     let identitiesText = reveal ? `[${p.originalIdentities.join(' + ')}]` : '';
+                     html += `<div class="player-list-item ${!p.isAlive ? 'dead-all' : ''}">
+                                <span>玩家 ${p.id} ${identitiesText}</span>
+                                <span>${p.isAlive ? '存活' : '出局'}</span>
+                             </div>`;
+                 }
+                 this.dom.hostPlayerList.innerHTML = html;
+                 if(this.revealAllBtnClicked) {
+                    this.revealAllBtnClicked = false;
+                 } else {
+                    this.dom.revealAllBtn.addEventListener('click', () => {
+                        this.revealAllBtnClicked = true;
+                        this.renderHostPlayerList(players, true);
+                    }, { once: true });
+                 }
+            },
+            
+            setGameState(newState) {
+                db.ref(`games/${this.gameId}/state`).update(newState);
+            },
+
+            // --- 玩家逻辑 ---
+            initPlayerView() {
+                this.dom.playerIdDisplay.textContent = `你是 ${this.playerId} 号玩家`;
+                
+                // 监听整个游戏状态
+                db.ref(`games/${this.gameId}`).on('value', (snapshot) => {
+                    const gameData = snapshot.val();
+                    if (!gameData) return;
+                    this.gameState = gameData.state;
+                    this.playerData = gameData.players[this.playerId];
+                    this.allPlayers = gameData.players;
+                    this.renderAll();
+                });
+
+                this.dom.swapIdentitiesBtn.addEventListener('click', () => this.swapIdentities());
+            },
+            
+            renderAll() {
+                this.renderMyIdentities();
+                this.renderPlayerStatus();
+                this.renderPlayerList();
+                this.renderPersistentInfo();
+                this.renderActionPanel();
+            },
+            
+            renderMyIdentities() {
+                if (!this.playerData) return;
+                const [id1, id2] = this.playerData.identities;
+                const [orig1, orig2] = this.playerData.originalIdentities;
+                
+                let html = '';
+                const renderId = (id, orig, isDead) => {
+                    let classes = isDead ? 'dead-identity' : '';
+                    if (id === orig) return `<span class="${classes}">${id}</span>`;
+                    return `<span class="${classes} thief-copy" title="由盗贼复制而来">${id}</span>`;
+                };
+
+                html += renderId(id1, orig1, this.playerData.deaths >= 1);
+                html += ' + ';
+                html += renderId(id2, orig2, this.playerData.deaths >= 2);
+
+                this.dom.myIdentities.innerHTML = `<div>${html}</div>`;
+                if (this.playerData.deaths >= 2) {
+                    this.dom.myIdentities.parentElement.classList.add('dead-all');
+                }
+            },
+            
+            renderPlayerStatus() {
+                if (!this.gameState) return;
+                const phaseMap = {
+                    'SETUP': '等待游戏开始...',
+                    'NIGHT_START': '天黑请闭眼...',
+                    'WOLF_ACTION': '狼人请行动...',
+                    'WITCH_ACTION': '女巫请行动...',
+                    'SEER_ACTION': '预言家请行动...',
+                    'GUARD_ACTION': '守卫请行动...',
+                    'DAY': `天亮了，现在是第 ${this.gameState.round} 天`,
+                    'VOTING': `投票阶段`,
+                    'GAME_OVER': '游戏结束！'
+                };
+                this.dom.playerStatus.textContent = phaseMap[this.gameState.phase] || '进行中...';
+            },
+
+            renderPlayerList() {
+                let html = '';
+                for (const id in this.allPlayers) {
+                    const p = this.allPlayers[id];
+                    let status = p.isAlive ? '存活' : '出局';
+                    if (p.deaths === 1) status = '受伤';
+
+                    html += `<div class="player-list-item ${!p.isAlive ? 'dead-all' : p.deaths > 0 ? 'dead' : ''}">
+                                <span class="player-name">玩家 ${p.id}</span>
+                                <span>${status}</span>
+                             </div>`;
+                }
+                this.dom.playerList.innerHTML = html;
+            },
+            
+            renderPersistentInfo() {
+                let html = '';
+                // 狼人队友信息
+                if (this.hasRole('狼人') || this.hasRole('隐狼')) {
+                    const teammates = Object.values(this.allPlayers).filter(p => 
+                        p.id != this.playerId && (ROLES[p.identities[0]].faction === 'bad' || ROLES[p.identities[1]].faction === 'bad')
+                    ).map(p => `${p.id}号`).join(', ');
+                    html += `<div><strong>狼人队友:</strong> ${teammates || '无'}</div>`;
+                }
+                // 预言家查验结果
+                if (this.hasRole('预言家') && this.playerData.seerResults) {
+                    const results = Object.entries(this.playerData.seerResults)
+                        .map(([id, result]) => `${id}号(${result})`).join('; ');
+                    if (results) {
+                        html += `<div><strong>查验历史:</strong> ${results}</div>`;
+                    }
+                }
+                
+                if (html) {
+                    this.dom.persistentInfo.innerHTML = html;
+                    this.dom.persistentInfo.classList.remove('hidden');
+                } else {
+                    this.dom.persistentInfo.classList.add('hidden');
+                }
+            },
+            
+            renderActionPanel() {
+                if (!this.gameState || !this.playerData.isAlive) {
+                    this.dom.actionPanel.innerHTML = '';
+                    return;
+                }
+
+                const phase = this.gameState.phase;
+                let html = '';
+
+                if (phase === 'WOLF_ACTION' && (this.hasRole('狼人') || this.hasRole('隐狼'))) {
+                    html = this.getWolfActionHtml();
+                } else if (phase === 'SEER_ACTION' && this.hasRole('预言家')) {
+                    html = this.getSelectTargetHtml('查验', 'seerCheck');
+                }
+                // ... 其他角色行动界面 ...
+
+                this.dom.actionPanel.innerHTML = html;
+                this.attachActionListeners();
+            },
+
+            getWolfActionHtml() {
+                 let chatHtml = (this.playerData.wolfChat || []).map(msg => 
+                    `<div class="wolf-msg"><strong>${msg.senderId}号:</strong> ${msg.text}</div>`
+                 ).join('');
+
+                 let targetsHtml = Object.values(this.allPlayers)
+                    .filter(p => p.isAlive && p.id != this.playerId)
+                    .map(p => `<button class="action-btn" data-action="wolfVote" data-target="${p.id}">${p.id}号</button>`)
+                    .join('');
+
+                 return `<h3>狼人频道</h3>
+                         <div id="wolf-chat">${chatHtml}</div>
+                         <input type="text" id="wolf-chat-input" placeholder="和队友秘密沟通...">
+                         <button id="send-wolf-msg">发送</button>
+                         <h3>选择目标</h3>
+                         <div>${targetsHtml}</div>`;
+            },
+
+            getSelectTargetHtml(actionName, functionName) {
+                let targetsHtml = Object.values(this.allPlayers)
+                    .filter(p => p.isAlive && p.id != this.playerId)
+                    .map(p => `<button class="action-btn" data-action="${functionName}" data-target="${p.id}">${p.id}号</button>`)
+                    .join('');
+                return `<h3>请选择要${actionName}的目标</h3><div>${targetsHtml}</div>`;
+            },
+            
+            attachActionListeners() {
+                document.querySelectorAll('.action-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const target = e.currentTarget;
+                        const action = target.dataset.action;
+                        const targetId = target.dataset.target;
+                        if (this[action]) {
+                            this[action](targetId);
+                        }
+                    });
+                });
+                const sendWolfMsgBtn = document.getElementById('send-wolf-msg');
+                if (sendWolfMsgBtn) {
+                    sendWolfMsgBtn.addEventListener('click', () => this.sendWolfMessage());
+                }
+            },
+            
+            async swapIdentities() {
+                const currentIds = this.playerData.identities;
+                const newIds = [currentIds[1], currentIds[0]];
+                await db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).set(newIds);
+                this.dom.swapIdentitiesBtn.disabled = true;
+                this.dom.swapIdentitiesBtn.textContent = '已锁定';
+            },
+
+            hasRole(roleName) {
+                return this.playerData && this.playerData.identities.includes(roleName);
+            },
+            
+            async seerCheck(targetId) {
+                const targetPlayer = this.allPlayers[targetId];
+                const targetFactions = targetPlayer.originalIdentities.map(id => ROLES[id]);
+                
+                let result = '好人';
+                // 隐狼对预言家显示为好人
+                const isTrulyBad = targetFactions.some(f => f.faction === 'bad' && !f.isInvisible);
+                if (isTrulyBad) {
+                    result = '狼人';
+                }
+                
+                await db.ref(`games/${this.gameId}/players/${this.playerId}/seerResults/${targetId}`).set(result);
+                this.dom.actionPanel.innerHTML = `<p>你查验了 ${targetId} 号，结果是: <strong>${result}</strong></p>`;
+            },
+
+            async sendWolfMessage() {
+                const input = document.getElementById('wolf-chat-input');
+                const text = input.value.trim();
+                if (!text) return;
+
+                const message = {
+                    senderId: this.playerId,
+                    text: text,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+                
+                // 给所有狼人阵营的玩家推送消息
+                Object.values(this.allPlayers).forEach(p => {
+                    if (ROLES[p.originalIdentities[0]].faction === 'bad' || ROLES[p.originalIdentities[1]].faction === 'bad') {
+                        db.ref(`games/${this.gameId}/players/${p.id}/wolfChat`).push(message);
+                    }
+                });
+                input.value = '';
+            },
+
+            // --- 通用工具 ---
+            copyToClipboard(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('链接已复制到剪贴板！');
+                }, () => {
+                    alert('复制失败，请手动复制。');
+                });
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => App.init());
+    </script>
+</body>
+</html>

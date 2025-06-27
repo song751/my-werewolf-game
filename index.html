@@ -272,7 +272,7 @@ async createGame(){
 deal(pool){
  const max=5000,shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
  for(let t=0;t<max;t++){
-  const s=shuffle(pool.slice()),pairs=[],gold=0;let bad=false;
+  const s=shuffle(pool.slice()),pairs=[]; let gold = 0, bad = false;
   // 先处理盗贼复制
   const processed=[];
   for(let i=0;i<s.length;i+=2){

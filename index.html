@@ -272,7 +272,9 @@ async createGame(){
 deal(pool){
  const max=5000,shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
  for(let t=0;t<max;t++){
-  const s=shuffle(pool.slice()),pairs=[]; let gold = 0, bad = false;
+  const s=shuffle(pool.slice()),pairs=[];
+  let gold=0,bad=false;
+
   // 先处理盗贼复制
   const processed=[];
   for(let i=0;i<s.length;i+=2){
@@ -282,7 +284,6 @@ deal(pool){
    }else if(r2==='盗贼'&&r1!=='盗贼'){
     processed.push({role:r1,isThiefCopy:false},{role:r1,isThiefCopy:true});
    }else if(r1==='盗贼'&&r2==='盗贼'){
-    // 双盗贼=两个平民
     processed.push({role:'平民',isThiefCopy:true},{role:'平民',isThiefCopy:true});
    }else{
     processed.push({role:r1,isThiefCopy:false},{role:r2,isThiefCopy:false});
@@ -352,19 +353,19 @@ async updatePhase(phase,round=null){const up={phase};if(round!==null)up.round=ro
 async processNight(){
  const g=(await db.ref(`games/${this.gameId}`).once('value')).val(),na=g.nightActions||{},dead=[],msg=[];
  const double=na.wolfKill&&na.witchPoison&&na.wolfKill===na.witchPoison?na.wolfKill:null;
- if(double){dead.push([double,2]);msg.push(`☠️☠️ ${double}号同时被狼刀与毒杀`)}
+ if(double){dead.push({id:double,lost:2,cause:'POISON'});msg.push(`☠️☠️ ${double}号同时被狼刀与毒杀`)}
  else{
   if(na.wolfKill){const t=na.wolfKill,guarded=na.guard==t,cured=na.witchCure;
-   if(guarded&&cured){dead.push([t,1]);msg.push(`☠️ ${t}号被守护且被解救，反而死亡`)}
-   else if(!guarded&&!cured){dead.push([t,1]);msg.push(`☠️ ${t}号被狼人杀害`)}
+   if(guarded&&cured){dead.push({id:t,lost:1,cause:'NIGHT'});msg.push(`☠️ ${t}号被守护且被解救，反而死亡`)}
+   else if(!guarded&&!cured){dead.push({id:t,lost:1,cause:'NIGHT'});msg.push(`☠️ ${t}号被狼人杀害`)}
    else msg.push(`💫 ${t}号被攻击但存活`) }
   else msg.push('🌙 狼人未行动');
-  if(na.witchPoison){dead.push([na.witchPoison,1]);msg.push(`☠️ ${na.witchPoison}号被毒杀`)}
+  if(na.witchPoison){dead.push({id:na.witchPoison,lost:1,cause:'POISON'});msg.push(`☠️ ${na.witchPoison}号被毒杀`)}
  }
  if(!dead.length){msg=['🌟 平安夜'];await db.ref(`games/${this.gameId}/state/peaceNight`).transaction(s=>(s||0)+1)}
  else await db.ref(`games/${this.gameId}/state/peaceNight`).set(0);
  this.dom.nightResult.innerHTML=`<div style="background:rgba(255,255,255,.05);padding:20px;border-radius:15px;margin:20px 0;"><h3>🌅 夜晚结果</h3><div style="font-size:18px;line-height:2;">${msg.join('<br>')}</div></div>`;this.dom.nightResult.classList.remove('hidden');
- for(const [id,lost] of dead)await this.kill(id,'NIGHT',g.players,lost);
+ for(const d of dead)await this.kill(d.id,d.cause,g.players,d.lost);
  const live=await this.checkWin();if(live){this.updatePhase('DAY',g.state.round+1)}
 },
 
@@ -392,7 +393,7 @@ renderStatus(){
 },
 renderList(){
  let h='';Object.values(this.allPlayers).forEach(p=>{const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
-  h+=`<div class="player-list-item ${!p.isAlive?'dead-all':p.deaths?'dead':''}"><span><strong>${p.id}号</strong> <small>${p.isExposedIdiot?'🤪 白痴':' '}</small></span><span>${heart}</span></div>`});this.dom.playerList.innerHTML=h;
+  h+=`<div class="player-list-item ${!p.isAlive?'dead-all':p.deaths?'dead':''}"><span><strong>${p.id}号</strong> <small>${p.isExposedIdiot?'🤪 白痴':''}</small></span><span>${heart}</span></div>`});this.dom.playerList.innerHTML=h;
 },
 renderPersist(){
  let h='';if(this.canSeeWolf()){const mates=Object.values(this.allPlayers).filter(p=>p.isAlive&&p.id!=this.playerId&&['狼人','隐狼'].includes(this.getActiveRole(p))).map(p=>`${p.id}号`).join('、')||'无';h+=`<div style="padding:15px;background:rgba(233,69,96,.1);border-radius:12px;margin:10px 0;"><strong>🐺 狼队友:</strong> ${mates}</div>`}
@@ -520,24 +521,36 @@ panelSeer(){
 seerSkip(){db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_SEER_ACTION`).set(true);this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>'},
 async seer(id){
  const tp=this.allPlayers[id];
- // 检查该玩家原始身份中是否有可见坏人
- const visBad=tp.originalIdentities.some(i=>ROLES[i.role].faction==='bad'&&!ROLES[i.role].isInvisible);
- // 检查是否有隐狼身份
- const hasInvis=tp.originalIdentities.some(i=>i.role==='隐狼');
- // 检查场上是否有其他可见狼人
- const otherWolfExists=Object.values(this.allPlayers).some(p=>
-  p.id!=id&&p.isAlive&&p.originalIdentities.some(i=>ROLES[i.role].faction==='bad'&&!ROLES[i.role].isInvisible)
- );
- 
+
+ /* ---------- 新隐狼判定逻辑 ---------- */
+ const rolesAliveOfPlayer=(p)=>{
+  const arr=[];
+  if(p.deaths<=0)arr.push(p.originalIdentities[0]);
+  if(p.deaths<=1)arr.push(p.originalIdentities[1]);
+  return arr;
+ };
+ const targetCardsAlive=rolesAliveOfPlayer(tp);
+ const hasVisibleBad=targetCardsAlive.some(i=>ROLES[i.role].faction==='bad'&&!ROLES[i.role].isInvisible);
+ const hasInvisWolf=targetCardsAlive.some(i=>i.role==='隐狼');
+
+ // 判定场上是否还有其它活着的狼人阵营身份牌
+ let otherAliveBad=false;
+ Object.values(this.allPlayers).forEach(p=>{
+  if(p.id==id)return;
+  rolesAliveOfPlayer(p).forEach(card=>{
+    if(ROLES[card.role].faction==='bad')otherAliveBad=true;
+  });
+ });
+
  let res;
- if(visBad){
-  res='狼人'; // 有可见坏人直接显示狼人
- }else if(hasInvis&&!otherWolfExists){
-  res='狼人'; // 隐狼且无其他狼人时显示狼人
+ if(hasVisibleBad){               // ① 目标自身有可被看到的狼人身份
+   res='狼人';
+ }else if(hasInvisWolf && !otherAliveBad){ // ② 目标仅剩隐狼且已无其他活坏身份
+   res='狼人';
  }else{
-  res='好人'; // 其他情况显示好人
+   res='好人';
  }
- 
+
  const results=this.getSkillState('seerResults')||{};
  results[id]=res;
  await this.setSkillState('seerResults',results);
@@ -598,7 +611,7 @@ async witch(type,target){
 /* --- 骑士 --- */
 panelKnight(){
  const btns=Object.values(this.allPlayers).filter(p=>p.isAlive&&p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">⚔️ ${p.id}号</button>`).join('');
- this.dom.actionPanel.innerHTML=`<h3>⚔️ 决斗</h3><p style="font-size:14px;color:var(--warning)">若目标为狼人阵营则其死亡并进入夜晚，否则你死亡</p><div>${btns}</div><div style="margin-top:10px;"><button id="knight-skip" class="control-btn">⏭️ 跳过</button></div>`;
+ this.dom.actionPanel.innerHTML=`<h3>⚔️ 决斗</h3><p style="font-size:14px;color:var(--warning)">若目标为狼人阵营则其死亡并进入夜晚，否则骑士死亡，发言继续</p><div>${btns}</div><div style="margin-top:10px;"><button id="knight-skip" class="control-btn">⏭️ 跳过</button></div>`;
  document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>this.knight(b.dataset.id));this.$('knight-skip').onclick=()=>this.knightSkip();
 },
 knightSkip(){db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_KNIGHT_ACTION`).set(true);this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>'},

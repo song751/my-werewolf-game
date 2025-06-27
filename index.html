@@ -145,8 +145,17 @@
         #wolf-chat-input {
             width: calc(100% - 90px);
         }
-        .wolf-msg { margin-bottom: 5px; }
+        .wolf-msg { 
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 3px;
+        }
         .wolf-msg strong { color: var(--accent-color); }
+        .wolf-msg.vote-msg {
+            background-color: rgba(233, 69, 96, 0.1);
+            border-left: 3px solid var(--accent-color);
+            padding-left: 10px;
+        }
         .swap-controls {
             background-color: rgba(233, 69, 96, 0.1);
             border: 2px solid var(--accent-color);
@@ -263,6 +272,25 @@
         .kill-btn:hover {
             background-color: #ff6666;
         }
+        .night-result {
+            background-color: rgba(233, 69, 96, 0.2);
+            border: 2px solid var(--accent-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .wolf-votes-summary {
+            background-color: rgba(255, 193, 7, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .waiting-msg {
+            color: #FFC107;
+            font-style: italic;
+            text-align: center;
+            padding: 10px;
+        }
     </style>
 </head>
 <body>
@@ -296,8 +324,8 @@
                 <button class="host-action-btn" data-action="WITCH_ACTION">女巫行动</button>
                 <button class="host-action-btn" data-action="SEER_ACTION">预言家行动</button>
                 <button class="host-action-btn" data-action="GUARD_ACTION">守卫行动</button>
-                <button id="execute-night-actions-btn">执行夜晚行动结果</button>
                 <div id="action-feedback-container"></div>
+                <div id="night-result-container" class="hidden"></div>
                 <hr>
                 <h3>游戏管理</h3>
                 <button id="reveal-all-btn">复盘：显示所有身份</button>
@@ -388,12 +416,14 @@
             gameState: null,
             isHost: false,
             wolfChatListener: null,
+            wolfVotesListener: null,
             currentIdentityOrder: null,
             isPreviewSwapped: false,
             allPlayers: {},
             currentWolfVote: null,
             actionCompletedListeners: {},
             nightActions: {},
+            allWolfVotes: {},
 
             init() {
                 this.cacheDOMElements();
@@ -442,7 +472,7 @@
                     readyStatus: document.getElementById('ready-status'),
                     actionFeedbackContainer: document.getElementById('action-feedback-container'),
                     wolfChatSection: document.getElementById('wolf-chat-section'),
-                    executeNightActionsBtn: document.getElementById('execute-night-actions-btn'),
+                    nightResultContainer: document.getElementById('night-result-container'),
                 };
             },
             
@@ -458,12 +488,11 @@
                 this.renderRoleSetup();
                 this.dom.createGameBtn.addEventListener('click', () => this.createGame());
                 this.dom.startGameBtn.addEventListener('click', () => this.startGame());
-                this.dom.nightBtn.addEventListener('click', () => this.setGameState({ phase: 'NIGHT_START' }));
-                this.dom.dayBtn.addEventListener('click', () => this.setGameState({ phase: 'DAY' }));
+                this.dom.nightBtn.addEventListener('click', () => this.nightStart());
+                this.dom.dayBtn.addEventListener('click', () => this.dayStart());
                 this.dom.hostActionBtns.forEach(btn => {
                     btn.addEventListener('click', () => this.triggerRoleAction(btn.dataset.action));
                 });
-                this.dom.executeNightActionsBtn.addEventListener('click', () => this.executeNightActions());
             },
 
             renderRoleSetup() {
@@ -547,7 +576,8 @@
                     config: { playerCount },
                     wolfChat: {},
                     actionCompleted: {},
-                    nightActions: {}
+                    nightActions: {},
+                    wolfVotes: {}
                 };
 
                 await db.ref(`games/${this.gameId}`).set(newGame);
@@ -559,30 +589,32 @@
             },
             
             dealAndCheck(roles) {
-                // 先创建一个角色数组的副本
-                let processedRoles = [];
-                let thiefPairs = []; // 记录盗贼配对信息
+                // 先洗牌所有角色
+                let shuffled = [...roles].sort(() => 0.5 - Math.random());
                 
-                // 预处理：找到所有盗贼并记录它们的配对
-                let tempPairs = [];
-                for (let i = 0; i < roles.length; i += 2) {
-                    tempPairs.push([roles[i], roles[i + 1]]);
+                // 将洗牌后的角色分成对
+                let pairs = [];
+                for (let i = 0; i < shuffled.length; i += 2) {
+                    pairs.push([shuffled[i], shuffled[i + 1]]);
                 }
                 
-                // 洗牌
-                tempPairs = tempPairs.sort(() => 0.5 - Math.random());
-                
-                // 处理盗贼复制
+                // 处理盗贼：将每对中的盗贼替换为其配对角色的复制
                 let finalPairs = [];
-                for (let pair of tempPairs) {
+                for (let pair of pairs) {
                     let newPair = [...pair];
                     
-                    // 检查是否有盗贼
+                    // 如果第一个是盗贼，复制第二个
                     if (pair[0] === '盗贼') {
                         newPair[0] = { role: pair[1], isThiefCopy: true };
-                    } else if (pair[1] === '盗贼') {
+                        newPair[1] = { role: pair[1], isThiefCopy: false };
+                    }
+                    // 如果第二个是盗贼，复制第一个
+                    else if (pair[1] === '盗贼') {
+                        newPair[0] = { role: pair[0], isThiefCopy: false };
                         newPair[1] = { role: pair[0], isThiefCopy: true };
-                    } else {
+                    }
+                    // 都不是盗贼
+                    else {
                         newPair[0] = { role: pair[0], isThiefCopy: false };
                         newPair[1] = { role: pair[1], isThiefCopy: false };
                     }
@@ -762,6 +794,28 @@
                 this.dom.startGameBtn.disabled = true;
             },
 
+            async nightStart() {
+                // 清空夜晚行动记录
+                await db.ref(`games/${this.gameId}`).update({
+                    nightActions: {},
+                    wolfVotes: {},
+                    actionCompleted: {}
+                });
+                
+                const round = this.gameState.round || 1;
+                this.setGameState({ phase: 'NIGHT_START', round: round });
+                this.dom.nightResultContainer.classList.add('hidden');
+            },
+
+            async dayStart() {
+                // 执行夜晚行动
+                await this.executeNightActions();
+                
+                // 更新游戏状态到白天
+                const newRound = (this.gameState.round || 1) + 1;
+                this.setGameState({ phase: 'DAY', round: newRound });
+            },
+
             triggerRoleAction(action) {
                 // 设置游戏状态
                 this.setGameState({ phase: action });
@@ -769,15 +823,15 @@
                 // 重置该行动的完成状态
                 db.ref(`games/${this.gameId}/actionCompleted/${action}`).remove();
                 
-                // 清除之前的夜晚行动记录
-                if (action === 'WOLF_ACTION') {
-                    db.ref(`games/${this.gameId}/wolfVotes`).remove();
-                }
-                
                 // 显示等待状态
                 const waitingDisplay = document.createElement('div');
                 waitingDisplay.className = 'action-waiting';
-                waitingDisplay.innerHTML = `<p>等待玩家行动...</p>`;
+                
+                // 找出有对应身份的玩家
+                const playersWithRole = this.getPlayersWithActiveRole(action);
+                const playersList = playersWithRole.map(p => `${p.id}号`).join(', ');
+                
+                waitingDisplay.innerHTML = `<p>等待玩家行动...</p><p>可行动玩家：${playersList || '无'}</p>`;
                 this.dom.actionFeedbackContainer.innerHTML = '';
                 this.dom.actionFeedbackContainer.appendChild(waitingDisplay);
                 
@@ -794,6 +848,42 @@
                         delete this.actionCompletedListeners[action];
                     }
                 });
+            },
+
+            getPlayersWithActiveRole(action) {
+                const roleMap = {
+                    'WOLF_ACTION': ['狼人', '隐狼'],
+                    'WITCH_ACTION': ['女巫'],
+                    'SEER_ACTION': ['预言家'],
+                    'GUARD_ACTION': ['守卫']
+                };
+                
+                const roles = roleMap[action] || [];
+                const players = [];
+                
+                for (const id in this.allPlayers) {
+                    const player = this.allPlayers[id];
+                    if (!player.isAlive) continue;
+                    
+                    const activeRole = this.getPlayerActiveRole(player);
+                    if (roles.includes(activeRole)) {
+                        players.push(player);
+                    }
+                }
+                
+                return players;
+            },
+
+            getPlayerActiveRole(player) {
+                const deaths = player.deaths || 0;
+                if (deaths === 0) {
+                    const id = player.identities[0];
+                    return id.role || id;
+                } else if (deaths === 1) {
+                    const id = player.identities[1];
+                    return id.role || id;
+                }
+                return null;
             },
 
             checkActionCompleted(completed) {
@@ -836,11 +926,19 @@
                     
                     // 找出票数最多的目标
                     let maxVotes = 0;
+                    let targets = [];
                     for (const [target, votes] of Object.entries(voteCount)) {
                         if (votes > maxVotes) {
                             maxVotes = votes;
-                            wolfTarget = target;
+                            targets = [target];
+                        } else if (votes === maxVotes) {
+                            targets.push(target);
                         }
+                    }
+                    
+                    // 如果有多个目标票数相同，随机选择一个
+                    if (targets.length > 0) {
+                        wolfTarget = targets[Math.floor(Math.random() * targets.length)];
                     }
                 }
                 
@@ -851,6 +949,7 @@
                 
                 // 执行击杀
                 const toKill = [];
+                let resultMessage = '';
                 
                 // 狼人击杀
                 if (wolfTarget) {
@@ -860,16 +959,22 @@
                     if (isProtected && isCured) {
                         // 同时被守护和救治，反而死亡
                         toKill.push(wolfTarget);
+                        resultMessage += `${wolfTarget}号被狼人击杀（同时被守护和救治）\n`;
                     } else if (!isProtected && !isCured) {
                         // 既没有被守护也没有被救治
                         toKill.push(wolfTarget);
+                        resultMessage += `${wolfTarget}号被狼人击杀\n`;
+                    } else {
+                        resultMessage += `${wolfTarget}号被狼人选中但未死亡（${isProtected ? '被守护' : '被救治'}）\n`;
                     }
-                    // 其他情况（只有守护或只有救治）不会死亡
+                } else {
+                    resultMessage += '狼人未击杀任何人\n';
                 }
                 
                 // 女巫毒杀
                 if (witchPoison) {
                     toKill.push(witchPoison);
+                    resultMessage += `${witchPoison}号被女巫毒死\n`;
                 }
                 
                 // 执行死亡
@@ -883,14 +988,20 @@
                     }
                 }
                 
-                // 清空夜晚行动记录
-                updates['nightActions'] = {};
-                updates['wolfVotes'] = {};
-                updates['actionCompleted'] = {};
+                if (toKill.length === 0) {
+                    resultMessage = '平安夜，无人死亡';
+                }
                 
                 await db.ref(`games/${this.gameId}`).update(updates);
                 
-                alert(`夜晚行动执行完毕！\n击杀目标：${toKill.length > 0 ? toKill.join(', ') + '号' : '无人死亡（平安夜）'}`);
+                // 显示结果
+                this.dom.nightResultContainer.innerHTML = `
+                    <div class="night-result">
+                        <h3>夜晚行动结果</h3>
+                        <pre>${resultMessage}</pre>
+                    </div>
+                `;
+                this.dom.nightResultContainer.classList.remove('hidden');
             },
             
             setGameState(newState) {
@@ -1124,6 +1235,22 @@
                 const activeIdentity = this.getActiveIdentity();
                 return activeIdentity === roleName;
             },
+
+            canPerformAction(phase) {
+                if (!this.playerData || !this.playerData.isAlive) return false;
+                
+                const roleMap = {
+                    'WOLF_ACTION': ['狼人', '隐狼'],
+                    'WITCH_ACTION': ['女巫'],
+                    'SEER_ACTION': ['预言家'],
+                    'GUARD_ACTION': ['守卫']
+                };
+                
+                const allowedRoles = roleMap[phase] || [];
+                const activeRole = this.getActiveIdentity();
+                
+                return allowedRoles.includes(activeRole);
+            },
             
             renderActionPanel() {
                 if (!this.gameState || !this.playerData) {
@@ -1141,6 +1268,7 @@
                     this.dom.wolfChatSection.innerHTML = '';
                     this.dom.wolfChatSection.classList.add('hidden');
                     this.stopListeningToWolfChat();
+                    this.stopListeningToWolfVotes();
                 }
 
                 let html = '';
@@ -1149,55 +1277,110 @@
                 // 狼人行动
                 if (phase === 'WOLF_ACTION' && this.canSeeWolfInfo()) {
                     this.renderWolfChat();
-                    if (this.playerData.isAlive) {
+                    if (this.canPerformAction(phase)) {
                         html = this.getWolfActionHtml();
                         hasAction = true;
                     }
                 } 
                 // 预言家行动
-                else if (phase === 'SEER_ACTION' && this.hasActiveRole('预言家') && this.playerData.isAlive) {
+                else if (phase === 'SEER_ACTION' && this.canPerformAction(phase)) {
                     html = this.getSelectTargetHtml('查验', 'seerCheck');
                     hasAction = true;
                 }
                 // 守卫行动
-                else if (phase === 'GUARD_ACTION' && this.hasActiveRole('守卫') && this.playerData.isAlive) {
+                else if (phase === 'GUARD_ACTION' && this.canPerformAction(phase)) {
                     html = this.getGuardActionHtml();
                     hasAction = true;
                 }
                 // 女巫行动
-                else if (phase === 'WITCH_ACTION' && this.hasActiveRole('女巫') && this.playerData.isAlive) {
+                else if (phase === 'WITCH_ACTION' && this.canPerformAction(phase)) {
                     html = this.getWitchActionHtml();
                     hasAction = true;
                 }
 
-                // 如果没有可执行的行动，显示"行动完成"按钮
+                // 如果是行动阶段但无法执行行动，显示等待信息
                 if (!hasAction && ['WOLF_ACTION', 'WITCH_ACTION', 'SEER_ACTION', 'GUARD_ACTION'].includes(phase)) {
-                    html = `<div class="action-feedback">
-                        <p>你当前无法执行此行动</p>
-                        <button class="action-complete-btn" onclick="App.completeAction('${phase}')">确认完成</button>
-                    </div>`;
+                    // 只有拥有对应身份的玩家才能看到完成按钮
+                    if (this.playerData.isAlive && this.shouldShowCompleteButton(phase)) {
+                        html = `<div class="action-feedback">
+                            <p>你当前无法执行此行动</p>
+                            <button class="action-complete-btn" onclick="App.completeAction('${phase}')">确认完成</button>
+                        </div>`;
+                    } else {
+                        html = `<div class="waiting-msg">等待其他玩家行动...</div>`;
+                    }
                 }
 
                 this.dom.actionPanel.innerHTML = html;
                 this.attachActionListeners();
             },
 
+            shouldShowCompleteButton(phase) {
+                // 检查玩家是否有对应身份（即使不是当前活跃身份）
+                const roleMap = {
+                    'WOLF_ACTION': ['狼人', '隐狼'],
+                    'WITCH_ACTION': ['女巫'],
+                    'SEER_ACTION': ['预言家'],
+                    'GUARD_ACTION': ['守卫']
+                };
+                
+                const allowedRoles = roleMap[phase] || [];
+                
+                // 检查两个身份
+                for (const identity of this.playerData.identities) {
+                    const role = identity.role || identity;
+                    if (allowedRoles.includes(role)) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            },
+
             renderWolfChat() {
                 if (!this.canSeeWolfInfo()) return;
                 
                 this.dom.wolfChatSection.classList.remove('hidden');
-                this.dom.wolfChatSection.innerHTML = `
+                let chatHTML = `
                     <div class="wolf-chat-container">
                         <h3>狼人频道</h3>
                         <div id="wolf-chat"></div>
                         <div>
                             <input type="text" id="wolf-chat-input" placeholder="和队友秘密沟通...">
-                            <button onclick="App.sendWolfMessage()">发送</button>
+                            <button id="send-wolf-msg">发送</button>
                         </div>
-                    </div>
                 `;
                 
+                // 如果当前是狼人行动阶段，显示投票情况
+                if (this.gameState.phase === 'WOLF_ACTION') {
+                    chatHTML += `<div id="wolf-votes-summary" class="wolf-votes-summary"></div>`;
+                }
+                
+                chatHTML += '</div>';
+                
+                this.dom.wolfChatSection.innerHTML = chatHTML;
+                
                 this.listenToWolfChat();
+                if (this.gameState.phase === 'WOLF_ACTION') {
+                    this.listenToWolfVotes();
+                }
+                
+                // 绑定发送消息事件
+                const sendBtn = document.getElementById('send-wolf-msg');
+                const input = document.getElementById('wolf-chat-input');
+                
+                if (sendBtn) {
+                    sendBtn.addEventListener('click', () => this.sendWolfMessage());
+                }
+                
+                if (input) {
+                    input.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.sendWolfMessage();
+                        }
+                    });
+                }
             },
 
             listenToWolfChat() {
@@ -1208,27 +1391,67 @@
                     const chatDiv = document.getElementById('wolf-chat');
                     if (!chatDiv) return;
                     
-                    // 保存当前滚动位置
                     const wasAtBottom = chatDiv.scrollHeight - chatDiv.clientHeight <= chatDiv.scrollTop + 1;
                     
                     let html = '';
                     const sortedMessages = Object.values(messages).sort((a, b) => a.timestamp - b.timestamp);
                     sortedMessages.forEach(msg => {
-                        html += `<div class="wolf-msg"><strong>${msg.senderId}号:</strong> ${msg.text}</div>`;
+                        const msgClass = msg.isVote ? 'wolf-msg vote-msg' : 'wolf-msg';
+                        html += `<div class="${msgClass}"><strong>${msg.senderId}号:</strong> ${msg.text}</div>`;
                     });
-                    chatDiv.innerHTML = html;
                     
-                    // 如果之前在底部，保持在底部
-                    if (wasAtBottom || sortedMessages.length === 0) {
+                    chatDiv.innerHTML = html || '<div class="waiting-msg">暂无消息</div>';
+                    
+                    if (wasAtBottom) {
                         chatDiv.scrollTop = chatDiv.scrollHeight;
                     }
                 });
+            },
+
+            listenToWolfVotes() {
+                if (this.wolfVotesListener) return;
+                
+                this.wolfVotesListener = db.ref(`games/${this.gameId}/wolfVotes`).on('value', (snapshot) => {
+                    this.allWolfVotes = snapshot.val() || {};
+                    this.updateWolfVotesSummary();
+                });
+            },
+
+            updateWolfVotesSummary() {
+                const summaryDiv = document.getElementById('wolf-votes-summary');
+                if (!summaryDiv) return;
+                
+                if (Object.keys(this.allWolfVotes).length === 0) {
+                    summaryDiv.innerHTML = '<p>暂无投票</p>';
+                    return;
+                }
+                
+                // 统计投票
+                const voteCount = {};
+                Object.entries(this.allWolfVotes).forEach(([voter, target]) => {
+                    voteCount[target] = voteCount[target] || [];
+                    voteCount[target].push(voter);
+                });
+                
+                let html = '<h4>当前投票情况：</h4>';
+                for (const [target, voters] of Object.entries(voteCount)) {
+                    html += `<p>${target}号: ${voters.map(v => v + '号').join(', ')} (${voters.length}票)</p>`;
+                }
+                
+                summaryDiv.innerHTML = html;
             },
 
             stopListeningToWolfChat() {
                 if (this.wolfChatListener) {
                     db.ref(`games/${this.gameId}/wolfChat`).off('value', this.wolfChatListener);
                     this.wolfChatListener = null;
+                }
+            },
+
+            stopListeningToWolfVotes() {
+                if (this.wolfVotesListener) {
+                    db.ref(`games/${this.gameId}/wolfVotes`).off('value', this.wolfVotesListener);
+                    this.wolfVotesListener = null;
                 }
             },
 

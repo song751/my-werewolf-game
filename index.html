@@ -530,6 +530,28 @@ const ROLES={
 const DEFAULT_SETUP={'平民':6,'守卫':1,'白痴':1,'预言家':1,'骑士':1,'女巫':1,'猎人':1,'狼人':2,'隐狼':1,'盗贼':1};
 const FORBIDDEN=[['预言家','狼人'],['预言家','隐狼'],['盗贼','狼人'],['盗贼','隐狼'],['隐狼','狼人'],['隐狼','隐狼']];
 
+/* ========== 统一的工具函数 ========== */
+function shouldAct(player, phase, allPlayers){
+  if(!player.isAlive) return false;
+  const activeRole = App.getActiveRole(player);
+  const map = {
+    WOLF_ACTION : ['狼人','隐狼'],
+    SEER_ACTION : ['预言家'],
+    GUARD_ACTION: ['守卫'],
+    WITCH_ACTION: ['女巫'],
+    KNIGHT_ACTION:['骑士'],
+    HUNTER_ACTION:['猎人']
+  };
+  if(!map[phase]?.includes(activeRole)) return false;
+
+  // 隐狼只有在场上没有存活"明狼"时才行动
+  if(phase==='WOLF_ACTION' && activeRole==='隐狼'){
+    return !Object.values(allPlayers).some(pp =>
+       pp.isAlive && pp.id!==player.id && App.getActiveRole(pp)==='狼人');
+  }
+  return true;
+}
+
 /* ===================== 3. App 主对象 ===================== */
 const App={
 /* ---------- 基础属性 ---------- */
@@ -568,7 +590,10 @@ cacheDom(){
 showView(viewName){
  this.dom.hostView.classList.add('hidden');
  this.dom.playerView.classList.add('hidden');
- if(viewName==='host') this.dom.hostView.classList.remove('hidden');
+ if(viewName==='host') {
+    this.dom.hostView.classList.remove('hidden');
+    this.stopWolfListeners(); // 避免主持端误听狼人频道
+ }
  else this.dom.playerView.classList.remove('hidden');
 },
 
@@ -754,9 +779,7 @@ updateNightActionStatus(actionCompleted) {
   if (!currentAction) return;
   
   // 找出应该行动的玩家
-  const shouldActPlayers = Object.values(this.allPlayers).filter(p => {
-    return p.isAlive && this.canPerformAction.call({playerData: p, playerId: p.id, allPlayers: this.allPlayers}, phase);
-  });
+  const shouldActPlayers = Object.values(this.allPlayers).filter(p => shouldAct(p, phase, this.allPlayers));
   
   const completedPlayers = shouldActPlayers.filter(p => actionCompleted[`${p.id}_${phase}`]);
   
@@ -1027,18 +1050,7 @@ canSeeWolfChat(){
  return r==='狼人'||r==='隐狼';
 },
 canPerformAction(phase){
- if(!this.playerData.isAlive)return false;
- const r=this.getActiveRole(this.playerData);
- const phaseMap={
-  WOLF_ACTION:['狼人','隐狼'],SEER_ACTION:['预言家'],GUARD_ACTION:['守卫'],WITCH_ACTION:['女巫'],
-  KNIGHT_ACTION:['骑士'],HUNTER_ACTION:['猎人']
- };
- if(!phaseMap[phase]?.includes(r))return false;
- if(phase==='WOLF_ACTION'&&r==='隐狼'){
-  const otherWolfExists=Object.values(this.allPlayers).some(p=>p.isAlive&&p.id!=this.playerId&&this.getActiveRole(p)==='狼人');
-  return !otherWolfExists;
- }
- return true;
+ return shouldAct(this.playerData, phase, this.allPlayers);
 },
 hasRoleInPair(roleName){
  return this.playerData.originalIdentities.some(id=>id.role===roleName);
@@ -1068,7 +1080,12 @@ renderActionPanel(){
  if(!this.playerData.isAlive && phase !== 'HUNTER_ACTION') return;
 
  switch(phase){
-  case 'DAY': return this.getActiveRole(this.playerData)==='骑士'?this.renderKnightPanel():'';
+  case 'DAY': 
+    // 白痴被放逐后不能再决斗
+    if(this.getActiveRole(this.playerData)==='骑士' && !this.playerData.isExposedIdiot) {
+      return this.renderKnightPanel();
+    }
+    return '';
   case 'WOLF_ACTION': return this.canPerformAction('WOLF_ACTION')?this.renderWolfPanel():this.renderWaitingPanel(phase);
   case 'SEER_ACTION': return this.canPerformAction('SEER_ACTION')?this.renderSeerPanel():this.renderWaitingPanel(phase);
   case 'GUARD_ACTION': return this.canPerformAction('GUARD_ACTION')?this.renderGuardPanel():this.renderWaitingPanel(phase);
@@ -1154,8 +1171,10 @@ initWolfChat(){
    <div id="wolf-votes-summary"></div>
  </div>`;
  
- // 设置聊天监听器
- this.wolfChatListener=db.ref(`games/${this.gameId}/wolfChat`).on('value',s=>this.updateWolfChat(s.val()));
+ // 设置聊天监听器 - 修复：使用 child_added
+ this.wolfChatListener = db.ref(`games/${this.gameId}/wolfChat`)
+    .orderByChild('timestamp')
+    .on('child_added', snap => this.appendWolfMsg(snap.val()));
  this.wolfVotesListener=db.ref(`games/${this.gameId}/wolfVotes`).on('value',s=>this.updateWolfVotes(s.val()));
  
  // 绑定发送按钮
@@ -1165,12 +1184,12 @@ initWolfChat(){
    if(sendBtn && input) {
      sendBtn.onclick = () => {
        if(!input.value.trim()) return;
-       const msg = {
+       // 修复：直接写入本地时间戳
+       db.ref(`games/${this.gameId}/wolfChat`).push().set({
          senderId: this.playerId,
          text: input.value.trim(),
-         timestamp: firebase.database.ServerValue.TIMESTAMP
-       };
-       db.ref(`games/${this.gameId}/wolfChat`).push(msg).then(() => {
+         timestamp: Date.now()
+       }).then(() => {
          input.value = '';
        }).catch(err => {
          console.error('发送消息失败:', err);
@@ -1189,12 +1208,15 @@ initWolfChat(){
  }, 100);
 },
 
-updateWolfChat(chatData){
- const node=this.$('wolf-chat');if(!node)return;
- const msgs=Object.values(chatData||{}).sort((a,b)=>a.timestamp-b.timestamp);
- node.innerHTML=msgs.map(m=>`<div style="margin:5px 0;"><strong>${m.senderId}号:</strong> ${m.text}</div>`).join('');
- node.scrollTop=node.scrollHeight;
+// 新增：追加单条消息
+appendWolfMsg(msg){
+  const node = this.$('wolf-chat'); 
+  if(!node) return;
+  node.insertAdjacentHTML('beforeend',
+    `<div style="margin:5px 0;"><strong>${msg.senderId}号:</strong> ${msg.text}</div>`);
+  node.scrollTop = node.scrollHeight;
 },
+
 updateWolfVotes(votesData){
  const summary=this.$('wolf-votes-summary');if(!summary)return;
  const votes=votesData||{};
@@ -1212,7 +1234,7 @@ updateWolfVotes(votesData){
 
 stopWolfListeners(){
  if(this.wolfChatListener){
-   db.ref(`games/${this.gameId}/wolfChat`).off('value',this.wolfChatListener);
+   db.ref(`games/${this.gameId}/wolfChat`).off('child_added',this.wolfChatListener);
    this.wolfChatListener=null;
  }
  if(this.wolfVotesListener){
@@ -1220,6 +1242,7 @@ stopWolfListeners(){
    this.wolfVotesListener=null;
  }
  this.dom.wolfChatArea.classList.add('hidden');
+ this.dom.wolfChatArea.innerHTML = ''; // 清空内容
 },
 
 renderSeerPanel(){
@@ -1255,6 +1278,11 @@ renderGuardPanel(){
  document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>this.guardProtect(b.dataset.id));
 },
 async guardProtect(targetId){
+ // 后台兜底检查
+ if(targetId == this.playerData.lastGuardTarget) {
+    alert('不能连续守护同一个人！');
+    return;
+ }
  await db.ref(`games/${this.gameId}/nightActions/guard`).set(targetId);
  await db.ref(`games/${this.gameId}/players/${this.playerId}/lastGuardTarget`).set(targetId);
  await db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_GUARD_ACTION`).set(true);
@@ -1326,6 +1354,8 @@ async knightDuel(targetId){
  const targetPlayer=this.allPlayers[targetId];
  const isBadFaction=targetPlayer.originalIdentities.some(i=>ROLES[i.role].faction==='bad');
  
+ await db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_KNIGHT_ACTION`).set(true);
+ 
  if(isBadFaction){
     await this.kill(targetId,'DUEL');
     await this.updatePhase('NIGHT_START');
@@ -1351,6 +1381,9 @@ renderHunterPanel(){
 },
 async hunterShoot(targetId){
  if(targetId && !confirm(`确定要带走 ${targetId}号 吗？`)) return;
+ 
+ await db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_HUNTER_ACTION`).set(true);
+ 
  if(targetId) await this.kill(targetId,'SHOT');
  await this.updatePhase('DAY');
  this.dom.actionPanel.innerHTML=`<div class="action-feedback"><p style="font-size:20px;">🔫 猎人行动结束</p></div>`;

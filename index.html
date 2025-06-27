@@ -3,18 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官</title>
+<title>双身份狼人杀 - 电子法官 (修复版)</title>
 
 <style>
-:root{--bg:#1a1a2e;--card:#16213e;--border:#0f3460;--accent:#e94560;
---text:#eaeaea;--success:#00d9ff;--danger:#ff006e;--warning:#ffb700;
---gradient:linear-gradient(135deg,#667eea 0%,#764ba2 100%);--shadow:0 10px 30px rgba(0,0,0,.3);
---font-main:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+:root{--bg:#1a1a2e;--card:#16213e;--border:#0f3460;--accent:#e94560;--text:#eaeaea;--success:#00d9ff;--danger:#ff006e;--warning:#ffb700;--gradient:linear-gradient(135deg,#667eea 0%,#764ba2 100%);--shadow:0 10px 30px rgba(0,0,0,.3);--font-main:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-main);line-height:1.6;min-height:100vh}
-body{display:flex;justify-content:center;align-items:flex-start;padding:20px;background-image:
- radial-gradient(circle at 20% 50%,rgba(233,69,96,.1)0%,transparent 50%),
- radial-gradient(circle at 80% 80%,rgba(0,217,255,.1)0%,transparent 50%)}
+body{display:flex;justify-content:center;align-items:flex-start;padding:20px;background-image:radial-gradient(circle at 20% 50%,rgba(233,69,96,.1)0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(0,217,255,.1)0%,transparent 50%)}
 #app{width:100%;max-width:900px;background:var(--card);border-radius:20px;padding:30px;box-shadow:var(--shadow);border:1px solid var(--border);animation:fadeIn .5s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 h1,h2,h3{color:var(--text);margin-bottom:20px;text-align:center;letter-spacing:1px}
@@ -52,29 +47,35 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 #wolf-chat::-webkit-scrollbar-thumb{background:var(--accent);border-radius:10px}
 #wolf-input{width:calc(100% - 100px);margin-right:10px;padding:12px;border-radius:10px;border:2px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)}
 .vote-msg{color:var(--warning);font-weight:600}
-.game-over-banner{padding:40px;text-align:center;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:20px;font-size:28px;font-weight:bold;animation:pulse 2s infinite}
+.game-over-banner{padding:40px;text-align:center;background:var(--gradient);color:#fff;border-radius:20px;font-size:28px;font-weight:bold;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 .game-over-banner.bad{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%)}
 details summary{cursor:pointer;font-weight:bold;color:var(--warning);padding:10px;transition:.3s all}
 details summary:hover{color:var(--success)}
+.status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.85em;font-weight:600;margin-left:10px}
+.status-ready{background:rgba(0,217,255,.2);color:var(--success);border:1px solid var(--success)}
+.status-not-ready{background:rgba(255,0,110,.2);color:var(--danger);border:1px solid var(--danger)}
 .role-icon{display:inline-block;width:30px;height:30px;margin-right:10px;text-align:center;line-height:30px;border-radius:50%;background:rgba(255,255,255,.1)}
 .loading-spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:var(--accent);animation:spin 1s infinite ease-in-out}
 @keyframes spin{to{transform:rotate(360deg)}}
 .identity-card{background:rgba(255,255,255,.05);padding:20px;border-radius:15px;margin:10px 0;border:2px solid var(--border);transition:.3s all}
 .identity-card:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(0,0,0,.3)}
 .action-status{padding:15px;background:rgba(255,255,255,.05);border-radius:12px;margin:15px 0}
-#host-controls {text-align: center; margin: 20px 0; background: rgba(0,217,255,0.1); padding: 15px; border-radius: 15px; border: 1px solid var(--success);}
-#night-status-board {display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;}
-.status-item {background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;}
+.night-status-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:15px;padding:15px;background:rgba(0,0,0,.2);border-radius:10px}
+.status-item{background:rgba(255,255,255,.05);padding:10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+.status-item .role{font-weight:bold;}
+.status-item .status{font-weight:bold;}
+.status-item .status.pending{color:var(--warning)}
+.status-item .status.complete{color:var(--success)}
+.status-item .status.skipped{color:#888}
 @media(max-width:600px){#app{padding:20px}h1{font-size:1.5em}button{padding:10px 16px;font-size:14px}}
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="view-container">
-    <h1 id="game-title">🌙 双身份狼人杀</h1>
-
+    <!-- Setup View -->
     <div id="setup-view">
+        <h1>🌙 双身份狼人杀 - 电子法官</h1>
         <h2>📋 身份配置</h2>
         <div id="role-setup"></div>
         <p style="text-align:center;font-size:18px;">
@@ -83,19 +84,21 @@ details summary:hover{color:var(--success)}
         </p>
         <div style="text-align:center;margin-top:20px;">
             <button id="btn-create" class="control-btn">
-            <span id="create-text">创建游戏</span>
-            <span id="create-spinner" class="loading-spinner hidden"></span>
+                <span id="create-text">创建游戏</span>
+                <span id="create-spinner" class="loading-spinner hidden"></span>
             </button>
         </div>
     </div>
 
+    <!-- Game View -->
     <div id="game-view" class="hidden">
+        <h1 id="game-title">🌙 双身份狼人杀</h1>
         <div id="player-info">
             <h2 id="pid-show"></h2>
             <h3>你的身份是:</h3>
             <div id="my-ids" class="identity-card"></div>
             <div id="swap-area" class="hidden">
-                <p style="text-align:center;color:var(--warning)">游戏开始前，你可以交换两个身份的顺序。</p>
+                <p style="text-align:center;color:var(--warning)">游戏开始前，你可以交换两个身份的顺序。当前生效的身份是第一个。</p>
                 <div style="text-align:center;">
                     <button id="btn-swap" class="action-btn">🔄 交换顺序</button>
                     <button id="btn-confirm" class="confirm-btn">✅ 确定身份顺序</button>
@@ -105,15 +108,25 @@ details summary:hover{color:var(--success)}
         <hr>
         <div id="game-area">
             <div id="player-status" style="text-align:center;font-size:20px;font-weight:bold;padding:15px;background:rgba(255,255,255,.05);border-radius:15px;margin-bottom:20px;">等待游戏开始...</div>
-            <div id="host-controls" class="hidden"></div>
+            
+            <!-- Host Controls -->
+            <div id="host-controls" class="hidden action-feedback"></div>
+
             <div id="persist" class="hidden"></div>
             <div id="action-panel"></div>
             <div id="wolf-chat-area" class="hidden"></div>
-            <h3>👥 玩家列表</h3>
-            <div id="player-list"></div>
+            
+            <details open>
+                <summary>显示/隐藏玩家列表</summary>
+                <div id="player-list"></div>
+            </details>
+
+             <details>
+                <summary>显示/隐藏完整身份底牌 (仅主持人)</summary>
+                <div id="host-player-list-reveal" class="hidden"></div>
+            </details>
         </div>
     </div>
-  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -121,52 +134,686 @@ details summary:hover{color:var(--success)}
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - 2025-07-02 自动化流程最终修复版
+   双身份狼人杀 - 2024-07-25 自动化流程修复版
    ========================================================== */
 
-const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
+const firebaseConfig = { apiKey: "AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI", authDomain: "werewolf-game-master-1f37f.firebaseapp.com", databaseURL: "https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "werewolf-game-master-1f37f", storageBucket: "werewolf-game-master-1f37f.appspot.com", messagingSenderId: "626014452910", appId: "1:626014452910:web:35b6eba412f95f1878013f" };
 firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
+const db = firebase.database();
 
-const ROLES={'平民':{name:'平民',faction:'good',isGod:false,icon:'👤'},'守卫':{name:'守卫',faction:'good',isGod:true,icon:'🛡️'},'白痴':{name:'白痴',faction:'good',isGod:true,icon:'🤪'},'预言家':{name:'预言家',faction:'good',isGod:true,icon:'🔮'},'骑士':{name:'骑士',faction:'good',isGod:true,icon:'⚔️'},'隐狼':{name:'隐狼',faction:'bad',isGod:false,isInvisible:true,icon:'🌑'},'女巫':{name:'女巫',faction:'good',isGod:true,icon:'🧪'},'猎人':{name:'猎人',faction:'good',isGod:true,icon:'🔫'},'狼人':{name:'狼人',faction:'bad',isGod:false,icon:'🐺'},'盗贼':{name:'盗贼',faction:'neutral',isGod:false,isThief:true,icon:'🎭'}};
-const DEFAULT_SETUP={'平民':6,'守卫':1,'白痴':1,'预言家':1,'骑士':1,'女巫':1,'猎人':1,'狼人':2,'隐狼':1,'盗贼':1};
-const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','狼人'],['盗贼','隐狼'],['隐狼','狼人'],['隐狼','隐狼']];
-
-const App={
-gameId:null,playerId:null,isHost:false,gameState:null,allPlayers:{},playerData:null,wolfChatListener:null,wolfVotesListener:null,
-$(id){return document.getElementById(id)},
-init(){const q=new URLSearchParams(location.search);this.gameId=q.get('game');this.playerId=q.get('player');if(this.gameId&&this.playerId){this.showView('game');this.listenToGameChanges()}else{this.showView('setup');this.renderRoleSetup();this.$('btn-create').onclick=()=>this.createGame()}},
-showView(v){this.$('setup-view').classList.add('hidden');this.$('game-view').classList.add('hidden');this.$(v+'-view').classList.remove('hidden')},
-renderRoleSetup(){let h='';for(const r in DEFAULT_SETUP){h+=`<div class="role-setup-item"><span><span class="role-icon">${ROLES[r].icon}</span>${r}</span><input type="number" id="role-${r}" min="0" value="${DEFAULT_SETUP[r]}"></div>`}this.$('role-setup').innerHTML=h;const u=()=>{let t=0;this.$('role-setup').querySelectorAll('input').forEach(i=>t+=+i.value||0);this.$('total-roles').textContent=t;this.$('player-cnt').textContent=t%2===0?t/2:'偶数'};this.$('role-setup').oninput=u;u()},
-async createGame(){this.$('btn-create').disabled=true;this.$('create-text').classList.add('hidden');this.$('create-spinner').classList.remove('hidden');const p=[];this.$('role-setup').querySelectorAll('input').forEach(i=>{const r=i.id.replace('role-','');for(let k=0;k<+i.value;k++)p.push(r)});if(p.length===0||p.length%2){alert('身份数需为偶数且>0');location.reload();return}const pairs=this.deal(p);if(!pairs){alert('无法生成合法牌组');location.reload();return}const gId=db.ref('games').push().key,pc=p.length/2,players={};for(let i=1;i<=pc;i++)players[i]={id:i,identities:pairs[i-1],originalIdentities:[...pairs[i-1]],deaths:0,isAlive:true,isReady:false,isExposedIdiot:false,skillStates:{}};await db.ref(`games/${gId}`).set({state:{phase:'SETUP',round:0,peaceNightStreak:0,winner:null,creatorId:1},players,config:{pc},wolfChat:{},wolfVotes:{},nightActions:{},nightStatus:{}});location.search=`?game=${gId}&player=1`},
-deal(pool){for(let t=0;t<5000;t++){const s=[...pool].sort(()=>.5-Math.random()),rawPairs=[],finalPairs=[];let isValid=true,gold=0;for(let i=0;i<s.length;i+=2)rawPairs.push([s[i],s[i+1]]);for(const p of rawPairs){if(FORBIDDEN_RAW.some(([r1,r2])=>(r1===p[0]&&r2===p[1])||(r1===p[1]&&r2===p[0]))){isValid=false;break}}if(!isValid)continue;for(const p of rawPairs){let p1,p2;if(p[0]==='盗贼'&&p[1]==='盗贼'){p1={r:'平民',t:true};p2={r:'平民',t:true}}else if(p[0]==='盗贼'){p1={r:p[1],t:true};p2={r:p[1],t:false}}else if(p[1]==='盗贼'){p1={r:p[0],t:false};p2={r:p[0],t:true}}else{p1={r:p[0],t:false};p2={r:p[1],t:false}}finalPairs.push([{role:p1.r,isThiefCopy:p1.t},{role:p2.r,isThiefCopy:p2.t}]);if(p1.r==='平民'&&p2.r==='平民')gold++}if(gold>=1&&gold<=2)return finalPairs}return null},
-listenToGameChanges(){db.ref(`games/${this.gameId}`).on('value',s=>{if(!s.exists()){document.body.innerHTML='<h1>游戏不存在</h1>';return}const g=s.val();this.gameState=g.state;this.allPlayers=g.players;this.playerData=g.players[this.playerId];this.isHost=this.playerData.id==this.gameState.creatorId;if(this.gameState.phase!=='NIGHT')this.stopWolfListeners();this.renderAll()})},
-renderAll(){if(!this.playerData)return;this.renderPlayerInfo();this.renderPlayerStatus();this.renderPlayerList();this.renderPersistentInfo();this.renderActionPanel();if(this.isHost)this.renderHostControls()},
-renderPlayerInfo(){this.$('pid-show').textContent=`🎮 你是 ${this.playerId} 号`+(this.isHost?' (主持人)':'');const i=this.playerData.identities,d=this.playerData.deaths,f=i=>`${ROLES[i.role].icon} ${i.isThiefCopy?'<span class="thief-copy">'+i.role+'</span>':i.role}`;this.$('my-ids').innerHTML=`<div style="font-size:24px;">${d>=1?'<span class="dead-identity">':''}${f(i[0])}${d>=1?'</span>':''}<span style="margin:0 20px;">+</span>${d>=2?'<span class="dead-identity">':''}${f(i[1])}${d>=2?'</span>':''}</div>`;const show=this.gameState.phase==='SETUP'&&!this.playerData.isReady;this.$('swap-area').classList[show?'remove':'add']('hidden');if(show){this.$('btn-swap').onclick=()=>{const[a,b]=this.playerData.identities;db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).set([b,a])};this.$('btn-confirm').onclick=()=>{if(!this.playerData.isReady)db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).set(true)}}},
-renderPlayerStatus(){const m={SETUP:'⏳ 等待准备',NIGHT:'🌙 夜晚行动中...',DAY:`☀️ 第 ${this.gameState.round} 天`,GAME_OVER:`🏆 ${this.gameState.winner}`};this.$('player-status').innerHTML=m[this.gameState.phase]||'进行中';if(this.gameState.phase==='GAME_OVER')this.$('game-title').innerHTML=`<div class="game-over-banner ${this.gameState.winner.includes('狼人')?'bad':''}">${this.gameState.winner}</div>`},
-renderPlayerList(){let h='';Object.values(this.allPlayers).forEach(p=>{const l=2-p.deaths,heart=`<span class="life-heart ${l<1?'lost':''}">❤</span><span class="life-heart ${l<2?'lost':''}">❤</span>`;h+=`<div class="player-list-item ${!p.isAlive?'dead-all':p.deaths?'dead':''}"><span><strong>${p.id}号</strong> <small>${p.isExposedIdiot?'🤪 白痴':''}</small></span><span>${heart}</span></div>`});this.$('player-list').innerHTML=h},
-renderPersistentInfo(){let h='';if(this.getActiveRole(this.playerData)==='预言家'){const r=this.getSkillState('seerResults')||{},l=Object.entries(r).map(([id,res])=>`${id}号(${res==='狼人'?'🐺':'😇'})`).join('、');if(l)h+=`<div><strong>🔮 查验历史:</strong> ${l}</div>`}this.$('persist').innerHTML=h;this.$('persist').classList[h?'remove':'add']('hidden')},
-renderHostControls(){this.$('host-controls').classList.remove('hidden');const ph=this.gameState.phase,rdy=Object.values(this.allPlayers).filter(p=>p.isReady).length,tot=Object.keys(this.allPlayers).length;let h=`<h3>游戏控制器</h3>`;if(ph==='SETUP'){h+=`<p>准备状态: ${rdy}/${tot}</p><button id="btn-start" class="control-btn" ${rdy<tot?'disabled':''}>🚀 开始游戏</button>`}else if(ph==='DAY'){h+=`<button id="btn-night" class="control-btn">🌙 进入夜晚</button>`}else if(ph==='NIGHT'){const ns=this.gameState.nightStatus||{},done=Object.values(ns).every(s=>s==='complete');h+=`<button id="btn-day" class="control-btn" ${!done?'disabled':''}>☀️ 进入白天</button><div id="night-status-board"><div class="status-item">守卫: ${this.getSymbol(ns.guard)}</div><div class="status-item">预言家: ${this.getSymbol(ns.seer)}</div><div class="status-item">狼人: ${this.getSymbol(ns.wolf)}</div><div class="status-item">女巫: ${this.getSymbol(ns.witch)}</div></div>`}this.$('host-controls').innerHTML=h;if(this.$('btn-start'))this.$('btn-start').onclick=()=>this.updatePhase('NIGHT',1);if(this.$('btn-night'))this.$('btn-night').onclick=()=>this.updatePhase('NIGHT');if(this.$('btn-day'))this.$('btn-day').onclick=()=>this.processNight()},
-getSymbol(s){if(s==='complete')return'✅';if(s==='pending')return'⏳';return'🔒'},
-async updatePhase(phase,round=null){const up={'state/phase':phase};let cr=this.gameState.round;if(round!==null){up['state/round']=round;cr=round}else if(phase==='NIGHT'){cr=this.gameState.round+1;up['state/round']=cr}if(phase==='NIGHT'){up['nightActions']={};up['wolfVotes']={};up['nightStatus']={guard:'pending',seer:'pending',wolf:'pending',witch:'locked'}}await db.ref(`games/${this.gameId}`).update(up);if(this.isHost&&phase==='NIGHT')this.checkAndAutocompleteRoles()},
-checkAndAutocompleteRoles(){const checks={guard:'守卫',seer:'预言家',wolf:['狼人','隐狼'],witch:'女巫'};for(const k in checks){let exists=Object.values(this.allPlayers).some(p=>{if(!p.isAlive)return false;const ar=this.getActiveRole(p);return Array.isArray(checks[k])?checks[k].includes(ar):checks[k]===ar});if(k==='wolf'&&exists){exists=Object.values(this.allPlayers).some(p=>this.canWolfAct(p))}if(!exists){const d=10000+Math.random()*10000;setTimeout(()=>{db.ref(`games/${this.gameId}/nightStatus/${k}`).set('complete')},d)}}},
-getActiveRole(p){return p.isAlive?p.identities[p.deaths].role:null},
-renderActionPanel(){this.$('action-panel').innerHTML='';if(this.gameState.phase!=='NIGHT'||!this.playerData.isAlive)return;const role=this.getActiveRole(this.playerData),nightStatus=this.gameState.nightStatus||{};let acted=false;switch(role){case'守卫':if(nightStatus.guard==='pending'){this.panelGuard();acted=true}break;case'预言家':if(nightStatus.seer==='pending'){this.panelSeer();acted=true}break;case'狼人':case'隐狼':if(nightStatus.wolf==='pending'&&this.canWolfAct(this.playerData)){this.panelWolf();acted=true}break;case'女巫':if(nightStatus.witch==='pending'){this.panelWitch();acted=true}break}if(!acted)this.$('action-panel').innerHTML=`<div class="action-feedback"><p>夜晚进行中，请耐心等待...</p></div>`},
-canWolfAct(p){const r=this.getActiveRole(p);if(!['狼人','隐狼'].includes(r))return false;if(r==='隐狼'){return!Object.values(this.allPlayers).some(p2=>p2.isAlive&&p2.id!==p.id&&this.getActiveRole(p2)==='狼人')}return true},
-getSkillState(key){return(this.playerData.skillStates||{})[`${this.playerData.deaths}_${key}`]},
-setSkillState(key,val){return db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${this.playerData.deaths}_${key}`).set(val)},
-panelWolf(){if(!this.wolfChatListener)this.initWolfChat();const vote=this.playerData.wolfVote,leader=this.playerId==Object.values(this.allPlayers).filter(p=>this.canWolfAct(p)).map(p=>p.id).sort((a,b)=>a-b)[0];const btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn ${vote==p.id?'selected':''}" data-id="${p.id}">${p.id}号</button>`).join('');let h=`<h3>🐺 请选择击杀目标</h3><div>${btns}</div>`;h+=leader?'<div style="margin-top:20px;"><button id="wolf-confirm" class="confirm-btn">✅ 确定击杀</button></div>':'<p style="margin-top:10px;font-size:14px;">等待领头狼确认</p>';this.$('action-panel').innerHTML=h;document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>{db.ref(`games/${this.gameId}/players/${this.playerId}/wolfVote`).set(b.dataset.id)});if(leader&&this.$('wolf-confirm'))this.$('wolf-confirm').onclick=async()=>{const tar=this.playerData.wolfVote;if(!tar)return alert('先选目标');await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(tar);await db.ref(`games/${this.gameId}/nightStatus`).update({wolf:'complete',witch:'pending'})}},
-initWolfChat(){this.$('wolf-chat-area').classList.remove('hidden');if(!this.$('wolf-chat'))this.$('wolf-chat-area').innerHTML=`<div class="wolf-chat-box"><h3>🐺 狼人频道</h3><div id="wolf-chat"></div><div style="display:flex;gap:10px;"><input id="wolf-input" placeholder="输入消息..." style="flex:1;"><button id="wolf-send" class="action-btn">📤</button></div></div>`;this.wolfChatListener=db.ref(`games/${this.gameId}/wolfChat`).orderByChild('timestamp').on('child_added',s=>{const c=this.$('wolf-chat');c.insertAdjacentHTML('beforeend',`<div><strong>${s.val().senderId}号:</strong> ${s.val().text}</div>`);c.scrollTop=c.scrollHeight});const btn=this.$('wolf-send'),inp=this.$('wolf-input');const send=()=>{if(!inp.value.trim())return;db.ref(`games/${this.gameId}/wolfChat`).push().set({senderId:this.playerId,text:inp.value.trim(),timestamp:Date.now()});inp.value=''};btn.onclick=send;inp.onkeypress=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}},
-stopWolfListeners(){if(this.wolfChatListener){db.ref(`games/${this.gameId}/wolfChat`).off('child_added',this.wolfChatListener);this.wolfChatListener=null}this.$('wolf-chat-area').classList.add('hidden')},
-async panelSeer(){const b=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">${p.id}号</button>`).join('');this.$('action-panel').innerHTML=`<h3>🔮 查验</h3><div>${b}</div><div style="margin-top:15px;"><button id="seer-skip" class="control-btn">⏭️ 跳过</button></div>`;document.querySelectorAll('.action-btn').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.id,tp=this.allPlayers[id],rolesAliveOfPlayer=p=>p.isAlive?[p.identities[p.deaths].role]:[],targetCardsAlive=rolesAliveOfPlayer(tp),hasInvisWolf=targetCardsAlive.includes('隐狼'),otherAliveBad=Object.values(this.allPlayers).some(p=>p.isAlive&&p.id!=id&&rolesAliveOfPlayer(p).some(r=>ROLES[r].faction==='bad'));let res='好人';if(targetCardsAlive.some(r=>ROLES[r].faction==='bad'&&!ROLES[r].isInvisible)|| (hasInvisWolf&&!otherAliveBad))res='狼人';const rs=this.getSkillState('seerResults')||{};rs[id]=res;await this.setSkillState('seerResults',rs);await db.ref(`games/${this.gameId}/nightStatus/seer`).set('complete');this.$('action-panel').innerHTML=`<div class="action-feedback"><p>${id}号是<strong>${res==='狼人'?'🐺狼人':'😇好人'}</strong></p></div>`});this.$('seer-skip').onclick=()=>db.ref(`games/${this.gameId}/nightStatus/seer`).set('complete')},
-async panelGuard(){const last=this.getSkillState('lastGuardTarget'),btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}" ${p.id==last?'disabled':''}>${p.id}号 ${p.id==last?'(连守)':''}</button>`).join('');this.$('action-panel').innerHTML=`<h3>🛡️ 守卫</h3><div>${btns}</div><div style="margin-top:15px;"><button id="guard-skip" class="control-btn">⏭️ 跳过</button></div>`;document.querySelectorAll('.action-btn').forEach(b=>b.onclick=async()=>{if(b.dataset.id==last)return;await db.ref(`games/${this.gameId}/nightActions/guard`).set(b.dataset.id);await this.setSkillState('lastGuardTarget',b.dataset.id);await db.ref(`games/${this.gameId}/nightStatus/guard`).set('complete')});this.$('guard-skip').onclick=()=>db.ref(`games/${this.gameId}/nightStatus/guard`).set('complete')},
-async panelWitch(){const cure=!this.getSkillState('hasUsedCure'),poison=!this.getSkillState('hasUsedPoison');const wolf=(await db.ref(`games/${this.gameId}/nightActions/wolfKill`).once('value')).val();let h='<h3>🧪 女巫</h3><div>解药:'+(cure?'✓':'✗')+'|毒药:'+(poison?'✓':'✗')+'</div>';if(cure&&wolf){const ban=this.gameState.round===1&&wolf==this.playerId;h+=`<div><button id="btn-cure" class="action-btn" ${ban?'disabled':''}>💉 救${wolf}号</button>${ban?'<small>(首夜禁自救)</small>':''}</div>`}if(poison){h+='<h4>毒药</h4><div>'+Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}">☠️ ${p.id}号</button>`).join('')+'</div>'}h+='<div style="margin-top:10px;"><button id="witch-skip" class="control-btn">⏭️ 跳过</button></div>';this.$('action-panel').innerHTML=h;if(this.$('btn-cure'))this.$('btn-cure').onclick=async()=>{await this.setSkillState('hasUsedCure',true);await db.ref(`games/${this.gameId}/nightActions/witchCure`).set(true);await db.ref(`games/${this.gameId}/nightStatus/witch`).set('complete')};document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=async()=>{await this.setSkillState('hasUsedPoison',true);await db.ref(`games/${this.gameId}/nightActions/witchPoison`).set(b.dataset.id);await db.ref(`games/${this.gameId}/nightStatus/witch`).set('complete')});this.$('witch-skip').onclick=()=>db.ref(`games/${this.gameId}/nightStatus/witch`).set('complete')},
-async processNight(){const g=(await db.ref(`games/${this.gameId}`).once('value')).val(),na=g.nightActions||{},dead=[],msg=[];const wk=na.wolfKill,wp=na.witchPoison;if(wk&&wk==wp){dead.push({id:wk,lost:2,cause:'POISON'});msg.push(`☠️☠️ ${wk}号同刀同毒`)}else{if(wk){const gd=na.guard==wk,cr=na.witchCure;if(gd&&cr){dead.push({id:wk,lost:1,cause:'NIGHT'});msg.push(`☠️ ${wk}号被守护且被解救`)}else if(!gd&&!cr){dead.push({id:wk,lost:1,cause:'NIGHT'});msg.push(`☠️ ${wk}号被狼杀`)}else msg.push(`💫 ${wk}号被攻击但存活`)}else msg.push('🌙 狼人未行动');if(wp&&wp!=wk){dead.push({id:wp,lost:1,cause:'POISON'});msg.push(`☠️ ${wp}号被毒杀`)}}if(!dead.length){msg=['🌟 平安夜'];await db.ref(`games/${this.gameId}/state/peaceNightStreak`).transaction(s=>(s||0)+1)}else await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);if(this.isHost)alert('夜晚结算:\n'+msg.join('\n'));for(const d of dead)await this.kill(d.id,d.cause,g.players,d.lost);const live=await this.checkWin();if(live){this.updatePhase('DAY')}},
-async kill(pid,cause,ps=null,lost=1){const players=ps||(await db.ref(`games/${this.gameId}/players`).once('value')).val(),p=players[pid];if(!p||!p.isAlive)return;if(this.getActiveRole(p)==='白痴'&&cause==='VOTE'){await db.ref(`games/${this.gameId}/players/${pid}/isExposedIdiot`).set(true);await this.checkWin();return}const nd=Math.min(p.deaths+lost,2),dead=nd>=2,up={};up['players/'+pid+'/deaths']=nd;up['players/'+pid+'/isAlive']=!dead;await db.ref(`games/${this.gameId}`).update(up);if(dead&&Object.values(p.originalIdentities).some(i=>i.role==='猎人')&&cause!=='POISON')this.updatePhase('HUNTER_ACTION');else this.checkWin()},
-async checkWin(){const g=(await db.ref(`games/${this.gameId}`).once('value')).val();if(g.state.phase==='GAME_OVER')return false;let wolf=0,god=0,gold=0;Object.values(g.players).forEach(p=>{if(!p.isAlive)return;const rs=p.originalIdentities.map(i=>ROLES[i.role]),goodOnly=rs.every(r=>r.faction==='good');if(rs[0].name==='平民'&&rs[1].name==='平民')gold++;if(goodOnly&&!rs.every(r=>r.name==='平民')&&rs.some(r=>r.isGod))god++;if(rs.some(r=>r.faction==='bad'))wolf++});let win=null;if(!wolf)win='😇 好人胜利(狼人全灭)';else if(g.state.peaceNightStreak>=3)win='😇 好人胜利(三夜平安)';else if(!god)win='🐺 狼人胜利(神职全灭)';else if(!gold)win='🐺 狼人胜利(金宝宝全灭)';if(win){await db.ref(`games/${this.gameId}/state`).update({phase:'GAME_OVER',winner:win});return false}return true;}
+const ROLES = {
+    '平民': { name: '平民', faction: 'good', isGod: false, icon: '👤' },
+    '守卫': { name: '守卫', faction: 'good', isGod: true, icon: '🛡️', actionPhase: 'GUARD' },
+    '白痴': { name: '白痴', faction: 'good', isGod: true, icon: '🤪' },
+    '预言家': { name: '预言家', faction: 'good', isGod: true, icon: '🔮', actionPhase: 'SEER' },
+    '骑士': { name: '骑士', faction: 'good', isGod: true, icon: '⚔️' },
+    '隐狼': { name: '隐狼', faction: 'bad', isGod: false, isInvisible: true, icon: '🌑', actionPhase: 'WOLF' },
+    '女巫': { name: '女巫', faction: 'good', isGod: true, icon: '🧪', actionPhase: 'WITCH' },
+    '猎人': { name: '猎人', faction: 'good', isGod: true, icon: '🔫' },
+    '狼人': { name: '狼人', faction: 'bad', isGod: false, icon: '🐺', actionPhase: 'WOLF' },
+    '盗贼': { name: '盗贼', faction: 'neutral', isGod: false, isThief: true, icon: '🎭' }
 };
 
-document.addEventListener('DOMContentLoaded',()=>App.init());
+const DEFAULT_SETUP = { '平民': 6, '守卫': 1, '白痴': 1, '预言家': 1, '骑士': 1, '女巫': 1, '猎人': 1, '狼人': 2, '隐狼': 1, '盗贼': 1 };
+const FORBIDDEN = [['预言家', '狼人'], ['预言家', '隐狼'], ['盗贼', '狼人'], ['盗贼', '隐狼'], ['隐狼', '狼人'], ['隐狼', '隐狼']];
+const NIGHT_SEQUENCE = ['GUARD', 'SEER', 'WOLF', 'WITCH'];
+
+const App = {
+    gameId: null, playerId: null, isHost: false,
+    gameState: null, allPlayers: {}, playerData: null,
+    wolfChatListener: null,
+
+    $(id) { return document.getElementById(id); },
+    copy(t) { navigator.clipboard.writeText(t).then(() => alert('已复制到剪贴板')); },
+
+    init() {
+        const qs = new URLSearchParams(location.search);
+        this.gameId = qs.get('game');
+        this.playerId = qs.get('player');
+
+        if (this.gameId && this.playerId) {
+            this.showView('game');
+            this.listenToGameChanges();
+        } else {
+            this.showView('setup');
+            this.renderRoleSetup();
+            this.$('btn-create').onclick = () => this.createGame();
+        }
+    },
+
+    showView(view) {
+        this.$('setup-view').classList.add('hidden');
+        this.$('game-view').classList.add('hidden');
+        this.$(view + '-view').classList.remove('hidden');
+    },
+
+    renderRoleSetup() {
+        let h = '';
+        for (const r in DEFAULT_SETUP) {
+            h += `<div class="role-setup-item"><span><span class="role-icon">${ROLES[r].icon}</span>${r}</span><input type="number" id="role-${r}" min="0" value="${DEFAULT_SETUP[r]}"></div>`;
+        }
+        this.$('role-setup').innerHTML = h;
+        const updateCounts = () => {
+            let total = 0;
+            this.$('role-setup').querySelectorAll('input').forEach(i => total += +i.value || 0);
+            this.$('total-roles').textContent = total;
+            this.$('player-cnt').textContent = total % 2 === 0 ? total / 2 : '身份总数必须为偶数';
+        };
+        this.$('role-setup').oninput = updateCounts;
+        updateCounts();
+    },
+
+    async createGame() {
+        this.$('btn-create').disabled = true;
+        this.$('create-text').classList.add('hidden');
+        this.$('create-spinner').classList.remove('hidden');
+
+        const pool = [];
+        this.$('role-setup').querySelectorAll('input').forEach(i => {
+            const r = i.id.replace('role-', '');
+            for (let k = 0; k < +i.value; k++) pool.push(r);
+        });
+
+        if (pool.length === 0 || pool.length % 2 !== 0) {
+            alert('身份总数需为偶数且 > 0');
+            location.reload();
+            return;
+        }
+
+        const pairs = this.deal(pool);
+        if (!pairs) {
+            alert('无法生成合法牌组，请检查配置后重试。');
+            location.reload();
+            return;
+        }
+
+        const gameId = db.ref('games').push().key;
+        const playerCount = pool.length / 2;
+        const players = {};
+        for (let i = 1; i <= playerCount; i++) {
+            players[i] = {
+                id: i,
+                identities: pairs[i - 1],
+                originalIdentities: JSON.parse(JSON.stringify(pairs[i - 1])),
+                deaths: 0,
+                isAlive: true,
+                isReady: false,
+                isExposedIdiot: false,
+                skillStates: {}
+            };
+        }
+
+        const initialGameState = {
+            state: {
+                phase: 'SETUP',
+                round: 0,
+                creatorId: '1',
+                peaceNightStreak: 0,
+                winner: null,
+                nightActionPhase: null
+            },
+            players,
+            config: { playerCount },
+            wolfChat: {},
+            nightActions: {},
+        };
+
+        await db.ref(`games/${gameId}`).set(initialGameState);
+        location.search = `?game=${gameId}&player=1`;
+    },
+
+    deal(pool) {
+        const maxTries = 5000;
+        const shuffle = a => {
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        };
+
+        for (let t = 0; t < maxTries; t++) {
+            const shuffled = shuffle([...pool]);
+            const pairs = [];
+            let badCombo = false;
+            for (let i = 0; i < shuffled.length; i += 2) {
+                const r1 = shuffled[i], r2 = shuffled[i + 1];
+                if (FORBIDDEN.some(([a, b]) => (a === r1 && b === r2) || (a === r2 && b === r1))) {
+                    badCombo = true;
+                    break;
+                }
+                pairs.push([r1, r2]);
+            }
+            if (badCombo) continue;
+
+            let goldBabies = 0;
+            const finalPairs = pairs.map(([r1, r2]) => {
+                let p1 = { role: r1, isThiefCopy: false };
+                let p2 = { role: r2, isThiefCopy: false };
+                if (r1 === '盗贼' && r2 === '盗贼') {
+                    p1 = { role: '平民', isThiefCopy: true };
+                    p2 = { role: '平民', isThiefCopy: true };
+                } else if (r1 === '盗贼') {
+                    p1 = { role: r2, isThiefCopy: true };
+                } else if (r2 === '盗贼') {
+                    p2 = { role: r1, isThiefCopy: true };
+                }
+                if (p1.role === '平民' && p2.role === '平民') {
+                    goldBabies++;
+                }
+                return [p1, p2];
+            });
+
+            if (goldBabies >= 1 && goldBabies <= 2) {
+                return finalPairs;
+            }
+        }
+        return null;
+    },
+
+    listenToGameChanges() {
+        db.ref(`games/${this.gameId}`).on('value', snapshot => {
+            if (!snapshot.exists()) {
+                document.body.innerHTML = '<h1>游戏不存在或已结束</h1>';
+                return;
+            }
+            const gameData = snapshot.val();
+            this.gameState = gameData.state;
+            this.allPlayers = gameData.players;
+            this.playerData = gameData.players[this.playerId];
+            this.isHost = this.playerData.id == this.gameState.creatorId;
+
+            if (this.gameState.phase !== 'NIGHT') {
+                this.stopWolfChatListener();
+            }
+
+            this.renderAll();
+        });
+    },
+
+    renderAll() {
+        if (!this.playerData) return;
+        this.renderPlayerInfo();
+        this.renderPlayerStatus();
+        this.renderPlayerList();
+        this.renderPersistentInfo();
+        this.renderActionPanel();
+        if (this.isHost) {
+            this.renderHostControls();
+            this.renderHostPlayerReveal();
+        }
+    },
+
+    renderPlayerInfo() {
+        this.$('pid-show').textContent = `🎮 你是 ${this.playerId} 号${this.isHost ? ' (主持人)' : ''}`;
+        const identities = this.playerData.identities;
+        const deaths = this.playerData.deaths;
+        const formatId = (id) => `${ROLES[id.role].icon} ${id.isThiefCopy ? `<span class="thief-copy">${id.role}</span>` : id.role}`;
+        
+        this.$('my-ids').innerHTML = `
+            <div style="font-size:24px;">
+                ${deaths >= 1 ? '<span class="dead-identity">' : ''}${formatId(identities[0])}${deaths >= 1 ? '</span>' : ''}
+                <span style="margin:0 20px;">+</span>
+                ${deaths >= 2 ? '<span class="dead-identity">' : ''}${formatId(identities[1])}${deaths >= 2 ? '</span>' : ''}
+            </div>`;
+
+        const showSwap = this.gameState.phase === 'SETUP' && !this.playerData.isReady;
+        this.$('swap-area').classList.toggle('hidden', !showSwap);
+        if (showSwap) {
+            this.$('btn-swap').onclick = () => {
+                const [a, b] = this.playerData.identities;
+                db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).set([b, a]);
+            };
+            this.$('btn-confirm').onclick = () => {
+                if (!this.playerData.isReady) {
+                    db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).set(true);
+                }
+            };
+        }
+    },
+
+    renderPlayerStatus() {
+        const phase = this.gameState.phase;
+        const round = this.gameState.round;
+        const winner = this.gameState.winner;
+        let statusText = '';
+
+        if (winner) {
+            statusText = `🏆 ${winner}`;
+            this.$('game-title').innerHTML = `<div class="game-over-banner ${winner.includes('狼人') ? 'bad' : ''}">${winner}</div>`;
+        } else {
+            const statusMap = {
+                'SETUP': '⏳ 等待所有玩家准备...',
+                'DAY': `☀️ 第 ${round} 天 - 发言/投票阶段`,
+                'NIGHT': `🌙 第 ${round} 夜 - 夜晚行动中...`
+            };
+            statusText = statusMap[phase] || '未知状态';
+        }
+        this.$('player-status').innerHTML = statusText;
+    },
+
+    renderPlayerList() {
+        let h = '';
+        Object.values(this.allPlayers).forEach(p => {
+            const lives = 2 - p.deaths;
+            const heart1 = `<span class="life-heart ${lives < 1 ? 'lost' : ''}">❤</span>`;
+            const heart2 = `<span class="life-heart ${lives < 2 ? 'lost' : ''}">❤</span>`;
+            h += `<div class="player-list-item ${!p.isAlive ? 'dead-all' : p.deaths > 0 ? 'dead' : ''}">
+                    <span><strong>${p.id}号</strong> <small>${p.isExposedIdiot ? '🤪 白痴' : ''}</small></span>
+                    <span>${heart1}${heart2}</span>
+                  </div>`;
+        });
+        this.$('player-list').innerHTML = h;
+    },
+    
+    renderHostPlayerReveal() {
+        this.$('host-player-list-reveal').classList.remove('hidden');
+        let h = '';
+        Object.values(this.allPlayers).forEach(p => {
+            const id1 = p.originalIdentities[0];
+            const id2 = p.originalIdentities[1];
+            const format = (id) => `${ROLES[id.role].icon} ${id.role}${id.isThiefCopy ? '(盗)' : ''}`;
+            h += `<div class="player-list-item">
+                    <span><strong>${p.id}号</strong></span>
+                    <span>${format(id1)} + ${format(id2)}</span>
+                  </div>`;
+        });
+        this.$('host-player-list-reveal').innerHTML = h;
+    },
+
+    renderPersistentInfo() {
+        let h = '';
+        if (this.getActiveRoleInfo(this.playerData)?.name === '预言家') {
+            const seerResults = this.getSkillState('seerResults') || {};
+            const log = Object.entries(seerResults).map(([id, res]) => `${id}号(${res === 'bad' ? '🐺' : '😇'})`).join('、');
+            if (log) h += `<div><strong>🔮 查验历史:</strong> ${log}</div>`;
+        }
+        this.$('persist').innerHTML = h;
+        this.$('persist').classList.toggle('hidden', !h);
+    },
+
+    renderHostControls() {
+        this.$('host-controls').classList.remove('hidden');
+        const phase = this.gameState.phase;
+        let h = '<h3>👑 主持人控制台</h3>';
+
+        if (phase === 'SETUP') {
+            const readyCount = Object.values(this.allPlayers).filter(p => p.isReady).length;
+            const totalCount = Object.keys(this.allPlayers).length;
+            h += `<p>准备状态: ${readyCount}/${totalCount}</p>`;
+            h += `<button id="btn-start-game" class="control-btn" ${readyCount < totalCount ? 'disabled' : ''}>🚀 锁定身份，开始游戏</button>`;
+        } else if (phase === 'DAY') {
+            h += `<button id="btn-go-night" class="control-btn">🌙 进入夜晚</button>`;
+        } else if (phase === 'NIGHT') {
+            const nightActions = this.gameState.nightActions || {};
+            const actionPhase = this.gameState.nightActionPhase;
+            const allDone = this.isNightPhaseComplete();
+            h += `<p>当前夜晚阶段: <strong>${actionPhase || '未开始'}</strong></p>`;
+            h += `<div class="night-status-board">`;
+            NIGHT_SEQUENCE.forEach(p => {
+                const status = nightActions[p] ? (nightActions[p].completed ? '✅ 完成' : '⏳ 进行中') : '🔒 等待';
+                const statusClass = nightActions[p] ? (nightActions[p].completed ? 'complete' : 'pending') : 'skipped';
+                h += `<div class="status-item"><span class="role">${p}</span> <span class="status ${statusClass}">${status}</span></div>`;
+            });
+            h += `</div>`;
+            h += `<button id="btn-end-night" class="control-btn" ${!allDone ? 'disabled' : ''}>☀️ 天亮了 (结算夜晚)</button>`;
+        }
+
+        this.$('host-controls').innerHTML = h;
+
+        if (this.$('btn-start-game')) this.$('btn-start-game').onclick = () => this.updatePhase('DAY', 1);
+        if (this.$('btn-go-night')) this.$('btn-go-night').onclick = () => this.updatePhase('NIGHT');
+        if (this.$('btn-end-night')) this.$('btn-end-night').onclick = () => this.processNight();
+    },
+
+    async updatePhase(phase, round = null) {
+        const updates = { 'state/phase': phase };
+        let currentRound = this.gameState.round;
+        if (round !== null) {
+            updates['state/round'] = round;
+            currentRound = round;
+        } else if (phase === 'DAY') {
+            currentRound = this.gameState.round;
+        } else if (phase === 'NIGHT') {
+            currentRound = this.gameState.round + 1;
+            updates['state/round'] = currentRound;
+        }
+
+        if (phase === 'NIGHT') {
+            updates['nightActions'] = {}; // Reset night actions
+            updates['state/nightActionPhase'] = null;
+        }
+        await db.ref(`games/${this.gameId}`).update(updates);
+        
+        if (phase === 'NIGHT' && this.isHost) {
+            // Automatically start the night sequence
+            setTimeout(() => this.advanceNightPhase(), 1000);
+        }
+    },
+
+    async advanceNightPhase() {
+        const currentPhase = this.gameState.nightActionPhase;
+        const currentIndex = currentPhase ? NIGHT_SEQUENCE.indexOf(currentPhase) : -1;
+        let nextIndex = currentIndex + 1;
+
+        while (nextIndex < NIGHT_SEQUENCE.length) {
+            const nextPhase = NIGHT_SEQUENCE[nextIndex];
+            const actors = Object.values(this.allPlayers).filter(p => this.doesRoleActInPhase(p, nextPhase));
+            if (actors.length > 0) {
+                const updates = {};
+                updates[`state/nightActionPhase`] = nextPhase;
+                updates[`nightActions/${nextPhase}`] = { completed: false, actions: {} };
+                // Special case for witch, depends on wolf action
+                if (nextPhase === 'WITCH') {
+                    const wolfAction = this.gameState.nightActions?.WOLF;
+                    if (!wolfAction || !wolfAction.completed) {
+                        // Skip witch if wolves haven't acted
+                        updates[`nightActions/WITCH`] = { completed: true, skipped: true }; 
+                    } else {
+                        // Witch is now pending
+                    }
+                } 
+                await db.ref(`games/${this.gameId}`).update(updates);
+                return; // Stop advancing
+            }
+            nextIndex++;
+        }
+
+        // If loop finishes, all phases are done or skipped
+        if (this.isHost && !this.isNightPhaseComplete()) {
+             // This is a fallback to ensure the night can end
+            const finalUpdates = {};
+            NIGHT_SEQUENCE.forEach(p => {
+                if (!this.gameState.nightActions?.[p]) {
+                    finalUpdates[`nightActions/${p}`] = { completed: true, skipped: true };
+                }
+            });
+            await db.ref(`games/${this.gameId}`).update(finalUpdates);
+        }
+    },
+
+    isNightPhaseComplete() {
+        const actions = this.gameState.nightActions || {};
+        return NIGHT_SEQUENCE.every(phase => actions[phase]?.completed);
+    },
+
+    doesRoleActInPhase(player, actionPhase) {
+        if (!player.isAlive) return false;
+        const role = this.getActiveRoleInfo(player);
+        if (!role || role.actionPhase !== actionPhase) return false;
+
+        // Special condition for Invisible Wolf
+        if (role.name === '隐狼') {
+            const hasLivingWolfTeammate = Object.values(this.allPlayers).some(p => 
+                p.id !== player.id && p.isAlive && this.getActiveRoleInfo(p)?.name === '狼人'
+            );
+            return !hasLivingWolfTeammate;
+        }
+        return true;
+    },
+
+    getActiveRoleInfo(player) {
+        if (!player.isAlive) return null;
+        const activeRoleName = player.identities[player.deaths].role;
+        return ROLES[activeRoleName];
+    },
+
+    renderActionPanel() {
+        this.$('action-panel').innerHTML = '';
+        if (this.gameState.phase !== 'NIGHT' || !this.playerData.isAlive) return;
+
+        const currentNightPhase = this.gameState.nightActionPhase;
+        if (!currentNightPhase) return;
+
+        const myRole = this.getActiveRoleInfo(this.playerData);
+        if (!myRole || myRole.actionPhase !== currentNightPhase) {
+            this.$('action-panel').innerHTML = `<div class="action-feedback"><p>夜晚进行中，请耐心等待其他玩家行动...</p></div>`;
+            return;
+        }
+        
+        const nightActions = this.gameState.nightActions || {};
+        if (nightActions[currentNightPhase]?.actions?.[this.playerId]) {
+            this.$('action-panel').innerHTML = `<div class="action-feedback"><p>你已完成操作，请等待天亮。</p></div>`;
+            return;
+        }
+
+        switch (currentNightPhase) {
+            case 'GUARD': this.panelGuard(); break;
+            case 'SEER': this.panelSeer(); break;
+            case 'WOLF': this.panelWolf(); break;
+            case 'WITCH': this.panelWitch(); break;
+        }
+    },
+
+    getSkillState(key) {
+        return (this.playerData.skillStates || {})[`r${this.gameState.round}_d${this.playerData.deaths}_${key}`];
+    },
+
+    setSkillState(key, value) {
+        return db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/r${this.gameState.round}_d${this.playerData.deaths}_${key}`).set(value);
+    },
+
+    async submitNightAction(action) {
+        const phase = this.gameState.nightActionPhase;
+        const actionPath = `nightActions/${phase}/actions/${this.playerId}`;
+        await db.ref(`games/${this.gameId}/${actionPath}`).set(action);
+
+        // Check if all actors in this phase are done
+        if (this.isHost) {
+            const actors = Object.values(this.allPlayers).filter(p => this.doesRoleActInPhase(p, phase));
+            const completedActors = Object.keys(this.gameState.nightActions[phase].actions || {}).length;
+            if (actors.length <= completedActors) {
+                await db.ref(`games/${this.gameId}/nightActions/${phase}/completed`).set(true);
+                this.advanceNightPhase();
+            }
+        }
+    },
+
+    panelGuard() {
+        const lastGuard = this.getSkillState('lastGuardTarget');
+        let h = '<h3>🛡️ 守卫：请选择守护一人</h3>';
+        const buttons = Object.values(this.allPlayers).filter(p => p.isAlive).map(p => 
+            `<button class="action-btn" data-id="${p.id}" ${p.id == lastGuard ? 'disabled' : ''}>${p.id}号</button>`
+        ).join('');
+        h += `<div>${buttons}<button class="action-btn" data-id="-1">空守</button></div>`;
+        this.$('action-panel').innerHTML = h;
+        this.$('action-panel').querySelectorAll('button').forEach(b => b.onclick = async () => {
+            const targetId = b.dataset.id;
+            await this.setSkillState('lastGuardTarget', targetId);
+            this.submitNightAction({ target: targetId });
+        });
+    },
+
+    panelSeer() {
+        let h = '<h3>🔮 预言家：请选择查验一人</h3>';
+        const buttons = Object.values(this.allPlayers).map(p => 
+            `<button class="action-btn" data-id="${p.id}" ${p.id == this.playerId ? 'disabled' : ''}>${p.id}号</button>`
+        ).join('');
+        h += `<div>${buttons}</div>`;
+        this.$('action-panel').innerHTML = h;
+        this.$('action-panel').querySelectorAll('button').forEach(b => b.onclick = () => {
+            this.submitNightAction({ target: b.dataset.id });
+        });
+    },
+
+    panelWolf() {
+        this.initWolfChat();
+        let h = '<h3>🐺 狼人：请选择击杀目标</h3>';
+        const buttons = Object.values(this.allPlayers).filter(p => p.isAlive).map(p => 
+            `<button class="action-btn" data-id="${p.id}">${p.id}号</button>`
+        ).join('');
+        h += `<div>${buttons}</div>`;
+        this.$('action-panel').innerHTML = h;
+        this.$('action-panel').querySelectorAll('button').forEach(b => b.onclick = () => {
+            this.submitNightAction({ target: b.dataset.id });
+        });
+    },
+
+    panelWitch() {
+        const hasUsedAntidote = this.playerData.skillStates?.usedAntidote;
+        const hasUsedPoison = this.playerData.skillStates?.usedPoison;
+        const wolfKillTarget = this.gameState.nightActions?.WOLF?.actions ? Object.values(this.gameState.nightActions.WOLF.actions)[0].target : null;
+
+        let h = '<h3>🧪 女巫：请选择使用药剂</h3>';
+        let buttons = '';
+        if (!hasUsedAntidote && wolfKillTarget && this.allPlayers[wolfKillTarget]?.isAlive) {
+            buttons += `<button class="action-btn" data-action="save" data-id="${wolfKillTarget}">解救 ${wolfKillTarget} 号</button>`;
+        }
+        if (!hasUsedPoison) {
+            buttons += '<h4>选择毒一人:</h4>';
+            Object.values(this.allPlayers).filter(p => p.isAlive).forEach(p => {
+                buttons += `<button class="action-btn" data-action="poison" data-id="${p.id}">${p.id}号</button>`;
+            });
+        }
+        buttons += `<button class="action-btn" data-action="skip">本晚不行使权力</button>`;
+        h += `<div>${buttons}</div>`;
+        this.$('action-panel').innerHTML = h;
+        this.$('action-panel').querySelectorAll('button').forEach(b => b.onclick = () => {
+            const { action, id } = b.dataset;
+            if (action === 'save') {
+                db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/usedAntidote`).set(true);
+                this.submitNightAction({ action: 'save', target: id });
+            } else if (action === 'poison') {
+                db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/usedPoison`).set(true);
+                this.submitNightAction({ action: 'poison', target: id });
+            } else {
+                this.submitNightAction({ action: 'skip' });
+            }
+        });
+    },
+
+    initWolfChat() {
+        this.$('wolf-chat-area').classList.remove('hidden');
+        this.$('wolf-chat-area').innerHTML = `
+            <div class="wolf-chat-box">
+                <h3>🐺 狼人频道</h3>
+                <div id="wolf-chat"></div>
+                <input id="wolf-input" placeholder="狼人请在此交流...">
+                <button id="wolf-send" class="action-btn">发送</button>
+            </div>`;
+
+        const send = () => {
+            const input = this.$('wolf-input');
+            if (input.value.trim()) {
+                db.ref(`games/${this.gameId}/wolfChat`).push({ pid: this.playerId, msg: input.value.trim(), ts: firebase.database.ServerValue.TIMESTAMP });
+                input.value = '';
+            }
+        };
+        this.$('wolf-send').onclick = send;
+        this.$('wolf-input').onkeydown = e => { if (e.key === 'Enter') send(); };
+
+        if (this.wolfChatListener) this.stopWolfChatListener();
+        this.wolfChatListener = db.ref(`games/${this.gameId}/wolfChat`).on('value', snap => {
+            const chat = this.$('wolf-chat');
+            if (!chat) return;
+            chat.innerHTML = '';
+            snap.forEach(s => {
+                const data = s.val();
+                chat.innerHTML += `<div><strong>${data.pid}号:</strong> ${data.msg}</div>`;
+            });
+            chat.scrollTop = chat.scrollHeight;
+        });
+    },
+
+    stopWolfChatListener() {
+        if (this.wolfChatListener) {
+            db.ref(`games/${this.gameId}/wolfChat`).off('value', this.wolfChatListener);
+            this.wolfChatListener = null;
+        }
+    },
+
+    async processNight() {
+        const night = this.gameState.nightActions;
+        const updates = {};
+        let deaths = []; // {id, reason}
+
+        // 1. Wolf kill
+        const wolfAction = night.WOLF?.actions ? Object.values(night.WOLF.actions)[0] : null;
+        let wolfKillTarget = wolfAction?.target;
+
+        // 2. Guard save
+        const guardAction = night.GUARD?.actions ? Object.values(night.GUARD.actions)[0] : null;
+        const guardSaveTarget = guardAction?.target;
+
+        // 3. Witch action
+        const witchAction = night.WITCH?.actions ? Object.values(night.WITCH.actions)[0] : null;
+        let witchSaveTarget = null;
+        if (witchAction?.action === 'save') witchSaveTarget = witchAction.target;
+        if (witchAction?.action === 'poison') {
+            deaths.push({ id: witchAction.target, reason: 'poison' });
+        }
+
+        // 4. Calculate deaths
+        if (wolfKillTarget) {
+            const isSavedByGuard = wolfKillTarget === guardSaveTarget;
+            const isSavedByWitch = wolfKillTarget === witchSaveTarget;
+            if (isSavedByGuard && isSavedByWitch) {
+                deaths.push({ id: wolfKillTarget, reason: 'double_save' }); // Double save kills
+            } else if (!isSavedByGuard && !isSavedByWitch) {
+                deaths.push({ id: wolfKillTarget, reason: 'wolf_kill' });
+            }
+        }
+
+        // 5. Process Seer results
+        const seerAction = night.SEER?.actions ? Object.values(night.SEER.actions)[0] : null;
+        if (seerAction?.target) {
+            const targetPlayer = this.allPlayers[seerAction.target];
+            const targetRole = this.getActiveRoleInfo(targetPlayer);
+            let result = targetRole.faction;
+            if (targetRole.name === '隐狼' && Object.values(this.allPlayers).some(p => p.isAlive && this.getActiveRoleInfo(p)?.name === '狼人')) {
+                result = 'good'; // Invisible wolf appears good
+            }
+            const seerId = Object.keys(night.SEER.actions)[0];
+            updates[`players/${seerId}/skillStates/seerResults/${seerAction.target}`] = result;
+        }
+
+        // 6. Apply deaths
+        let peaceNight = deaths.length === 0;
+        for (const death of deaths) {
+            const player = this.allPlayers[death.id];
+            if (!player.isAlive) continue;
+            player.deaths++;
+            updates[`players/${death.id}/deaths`] = player.deaths;
+            if (player.deaths >= 2) {
+                updates[`players/${death.id}/isAlive`] = false;
+            }
+        }
+        
+        updates['state/phase'] = 'DAY';
+        updates['state/peaceNightStreak'] = peaceNight ? (this.gameState.peaceNightStreak || 0) + 1 : 0;
+
+        await db.ref(`games/${this.gameId}`).update(updates);
+        this.checkGameOver();
+    },
+
+    checkGameOver() {
+        const players = Object.values(this.allPlayers);
+        const living = players.filter(p => p.isAlive);
+        
+        const livingGods = living.filter(p => this.getActiveRoleInfo(p)?.isGod).length;
+        const livingWolves = living.filter(p => this.getActiveRoleInfo(p)?.faction === 'bad').length;
+        const livingGoldBabies = living.filter(p => p.originalIdentities.every(id => id.role === '平民')).length;
+
+        let winner = null;
+        if (livingWolves === 0) {
+            winner = '😇 好人阵营胜利 (狼人出局)';
+        } else if (this.gameState.peaceNightStreak >= 3) {
+            winner = '😇 好人阵营胜利 (三连平安夜)';
+        } else if (livingGods === 0) {
+            winner = '🐺 狼人阵营胜利 (神职死完)';
+        } else if (livingGoldBabies === 0) {
+            winner = '🐺 狼人阵营胜利 (金宝宝死完)';
+        }
+
+        if (winner) {
+            db.ref(`games/${this.gameId}/state/winner`).set(winner);
+            db.ref(`games/${this.gameId}/state/phase`).set('GAME_OVER');
+        }
+    }
+};
+
+window.onload = () => App.init();
+
 </script>
 </body>
 </html>

@@ -627,93 +627,55 @@ async createGame(){
 
 // 优化的发牌算法
 optimizedDealIdentities(pool) {
-    // 分类统计
-    const roleCount = {};
-    pool.forEach(r => roleCount[r] = (roleCount[r] || 0) + 1);
-    
-    // 特殊处理的角色
-    const thiefCount = roleCount['盗贼'] || 0;
-    const villagerCount = roleCount['平民'] || 0;
-    const wolfCount = roleCount['狼人'] || 0;
-    const hiddenWolfCount = roleCount['隐狼'] || 0;
-    const seerCount = roleCount['预言家'] || 0;
-    
-    // 检查是否可能生成合法牌组
-    if (thiefCount > 0 && (wolfCount > 0 || hiddenWolfCount > 0)) return null;
-    if (seerCount > 0 && (wolfCount + hiddenWolfCount) > (pool.length - seerCount)) return null;
-    
-    // 构建配对
-    let pairs = [];
-    let remainingRoles = [...pool];
-    
-    // 1. 优先处理盗贼
-    for (let i = 0; i < thiefCount; i++) {
-        remainingRoles.splice(remainingRoles.indexOf('盗贼'), 1);
-        // 随机选一个非狼角色与盗贼配对
-        const validRoles = remainingRoles.filter(r => r !== '狼人' && r !== '隐狼');
-        if (validRoles.length === 0) return null;
-        const partnerIndex = Math.floor(Math.random() * validRoles.length);
-        const partner = validRoles[partnerIndex];
-        remainingRoles.splice(remainingRoles.indexOf(partner), 1);
-        pairs.push([
-            {role: partner, isThiefCopy: true},
-            {role: partner, isThiefCopy: false}
-        ]);
+  const n = pool.length;
+  const maxAttempts = 5000;
+  // 简单洗牌
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    
-    // 2. 处理预言家
-    for (let i = 0; i < seerCount; i++) {
-        const seerIndex = remainingRoles.indexOf('预言家');
-        if (seerIndex === -1) continue;
-        remainingRoles.splice(seerIndex, 1);
-        // 预言家必须与非狼角色配对
-        const validRoles = remainingRoles.filter(r => r !== '狼人' && r !== '隐狼');
-        if (validRoles.length === 0) return null;
-        const partnerIndex = Math.floor(Math.random() * validRoles.length);
-        const partner = validRoles[partnerIndex];
-        remainingRoles.splice(remainingRoles.indexOf(partner), 1);
-        pairs.push([
-            {role: '预言家', isThiefCopy: false},
-            {role: partner, isThiefCopy: false}
-        ]);
+    return arr;
+  }
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const shuffled = shuffle(pool.slice());
+    const pairs = [];
+    let valid = true;
+    let goldenCount = 0;
+
+    // 两两配
+    for (let i = 0; i < n; i += 2) {
+      const r1 = shuffled[i], r2 = shuffled[i + 1];
+      // 检查禁配
+      for (const [f1, f2] of FORBIDDEN) {
+        if ((r1 === f1 && r2 === f2) || (r1 === f2 && r2 === f1)) {
+          valid = false;
+          break;
+        }
+      }
+      if (!valid) break;
+      // 统计“金宝宝”：平民+平民 或 盗贼+平民（双向）
+      if ((r1 === '平民' && r2 === '平民')
+       || (r1 === '盗贼' && r2 === '平民')
+       || (r1 === '平民' && r2 === '盗贼')) {
+        goldenCount++;
+      }
+      pairs.push([r1, r2]);
     }
-    
-    // 3. 处理隐狼（不能与狼人或隐狼配对）
-    for (let i = 0; i < hiddenWolfCount; i++) {
-        const hiddenWolfIndex = remainingRoles.indexOf('隐狼');
-        if (hiddenWolfIndex === -1) continue;
-        remainingRoles.splice(hiddenWolfIndex, 1);
-        const validRoles = remainingRoles.filter(r => r !== '狼人' && r !== '隐狼');
-        if (validRoles.length === 0) return null;
-        const partnerIndex = Math.floor(Math.random() * validRoles.length);
-        const partner = validRoles[partnerIndex];
-        remainingRoles.splice(remainingRoles.indexOf(partner), 1);
-        pairs.push([
-            {role: '隐狼', isThiefCopy: false},
-            {role: partner, isThiefCopy: false}
-        ]);
-    }
-    
-    // 4. 随机配对剩余角色
-    const shuffled = remainingRoles.sort(() => Math.random() - 0.5);
-    for (let i = 0; i < shuffled.length; i += 2) {
-        if (i + 1 >= shuffled.length) return null;
-        pairs.push([
-            {role: shuffled[i], isThiefCopy: false},
-            {role: shuffled[i + 1], isThiefCopy: false}
-        ]);
-    }
-    
-    // 验证金宝宝数量
-    let goldenBabyCount = 0;
-    pairs.forEach(p => {
-        if (p[0].role === '平民' && p[1].role === '平民') goldenBabyCount++;
-    });
-    
-    if (goldenBabyCount < 1 || goldenBabyCount > 2) return null;
-    
-    // 随机打乱配对顺序
-    return pairs.sort(() => Math.random() - 0.5);
+
+    if (!valid) continue;
+    if (goldenCount < 1 || goldenCount > 2) continue;
+
+    // 构造返回格式
+    return pairs.map(pair => pair.map(role => ({
+      role,
+      isThiefCopy: false
+    })));
+  }
+
+  // 超时未找到合法方案
+  return null;
 },
 
 buildPlayerLinks(count){

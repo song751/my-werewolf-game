@@ -310,19 +310,17 @@ updateNight(ac){
   this.dom.nightActionStatus.classList.add('hidden');
   return;
  }
-
  /* 只统计，不显示号数 */
  const roleNameMap={
   WOLF_ACTION:'狼人',WITCH_ACTION:'女巫',
   SEER_ACTION:'预言家',GUARD_ACTION:'守卫'
  };
  const total=ph==='WOLF_ACTION'
-  ?1  // 只看最小号狼人
+  ?1 // 只看最小号狼人
   :Object.values(this.allPlayers).filter(p=>shouldAct(p,ph,this.allPlayers)).length;
  const done=ph==='WOLF_ACTION'
   ?(ac['LEADER_WOLF']?1:0)
   :Object.keys(ac).filter(k=>k.endsWith('_'+ph)).length;
-
  this.dom.nightActionStatus.innerHTML=
   `<h4>${roleNameMap[ph]||''} 阶段</h4><div>已完成: ${done}/${total}</div>`;
  this.dom.nightActionStatus.classList.remove('hidden');
@@ -456,7 +454,6 @@ skipPanel(actionFlag){
    '<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>';
  };
 },
-
 wait(){this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:18px;">⏳ 等待其他玩家...</p></div>'},
 
 /* --- 狼人 --- */
@@ -527,7 +524,7 @@ panelGuard(){
  document.querySelectorAll('.action-btn').forEach(b=>
   b.onclick=()=>this.guard(b.dataset.id));
  this.$('guard-skip').onclick=()=>this.guardSkip();
- if(allDisabled)this.$('guard-skip').click();  /* 自动跳过，避免卡死 */
+ if(allDisabled)this.$('guard-skip').click(); /* 自动跳过，避免卡死 */
 },
 guardSkip(){db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_GUARD_ACTION`).set(true);this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>'},
 async guard(id){
@@ -536,7 +533,6 @@ async guard(id){
  await db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_GUARD_ACTION`).set(true);
  this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">🛡️ 已守护</p></div>';
 },
-
 /* --- 女巫 --- */
 async panelWitch(){
  const cure=!this.playerData.hasUsedCure,poison=!this.playerData.hasUsedPoison,wolf=(await db.ref(`games/${this.gameId}/nightActions/wolfKill`).once('value')).val();
@@ -555,7 +551,6 @@ async witch(type,target){
  up[`actionCompleted/${this.playerId}_WITCH_ACTION`]=true;await db.ref(`games/${this.gameId}`).update(up);
  this.dom.actionPanel.innerHTML=`<div class="action-feedback"><p style="font-size:20px;">${msg}</p></div>`;
 },
-
 /* --- 骑士 --- */
 panelKnight(){
  const btns=Object.values(this.allPlayers).filter(p=>p.isAlive&&p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">⚔️ ${p.id}号</button>`).join('');
@@ -569,7 +564,6 @@ async knight(id){
  if(bad){await this.kill(id,'DUEL');await this.updatePhase('NIGHT_START')}else await this.kill(this.playerId,'DUEL');
  this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">⚔️ 决斗结束</p></div>';
 },
-
 /* --- 猎人 --- */
 panelHunter(){
  const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}" ${!p.isAlive?'disabled':''}>${p.id}号</button>`).join('');

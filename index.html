@@ -291,6 +291,11 @@
             text-align: center;
             padding: 10px;
         }
+        .hidden-wolf-note {
+            font-size: 12px;
+            color: #aaa;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -406,7 +411,7 @@
 
         const FORBIDDEN_PAIRS = [
             ['预言家', '狼人'], ['预言家', '隐狼'], ['盗贼', '狼人'],
-            ['盗贼', '隐狼'], ['隐狼', '狼人']
+            ['盗贼', '隐狼'], ['隐狼', '狼人'], ['隐狼', '隐狼']
         ];
 
         const App = {
@@ -424,6 +429,7 @@
             actionCompletedListeners: {},
             nightActions: {},
             allWolfVotes: {},
+            hasVoted: false,
 
             init() {
                 this.cacheDOMElements();
@@ -811,9 +817,8 @@
                 // 执行夜晚行动
                 await this.executeNightActions();
                 
-                // 更新游戏状态到白天
-                const newRound = (this.gameState.round || 1) + 1;
-                this.setGameState({ phase: 'DAY', round: newRound });
+                // 更新游戏状态到白天，回合数已在executeNightActions中更新
+                this.setGameState({ phase: 'DAY' });
             },
 
             triggerRoleAction(action) {
@@ -992,6 +997,10 @@
                     resultMessage = '平安夜，无人死亡';
                 }
                 
+                // 更新回合数
+                const newRound = (game.state.round || 1) + 1;
+                updates['state/round'] = newRound;
+                
                 await db.ref(`games/${this.gameId}`).update(updates);
                 
                 // 显示结果
@@ -1023,6 +1032,12 @@
                     // 初始化当前身份顺序
                     if (!this.currentIdentityOrder && this.playerData) {
                         this.currentIdentityOrder = [...this.playerData.identities];
+                    }
+                    
+                    // 检查是否需要重置投票状态
+                    if (this.gameState.phase !== 'WOLF_ACTION') {
+                        this.hasVoted = false;
+                        this.currentWolfVote = null;
                     }
                     
                     this.renderAll();
@@ -1182,6 +1197,10 @@
                         if (!activeIdentity) return false;
                         
                         const role = activeIdentity.role || activeIdentity;
+                        // 如果自己是普通狼人，看不到隐狼
+                        if (this.hasActiveRole('狼人') && role === '隐狼') {
+                            return false;
+                        }
                         return ROLES[role] && ROLES[role].faction === 'bad';
                     });
                     
@@ -1192,6 +1211,10 @@
                         html += `<div>队友: ${aliveWolves}</div>`;
                     } else {
                         html += '<div>暂无其他活跃狼人</div>';
+                    }
+                    
+                    if (this.hasActiveRole('狼人')) {
+                        html += '<div class="hidden-wolf-note">（普通狼人看不到隐狼）</div>';
                     }
                 }
                 
@@ -1265,8 +1288,6 @@
                 
                 // 如果不是狼人行动阶段，停止监听
                 if (phase !== 'WOLF_ACTION') {
-                    this.dom.wolfChatSection.innerHTML = '';
-                    this.dom.wolfChatSection.classList.add('hidden');
                     this.stopListeningToWolfChat();
                     this.stopListeningToWolfVotes();
                 }
@@ -1277,9 +1298,11 @@
                 // 狼人行动
                 if (phase === 'WOLF_ACTION' && this.canSeeWolfInfo()) {
                     this.renderWolfChat();
-                    if (this.canPerformAction(phase)) {
+                    if (this.canPerformAction(phase) && !this.hasVoted) {
                         html = this.getWolfActionHtml();
                         hasAction = true;
+                    } else if (this.hasVoted) {
+                        html = `<div class="action-feedback"><p>你已完成投票</p></div>`;
                     }
                 } 
                 // 预言家行动
@@ -1340,46 +1363,42 @@
             renderWolfChat() {
                 if (!this.canSeeWolfInfo()) return;
                 
-                this.dom.wolfChatSection.classList.remove('hidden');
-                let chatHTML = `
-                    <div class="wolf-chat-container">
-                        <h3>狼人频道</h3>
-                        <div id="wolf-chat"></div>
-                        <div>
-                            <input type="text" id="wolf-chat-input" placeholder="和队友秘密沟通...">
-                            <button id="send-wolf-msg">发送</button>
+                const existingContainer = document.querySelector('.wolf-chat-container');
+                if (!existingContainer) {
+                    this.dom.wolfChatSection.classList.remove('hidden');
+                    this.dom.wolfChatSection.innerHTML = `
+                        <div class="wolf-chat-container">
+                            <h3>狼人频道</h3>
+                            <div id="wolf-chat"></div>
+                            <div>
+                                <input type="text" id="wolf-chat-input" placeholder="和队友秘密沟通...">
+                                <button id="send-wolf-msg">发送</button>
+                            </div>
+                            <div id="wolf-votes-summary" class="wolf-votes-summary"></div>
                         </div>
-                `;
-                
-                // 如果当前是狼人行动阶段，显示投票情况
-                if (this.gameState.phase === 'WOLF_ACTION') {
-                    chatHTML += `<div id="wolf-votes-summary" class="wolf-votes-summary"></div>`;
+                    `;
+                    
+                    // 绑定发送消息事件
+                    const sendBtn = document.getElementById('send-wolf-msg');
+                    const input = document.getElementById('wolf-chat-input');
+                    
+                    if (sendBtn) {
+                        sendBtn.addEventListener('click', () => this.sendWolfMessage());
+                    }
+                    
+                    if (input) {
+                        input.addEventListener('keypress', (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                this.sendWolfMessage();
+                            }
+                        });
+                    }
                 }
-                
-                chatHTML += '</div>';
-                
-                this.dom.wolfChatSection.innerHTML = chatHTML;
                 
                 this.listenToWolfChat();
                 if (this.gameState.phase === 'WOLF_ACTION') {
                     this.listenToWolfVotes();
-                }
-                
-                // 绑定发送消息事件
-                const sendBtn = document.getElementById('send-wolf-msg');
-                const input = document.getElementById('wolf-chat-input');
-                
-                if (sendBtn) {
-                    sendBtn.addEventListener('click', () => this.sendWolfMessage());
-                }
-                
-                if (input) {
-                    input.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            this.sendWolfMessage();
-                        }
-                    });
                 }
             },
 
@@ -1414,6 +1433,12 @@
                 this.wolfVotesListener = db.ref(`games/${this.gameId}/wolfVotes`).on('value', (snapshot) => {
                     this.allWolfVotes = snapshot.val() || {};
                     this.updateWolfVotesSummary();
+                    
+                    // 检查自己是否已投票
+                    if (this.allWolfVotes[this.playerId]) {
+                        this.hasVoted = true;
+                        this.renderActionPanel();
+                    }
                 });
             },
 
@@ -1446,6 +1471,8 @@
                     db.ref(`games/${this.gameId}/wolfChat`).off('value', this.wolfChatListener);
                     this.wolfChatListener = null;
                 }
+                this.dom.wolfChatSection.innerHTML = '';
+                this.dom.wolfChatSection.classList.add('hidden');
             },
 
             stopListeningToWolfVotes() {
@@ -1591,6 +1618,8 @@
                     isVote: true
                 };
                 await db.ref(`games/${this.gameId}/wolfChat`).push(voteMessage);
+                
+                this.hasVoted = true;
                 
                 // 标记行动完成
                 await this.completeAction('WOLF_ACTION');

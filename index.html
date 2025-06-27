@@ -157,7 +157,7 @@ details summary:hover{color:var(--success)}
 
 <script>
 /* ==========================================================
-   双身份狼人杀 2025-06-29 修订
+   双身份狼人杀 2025-06-30 终版
    ========================================================== */
 
 /* ---------- 1. Firebase ---------- */
@@ -305,12 +305,26 @@ updateBtns(){
  this.dom.btnNight.disabled=isNight||ph==='GAME_OVER';this.dom.btnDay.disabled=!isNight||ph==='GAME_OVER';
 },
 updateNight(ac){
- const ph=this.gameState.phase;if(!ph.includes('ACTION')){this.dom.nightActionStatus.classList.add('hidden');return}
- const map={'WOLF_ACTION':['🐺','狼人'],WITCH_ACTION:['🧪','女巫'],SEER_ACTION:['🔮','预言家'],GUARD_ACTION:['🛡️','守卫']};
- const info=map[ph];if(!info)return;
- const total=Object.values(this.allPlayers).filter(p=>shouldAct(p,ph,this.allPlayers)).length;
- const done=ph==='WOLF_ACTION'?(ac['LEADER_WOLF']?1:0):Object.keys(ac).filter(k=>k.endsWith('_'+ph)).length;
- this.dom.nightActionStatus.innerHTML=`<h4>${info[0]} ${info[1]}行动</h4><div>已完成: ${done}/${total}</div>`;
+ const ph=this.gameState.phase;
+ if(!ph.includes('ACTION')){
+  this.dom.nightActionStatus.classList.add('hidden');
+  return;
+ }
+
+ /* 只统计，不显示号数 */
+ const roleNameMap={
+  WOLF_ACTION:'狼人',WITCH_ACTION:'女巫',
+  SEER_ACTION:'预言家',GUARD_ACTION:'守卫'
+ };
+ const total=ph==='WOLF_ACTION'
+  ?1  // 只看最小号狼人
+  :Object.values(this.allPlayers).filter(p=>shouldAct(p,ph,this.allPlayers)).length;
+ const done=ph==='WOLF_ACTION'
+  ?(ac['LEADER_WOLF']?1:0)
+  :Object.keys(ac).filter(k=>k.endsWith('_'+ph)).length;
+
+ this.dom.nightActionStatus.innerHTML=
+  `<h4>${roleNameMap[ph]||''} 阶段</h4><div>已完成: ${done}/${total}</div>`;
  this.dom.nightActionStatus.classList.remove('hidden');
 },
 renderHostPlayers(reveal){
@@ -380,17 +394,69 @@ confirm(){if(this.playerData.isReady)return;db.ref(`games/${this.gameId}/players
 
 /* ---------------- 行动面板 ---------------- */
 renderPanel(){
- const ph=this.gameState.phase;this.dom.actionPanel.innerHTML='';
+ const ph=this.gameState.phase;
+ this.dom.actionPanel.innerHTML='';
+
+ /* 亡者除猎人外不再操作 */
  if(!this.playerData.isAlive&&ph!=='HUNTER_ACTION')return;
+
+ const activeCould=this.canAct(ph);
+
+ /* 如果"应该行动但因为各种原因无法"----给跳过 */
+ const ownsRoleButCannot=
+  !activeCould&&
+  ['SEER_ACTION','GUARD_ACTION','WITCH_ACTION'].includes(ph)&&
+  this.playerData.originalIdentities.some(i=>
+   ({SEER_ACTION:'预言家',GUARD_ACTION:'守卫',WITCH_ACTION:'女巫'}[ph]===i.role));
+
+ if(!activeCould&&!ownsRoleButCannot){
+  this.wait();
+  return;
+ }
+
  switch(ph){
-  case 'DAY':if(this.getActiveRole(this.playerData)==='骑士'&&!this.playerData.isExposedIdiot)this.panelKnight();break;
-  case 'WOLF_ACTION':if(this.canAct('WOLF_ACTION'))this.panelWolf();else this.wait();break;
-  case 'SEER_ACTION':if(this.canAct('SEER_ACTION'))this.panelSeer();else this.wait();break;
-  case 'GUARD_ACTION':if(this.canAct('GUARD_ACTION'))this.panelGuard();else this.wait();break;
-  case 'WITCH_ACTION':if(this.canAct('WITCH_ACTION'))this.panelWitch();else this.wait();break;
-  case 'HUNTER_ACTION':if(this.hasRole('猎人'))this.panelHunter();break;
+  case 'DAY':
+   if(this.getActiveRole(this.playerData)==='骑士'&&!this.playerData.isExposedIdiot)
+    this.panelKnight();
+   break;
+
+  case 'WOLF_ACTION':
+   activeCould?this.panelWolf():this.wait();
+   break;
+
+  case 'SEER_ACTION':
+   activeCould?this.panelSeer():this.skipPanel('SEER_ACTION');
+   break;
+
+  case 'GUARD_ACTION':
+   /* Guard 特殊：若全部目标按钮均被禁用也允许跳过 */
+   if(activeCould)this.panelGuard();else this.skipPanel('GUARD_ACTION');
+   break;
+
+  case 'WITCH_ACTION':
+   activeCould?this.panelWitch():this.skipPanel('WITCH_ACTION');
+   break;
+
+  case 'HUNTER_ACTION':
+   if(this.hasRole('猎人'))this.panelHunter();
+   break;
  }
 },
+
+/* --- 通用"跳过"面板 --- */
+skipPanel(actionFlag){
+ this.dom.actionPanel.innerHTML=`
+  <div class="action-feedback">
+   <p style="font-size:18px;">无法 / 不需在此阶段行动</p>
+   <button id="btn-skip-now" class="control-btn">⏭️ 跳过</button>
+  </div>`;
+ this.$('btn-skip-now').onclick=()=>{
+  db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_${actionFlag}`).set(true);
+  this.dom.actionPanel.innerHTML=
+   '<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>';
+ };
+},
+
 wait(){this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:18px;">⏳ 等待其他玩家...</p></div>'},
 
 /* --- 狼人 --- */
@@ -442,11 +508,26 @@ async seer(id){
  await db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_SEER_ACTION`).set(true);
  this.dom.actionPanel.innerHTML=`<div class="action-feedback"><p style="font-size:20px;">${id}号是<strong style="color:${res==='狼人'?'var(--danger)':'var(--success)'}"> ${res==='狼人'?'🐺 狼人':'😇 好人'}</strong></p></div>`;
 },
-/* --- 守卫 --- */
+
+/* --- 守卫面板小改：若因连守限制全部按钮 disabled，则自动补渲染跳过按钮 --- */
 panelGuard(){
- const last=this.playerData.lastGuardTarget,btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}" ${p.id==last?'disabled':''}>${p.id}号 ${p.id==last?'(不可连守)':''}</button>`).join('');
- this.dom.actionPanel.innerHTML=`<h3>🛡️ 守卫</h3><div>${btns}</div><div style="margin-top:15px;"><button id="guard-skip" class="control-btn">⏭️ 跳过</button></div>`;
- document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>this.guard(b.dataset.id));this.$('guard-skip').onclick=()=>this.guardSkip();
+ const last=this.playerData.lastGuardTarget;
+ const live=Object.values(this.allPlayers).filter(p=>p.isAlive);
+ const btnHtml=live.map(p=>
+  `<button class="action-btn" data-id="${p.id}" ${p.id==last?'disabled':''}>
+    ${p.id}号 ${p.id==last?'(不可连守)':''}
+   </button>`).join('');
+ const allDisabled=live.every(p=>p.id==last);
+ this.dom.actionPanel.innerHTML=`
+  <h3>🛡️ 守卫</h3>
+  <div>${btnHtml}</div>
+  <div style="margin-top:15px;">
+   <button id="guard-skip" class="control-btn">⏭️ 跳过</button>
+  </div>`;
+ document.querySelectorAll('.action-btn').forEach(b=>
+  b.onclick=()=>this.guard(b.dataset.id));
+ this.$('guard-skip').onclick=()=>this.guardSkip();
+ if(allDisabled)this.$('guard-skip').click();  /* 自动跳过，避免卡死 */
 },
 guardSkip(){db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_GUARD_ACTION`).set(true);this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>'},
 async guard(id){
@@ -455,6 +536,7 @@ async guard(id){
  await db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_GUARD_ACTION`).set(true);
  this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">🛡️ 已守护</p></div>';
 },
+
 /* --- 女巫 --- */
 async panelWitch(){
  const cure=!this.playerData.hasUsedCure,poison=!this.playerData.hasUsedPoison,wolf=(await db.ref(`games/${this.gameId}/nightActions/wolfKill`).once('value')).val();
@@ -473,6 +555,7 @@ async witch(type,target){
  up[`actionCompleted/${this.playerId}_WITCH_ACTION`]=true;await db.ref(`games/${this.gameId}`).update(up);
  this.dom.actionPanel.innerHTML=`<div class="action-feedback"><p style="font-size:20px;">${msg}</p></div>`;
 },
+
 /* --- 骑士 --- */
 panelKnight(){
  const btns=Object.values(this.allPlayers).filter(p=>p.isAlive&&p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">⚔️ ${p.id}号</button>`).join('');
@@ -486,6 +569,7 @@ async knight(id){
  if(bad){await this.kill(id,'DUEL');await this.updatePhase('NIGHT_START')}else await this.kill(this.playerId,'DUEL');
  this.dom.actionPanel.innerHTML='<div class="action-feedback"><p style="font-size:20px;">⚔️ 决斗结束</p></div>';
 },
+
 /* --- 猎人 --- */
 panelHunter(){
  const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}" ${!p.isAlive?'disabled':''}>${p.id}号</button>`).join('');

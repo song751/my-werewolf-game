@@ -430,14 +430,8 @@ renderPanel(){
 
  const activeCould=this.canAct(ph);
 
- const ownsRoleButCannot=
-  !activeCould&&
-  ['SEER_ACTION','GUARD_ACTION','WITCH_ACTION'].includes(ph)&&
-  this.playerData.originalIdentities.some(i=>
-   ({SEER_ACTION:'预言家',GUARD_ACTION:'守卫',WITCH_ACTION:'女巫'}[ph]===i.role));
-
- if(!activeCould&&!ownsRoleButCannot){
-  this.wait();
+ if(!activeCould){
+  this.skipPanel(ph,false);
   return;
  }
 
@@ -448,19 +442,19 @@ renderPanel(){
    break;
 
   case 'WOLF_ACTION':
-   activeCould?this.panelWolf():this.wait();
+   this.panelWolf();
    break;
 
   case 'SEER_ACTION':
-   activeCould?this.panelSeer():this.skipPanel('SEER_ACTION');
+   this.panelSeer();
    break;
 
   case 'GUARD_ACTION':
-   if(activeCould)this.panelGuard();else this.skipPanel('GUARD_ACTION');
+   this.panelGuard();
    break;
 
   case 'WITCH_ACTION':
-   activeCould?this.panelWitch():this.skipPanel('WITCH_ACTION');
+   this.panelWitch();
    break;
 
   case 'HUNTER_ACTION':
@@ -469,14 +463,17 @@ renderPanel(){
  }
 },
 
-skipPanel(actionFlag){
+skipPanel(actionFlag,countAsDone=true){
+ const key=countAsDone
+  ?`${this.playerId}_${actionFlag}`
+  :`${this.playerId}_SKIP_${actionFlag}`;
  this.dom.actionPanel.innerHTML=`
   <div class="action-feedback">
    <p style="font-size:18px;">无法 / 不需在此阶段行动</p>
    <button id="btn-skip-now" class="control-btn">⏭️ 跳过</button>
   </div>`;
  this.$('btn-skip-now').onclick=()=>{
-  db.ref(`games/${this.gameId}/actionCompleted/${this.playerId}_${actionFlag}`).set(true);
+  db.ref(`games/${this.gameId}/actionCompleted/${key}`).set(true);
   this.dom.actionPanel.innerHTML=
    '<div class="action-feedback"><p style="font-size:20px;">⏭️ 已跳过</p></div>';
  };

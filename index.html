@@ -163,15 +163,13 @@ const App={
         }
     },
     
-    // [MODIFIED] 更健壮的渲染函数，避免UI显示问题
     renderRoleSetup() {
         const container = this.$('role-setup');
-        container.innerHTML = ''; // 确保容器是空的
+        container.innerHTML = ''; 
 
-        // 使用更可靠的方式遍历对象并创建DOM元素
         Object.keys(DEFAULT_SETUP).forEach(roleName => {
             const roleData = ROLES[roleName];
-            if (!roleData) return; // 安全检查
+            if (!roleData) return;
             const defaultValue = DEFAULT_SETUP[roleName];
 
             const itemDiv = document.createElement('div');
@@ -196,7 +194,6 @@ const App={
             container.appendChild(itemDiv);
         });
 
-        // 更新计数的逻辑保持不变
         const u = () => {
             let t = 0;
             this.$('role-setup').querySelectorAll('input').forEach(i => t += +i.value || 0);
@@ -204,7 +201,7 @@ const App={
             this.$('player-cnt').textContent = t % 2 === 0 ? t / 2 : '身份总数必须为偶数';
         };
         this.$('role-setup').oninput = u;
-        u(); // 立即执行一次以显示初始总数
+        u();
     },
 
     async createGame(){
@@ -219,8 +216,8 @@ const App={
         for(let i=1;i<=pc;i++)players[i]={id:i,identities:pairs[i-1],originalIdentities:pairs[i-1].map(p=>({...p})),deaths:0,isAlive:true,isReady:false,isExposedIdiot:false,skillStates:{}};
         
         await db.ref(`games/${gId}`).set({
-            state:{phase:'SETUP',round:0,peaceNightStreak:0,winner:null,creatorId:1},
-            players, config:{pc}, wolfChat:{}, wolfVotes:{}, nightActions:{}, nightStatus:{}
+            state:{phase:'SETUP',round:0,peaceNightStreak:0,winner:null,creatorId:1, nightStatus:{}},
+            players, config:{pc}, wolfChat:{}, wolfVotes:{}, nightActions:{}
         });
         
         alert(`游戏创建成功！\n游戏ID: ${gId}\n\n您将作为1号玩家进入游戏。请将此游戏ID分享给其他玩家，让他们修改链接中的座位号加入游戏。`);
@@ -416,7 +413,8 @@ const App={
             if (nightStatus.wolf === 'complete' && nightStatus.witch === 'locked') {
                 nightStatus.witch = 'pending';
             }
-            up['nightStatus'] = nightStatus;
+            // [FIXED] 将 nightStatus 写入 state 对象中，以匹配读取逻辑
+            up['state/nightStatus'] = nightStatus;
         }
         await db.ref(`games/${this.gameId}`).update(up);
     },
@@ -427,6 +425,7 @@ const App={
 
         const phase = this.gameState.phase;
         const activeRole = this.getActiveRole(this.playerData);
+        // [FIXED] 从 gameState 中读取 nightStatus
         const nightStatus = this.gameState.nightStatus || {};
 
         let content = '';
@@ -486,7 +485,8 @@ const App={
             const finalTarget = Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b);
 
             await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
-            await db.ref(`games/${this.gameId}/nightStatus`).update({wolf:'complete',witch:'pending'});
+            // [FIXED] 更新 state/nightStatus 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
         };
     },
     
@@ -495,7 +495,8 @@ const App={
         this.$('action-panel').innerHTML=`<h3>🔮 请选择查验目标</h3><div>${btns}</div><div style="margin-top:15px;"><button id="seer-skip" class="control-btn">⏭️ 跳过本回合</button></div>`;
         document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>this.seer(b.dataset.id));
         this.$('seer-skip').onclick=async ()=>{
-            await db.ref(`games/${this.gameId}/nightStatus/seer`).set('complete');
+            // [FIXED] 更新 state/nightStatus/seer 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过查验</p></div>';
         };
     },
@@ -522,7 +523,8 @@ const App={
         const results = this.getSkillState('seerResults') || {};
         results[id] = res;
         await this.setSkillState('seerResults', results);
-        await db.ref(`games/${this.gameId}/nightStatus/seer`).set('complete');
+        // [FIXED] 更新 state/nightStatus/seer 路径
+        await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
         this.$('action-panel').innerHTML = `<div class="action-feedback"><p style="font-size:20px;">${id}号是<strong style="color:${res==='狼人'?'var(--danger)':'var(--success)'}"> ${res==='狼人'?'🐺 狼人':'😇 好人'}</strong></p></div>`;
     },
 
@@ -534,11 +536,13 @@ const App={
             if(b.dataset.id == last) return alert('不能连续守护同一个人！');
             await db.ref(`games/${this.gameId}/nightActions/guard`).set(b.dataset.id);
             await this.setSkillState('lastGuardTarget',b.dataset.id);
-            await db.ref(`games/${this.gameId}/nightStatus/guard`).set('complete');
+            // [FIXED] 更新 state/nightStatus/guard 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>🛡️ 已守护</p></div>';
         });
         this.$('guard-skip').onclick=async ()=>{
-            await db.ref(`games/${this.gameId}/nightStatus/guard`).set('complete');
+            // [FIXED] 更新 state/nightStatus/guard 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过守护</p></div>';
         };
     },
@@ -560,17 +564,20 @@ const App={
         if(this.$('btn-cure'))this.$('btn-cure').onclick=async()=>{
             await this.setSkillState('hasUsedCure',true);
             await db.ref(`games/${this.gameId}/nightActions/witchCure`).set(true);
-            await db.ref(`games/${this.gameId}/nightStatus/witch`).set('complete');
+            // [FIXED] 更新 state/nightStatus/witch 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>💉 已使用解药</p></div>';
         };
         document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=async()=>{
             await this.setSkillState('hasUsedPoison',true);
             await db.ref(`games/${this.gameId}/nightActions/witchPoison`).set(b.dataset.id);
-            await db.ref(`games/${this.gameId}/nightStatus/witch`).set('complete');
+            // [FIXED] 更新 state/nightStatus/witch 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
             this.$('action-panel').innerHTML=`<div class="action-feedback"><p>☠️ 已毒杀 ${b.dataset.id} 号</p></div>`;
         });
         this.$('witch-skip').onclick=async()=>{
-            await db.ref(`games/${this.gameId}/nightStatus/witch`).set('complete');
+            // [FIXED] 更新 state/nightStatus/witch 路径
+            await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过</p></div>';
         };
     },
@@ -681,28 +688,27 @@ const App={
         }
     },
 
-    // [MODIFIED] 修正白痴的死亡逻辑，并优化数据库更新
+    // [FIXED] 修正白痴被投票出局时的逻辑
     async kill(pid, cause, ps = null, lost = 1) {
         const players = ps || this.allPlayers, p = players[pid];
         if (!p || !p.isAlive) return false;
 
-        const updates = {}; // 创建一个对象来批量更新
-
-        // 如果白痴被投票出局，添加翻牌标记
-        if (this.getActiveRole(p) === '白痴' && cause === 'VOTE') {
-            updates['players/' + pid + '/isExposedIdiot'] = true;
-            // 注意：不再提前返回，让死亡逻辑继续
+        // 如果白痴因投票出局且尚未翻牌，则翻牌并取消本次死亡
+        if (this.getActiveRole(p) === '白痴' && cause === 'VOTE' && !p.isExposedIdiot) {
+            await db.ref(`games/${this.gameId}/players/${pid}/isExposedIdiot`).set(true);
+            if(this.isHost) alert(`${pid}号玩家是白痴，已翻牌，本次投票无效。`);
+            // 白痴翻牌，不死，所以直接返回，不触发猎人等后续技能
+            await this.checkWin(); // 检查翻牌后是否会改变游戏结局
+            return false;
         }
 
-        // 正常计算新的死亡次数和存活状态
+        const updates = {};
         const newDeaths = Math.min(p.deaths + lost, 2), isNowDead = newDeaths >= 2;
         updates['players/' + pid + '/deaths'] = newDeaths;
         updates['players/' + pid + '/isAlive'] = !isNowDead;
 
-        // 一次性将所有更改更新到数据库
         await db.ref(`games/${this.gameId}`).update(updates);
 
-        // 后续的猎人技能和胜利判断逻辑保持不变
         if (isNowDead && p.originalIdentities.some(i => i.role === '猎人') && cause !== 'POISON') {
             await this.updatePhase('HUNTER_ACTION');
             return true;
@@ -723,7 +729,8 @@ const App={
             
             if(rs.some(r=>r.faction==='bad')) wolfCount++;
             if(rs.every(r=>r.name==='平民')) goldBabyCount++;
-            if(isGoodOnly && !rs.every(r=>r.name==='平民') && rs.some(r=>r.isGod)) godCount++;
+            // [FIXED] 白痴翻牌后不算作神职
+            if(isGoodOnly && !rs.every(r=>r.name==='平民') && rs.some(r=>r.isGod) && !p.isExposedIdiot) godCount++;
         });
         
         let win=null;

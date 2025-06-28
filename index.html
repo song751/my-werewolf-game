@@ -395,7 +395,7 @@ const App={
         if(this.$('btn-reveal'))this.$('btn-reveal').onclick=()=>this.renderPlayerList(true);
     },
 
-    // [MODIFIED] Host now handles delayed status updates to prevent information leaks.
+    // [MODIFIED] Host delay changed to 5-15s.
     async updatePhase(phase,round=null){
         const up={'state/phase':phase};
         if(round!==null){up['state/round']=round}
@@ -426,27 +426,28 @@ const App={
 
                 ['guard', 'seer', 'wolf'].forEach(role => {
                     if (targetStatus[role] === 'complete') {
-                        initialStatus[role] = 'pending'; // Show as pending initially
+                        initialStatus[role] = 'pending';
                         delayedUpdates[role] = 'complete';
                         hasDelayedActions = true;
                     }
                 });
 
                 if (targetStatus.wolf === 'complete' && roleExists('女巫')) {
-                    initialStatus.witch = 'locked'; // Keep witch locked
-                    delayedUpdates.witch = 'pending'; // Will become pending with other updates
+                    initialStatus.witch = 'locked';
+                    delayedUpdates.witch = 'pending';
                 }
 
                 up['state/nightStatus'] = initialStatus;
+                await db.ref(`games/${this.gameId}`).update(up);
 
                 if (hasDelayedActions) {
-                    const randomDelay = Math.random() * 10000 + 10000; // 10-20 seconds
+                    const randomDelay = Math.random() * 10000 + 5000; // 5-15 seconds
                     setTimeout(() => {
                         db.ref(`games/${this.gameId}/state/nightStatus`).update(delayedUpdates);
                     }, randomDelay);
                 }
+                return; // Host update is complete
             } else {
-                // Non-host clients just set the final state, they don't need to see the delay
                 up['state/nightStatus'] = targetStatus;
             }
         }
@@ -454,7 +455,6 @@ const App={
     },
 
     renderActionPanel(){
-        this.$('action-panel').innerHTML='';
         if(this.gameState.phase === 'HUNTER_ACTION'){
              const hunterQueue = this.gameState.hunterQueue || [];
              if (hunterQueue.length > 0 && this.playerData.id == hunterQueue[0]) {
@@ -502,6 +502,7 @@ const App={
         }
     },
 
+    // [MODIFIED] Added a skip button for wolves.
     panelWolf(){
         if(!this.wolfChatListener)this.initWolfListeners();
         const wolves = Object.values(this.allPlayers).filter(p=>p.isAlive && this.canWolfAct(p));
@@ -511,20 +512,31 @@ const App={
         const vote=this.playerData.wolfVote;
         const btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn ${vote==p.id?'selected':''}" data-id="${p.id}">${p.id}号</button>`).join('');
         let h=`<h3>🐺 请选择击杀目标</h3><div>${btns}</div>`;
-        h+=isLeader?'<div style="margin-top:20px;"><button id="wolf-confirm" class="confirm-btn">✅ 确定击杀</button></div>':'<p style="margin-top:10px;font-size:14px;">等待领头狼确认</p>';
+        if (isLeader) {
+            h+='<div style="margin-top:20px;"><button id="wolf-confirm" class="confirm-btn">✅ 确定击杀</button><button id="wolf-skip" class="control-btn">⏭️ 空刀 (跳过)</button></div>';
+        } else {
+            h+='<p style="margin-top:10px;font-size:14px;">等待领头狼确认</p>';
+        }
         this.$('action-panel').innerHTML=h;
         document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=()=>{db.ref(`games/${this.gameId}/players/${this.playerId}/wolfVote`).set(b.dataset.id); db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(b.dataset.id)});
-        if(isLeader&&this.$('wolf-confirm'))this.$('wolf-confirm').onclick=async()=>{
-            const allVotes = (await db.ref(`games/${this.gameId}/wolfVotes`).once('value')).val() || {};
-            if (Object.keys(allVotes).length === 0) return alert('请狼人先投票！');
-            
-            const voteCounts = {};
-            Object.values(allVotes).forEach(target => { voteCounts[target] = (voteCounts[target] || 0) + 1; });
-            const finalTarget = Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b);
+        
+        if(isLeader) {
+            if (this.$('wolf-confirm')) this.$('wolf-confirm').onclick=async()=>{
+                const allVotes = (await db.ref(`games/${this.gameId}/wolfVotes`).once('value')).val() || {};
+                if (Object.keys(allVotes).length === 0) return alert('请狼人先投票！');
+                
+                const voteCounts = {};
+                Object.values(allVotes).forEach(target => { voteCounts[target] = (voteCounts[target] || 0) + 1; });
+                const finalTarget = Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b);
 
-            await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
-            await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
-        };
+                await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
+                await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
+            };
+            if (this.$('wolf-skip')) this.$('wolf-skip').onclick=async()=>{
+                await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(null); // Set to null for skip
+                await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
+            };
+        }
     },
     
     async panelSeer(){
@@ -580,14 +592,27 @@ const App={
         };
     },
 
+    // [MODIFIED] Witch panel now conditionally shows wolf kill info.
     async panelWitch(){
-        const cure=!this.getSkillState('hasUsedCure'),poison=!this.getSkillState('hasUsedPoison');
-        const wolfKillTarget=(await db.ref(`games/${this.gameId}/nightActions/wolfKill`).once('value')).val();
-        let h=`<h3>🧪 女巫行动</h3><div style="margin-bottom:10px;">解药: ${cure?'✓':'✗'} | 毒药: ${poison?'✓':'✗'}</div>`;
-        if(cure&&wolfKillTarget){
-            const ban=this.gameState.round===1&&wolfKillTarget==this.playerId;
-            h+=`<div style="margin-bottom:10px;"><button id="btn-cure" class="action-btn" ${ban?'disabled':''}>💉 解救 ${wolfKillTarget}号</button>${ban?'<span style="font-size:12px;color:var(--danger)"> 首夜不可自救</span>':''}</div>`;
+        const cure = !this.getSkillState('hasUsedCure');
+        const poison = !this.getSkillState('hasUsedPoison');
+        
+        let wolfKillTarget = null;
+        if (cure) {
+            wolfKillTarget = (await db.ref(`games/${this.gameId}/nightActions/wolfKill`).once('value')).val();
         }
+
+        let h=`<h3>🧪 女巫行动</h3><div style="margin-bottom:10px;">解药: ${cure?'✓':'✗'} | 毒药: ${poison?'✓':'✗'}</div>`;
+        
+        if (cure) {
+            if (wolfKillTarget != null) {
+                const ban = this.gameState.round === 1 && wolfKillTarget == this.playerId;
+                h += `<div style="margin-bottom:10px;"><button id="btn-cure" class="action-btn" ${ban?'disabled':''}>💉 解救 ${wolfKillTarget}号</button>${ban?'<span style="font-size:12px;color:var(--danger)"> 首夜不可自救</span>':''}</div>`;
+            } else {
+                h += `<p style="color:var(--success); margin-bottom:10px;">🌙 狼人昨晚没有选择目标。</p>`;
+            }
+        }
+
         if(poison){
             h+='<h4>使用毒药</h4><div>'+Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}">☠️ 毒杀 ${p.id}号</button>`).join('')+'</div>';
         }
@@ -635,7 +660,7 @@ const App={
 
     panelHunter(){
         const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}" ${!p.isAlive?'disabled':''}>${p.id}号</button>`).join('');
-        this.$('action-panel').innerHTML=`<h3>🔫 猎人开枪</h3><p>你已失去一条生命，请选择一名玩家带走，或放弃开枪。</p><div>${btns}</div><div style="margin-top:10px;"><button id="hunter-skip" class="control-btn">🚫 放弃开枪</button></div>`;
+        this.$('action-panel').innerHTML=`<h3>🔫 猎人开枪</h3><p>你的猎人身份已死亡，请选择一名玩家带走，或放弃开枪。</p><div>${btns}</div><div style="margin-top:10px;"><button id="hunter-skip" class="control-btn">🚫 放弃开枪</button></div>`;
         document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=()=>this.hunter(b.dataset.id));
         this.$('hunter-skip').onclick=()=>this.hunter(null);
     },
@@ -705,10 +730,10 @@ const App={
         this.$('wolf-chat-area').classList.add('hidden');
     },
 
+    // [MODIFIED] Daybreak announcement is now simplified.
     async processNight(){
         const g = (await db.ref(`games/${this.gameId}`).once('value')).val();
         const na = g.nightActions || {};
-        const msg = [];
         const damageMap = {};
 
         const addDamage = (id, dmg, cause) => {
@@ -719,27 +744,18 @@ const App={
 
         const { wolfKill, witchPoison, witchCure, guard } = na;
 
-        if (wolfKill) {
+        if (wolfKill != null) {
             const isGuarded = guard === wolfKill;
             const isCured = witchCure;
             if (isGuarded && isCured) {
                 addDamage(wolfKill, 1, 'NIGHT');
-                msg.push(`☠️ ${wolfKill}号玩家被守护且被解救，根据规则死亡。`);
             } else if (!isGuarded && !isCured) {
                 addDamage(wolfKill, 1, 'NIGHT');
-                msg.push(`☠️ ${wolfKill}号玩家被狼人杀害。`);
-            } else {
-                msg.push(`💫 ${wolfKill}号玩家被攻击，但因为守护或解救而存活。`);
             }
-        } else {
-            msg.push('🌙 狼人没有选择目标。');
         }
 
         if (witchPoison) {
             addDamage(witchPoison, 1, 'POISON');
-            if (!msg.some(m => m.includes(`${witchPoison}号`))) {
-                 msg.push(`☠️ ${witchPoison}号玩家被女巫毒杀。`);
-            }
         }
         
         const dead = Object.entries(damageMap).map(([pid, data]) => {
@@ -747,14 +763,16 @@ const App={
             return { id: pid, lost: data.damage, cause: finalCause };
         });
         
+        let announcementMsg;
         if(!dead.length){
-            msg.push('🌟 昨晚是一个平安夜。');
+            announcementMsg = '🌟 昨晚是一个平安夜。';
             await db.ref(`games/${this.gameId}/state/peaceNightStreak`).transaction(s=>(s||0)+1);
         } else {
+            announcementMsg = '昨晚, 以下玩家死亡: ' + dead.map(d => `${d.id}号`).join('、 ');
             await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);
         }
         
-        if(this.isHost) alert('夜晚结算结果:\n\n' + msg.join('\n'));
+        if(this.isHost) alert('夜晚结算结果:\n\n' + announcementMsg);
         
         let anyHunterTriggered = false;
         for(const d of dead) {

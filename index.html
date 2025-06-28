@@ -395,6 +395,7 @@ const App={
         if(this.$('btn-reveal'))this.$('btn-reveal').onclick=()=>this.renderPlayerList(true);
     },
 
+    // [MODIFIED] Host now handles delayed status updates to prevent information leaks.
     async updatePhase(phase,round=null){
         const up={'state/phase':phase};
         if(round!==null){up['state/round']=round}
@@ -402,28 +403,67 @@ const App={
         
         if(phase==='NIGHT'){
             up['nightActions']={}; up['wolfVotes']={};
-            const nightStatus = {};
-            const alivePlayers = Object.values(this.allPlayers).filter(p => p.isAlive);
             
+            const alivePlayers = Object.values(this.allPlayers).filter(p => p.isAlive);
             const roleExists = (role) => alivePlayers.some(p => this.getActiveRole(p) === role);
             const wolfActors = alivePlayers.filter(p => this.canWolfAct(p));
 
-            nightStatus.guard = roleExists('守卫') ? 'pending' : 'complete';
-            nightStatus.seer = roleExists('预言家') ? 'pending' : 'complete';
-            nightStatus.wolf = wolfActors.length > 0 ? 'pending' : 'complete';
-            nightStatus.witch = roleExists('女巫') ? 'locked' : 'complete';
-            
-            if (nightStatus.wolf === 'complete' && nightStatus.witch === 'locked') {
-                nightStatus.witch = 'pending';
+            const targetStatus = {
+                guard: roleExists('守卫') ? 'pending' : 'complete',
+                seer: roleExists('预言家') ? 'pending' : 'complete',
+                wolf: wolfActors.length > 0 ? 'pending' : 'complete',
+                witch: roleExists('女巫') ? 'locked' : 'complete'
+            };
+
+            if (targetStatus.wolf === 'complete' && targetStatus.witch === 'locked') {
+                targetStatus.witch = 'pending';
             }
-            up['state/nightStatus'] = nightStatus;
+            
+            if (this.isHost) {
+                const initialStatus = { ...targetStatus };
+                const delayedUpdates = {};
+                let hasDelayedActions = false;
+
+                ['guard', 'seer', 'wolf'].forEach(role => {
+                    if (targetStatus[role] === 'complete') {
+                        initialStatus[role] = 'pending'; // Show as pending initially
+                        delayedUpdates[role] = 'complete';
+                        hasDelayedActions = true;
+                    }
+                });
+
+                if (targetStatus.wolf === 'complete' && roleExists('女巫')) {
+                    initialStatus.witch = 'locked'; // Keep witch locked
+                    delayedUpdates.witch = 'pending'; // Will become pending with other updates
+                }
+
+                up['state/nightStatus'] = initialStatus;
+
+                if (hasDelayedActions) {
+                    const randomDelay = Math.random() * 10000 + 10000; // 10-20 seconds
+                    setTimeout(() => {
+                        db.ref(`games/${this.gameId}/state/nightStatus`).update(delayedUpdates);
+                    }, randomDelay);
+                }
+            } else {
+                // Non-host clients just set the final state, they don't need to see the delay
+                up['state/nightStatus'] = targetStatus;
+            }
         }
         await db.ref(`games/${this.gameId}`).update(up);
     },
 
     renderActionPanel(){
         this.$('action-panel').innerHTML='';
-        if(!this.playerData.isAlive && this.gameState.phase !== 'HUNTER_ACTION') return;
+        if(this.gameState.phase === 'HUNTER_ACTION'){
+             const hunterQueue = this.gameState.hunterQueue || [];
+             if (hunterQueue.length > 0 && this.playerData.id == hunterQueue[0]) {
+                this.panelHunter();
+             }
+             return;
+        }
+
+        if(!this.playerData.isAlive) return;
 
         const phase = this.gameState.phase;
         const activeRole = this.getActiveRole(this.playerData);
@@ -458,12 +498,6 @@ const App={
                         content = '<p>你在此阶段无需行动，请耐心等待天亮...</p>';
                 }
                 this.$('action-panel').innerHTML = `<div class="action-feedback">${content}</div>`;
-                break;
-            case 'HUNTER_ACTION':
-                const hunterQueue = this.gameState.hunterQueue || [];
-                if (hunterQueue.length > 0 && this.playerData.id == hunterQueue[0]) {
-                    this.panelHunter();
-                }
                 break;
         }
     },
@@ -626,7 +660,6 @@ const App={
         });
 
         if (shotPlayerId) {
-            // A hunter shot by another hunter cannot use their skill, so the return value is ignored.
             await this.kill(shotPlayerId, 'SHOT');
         }
 
@@ -635,7 +668,6 @@ const App={
             if (!newQueue || newQueue.length === 0) {
                 await this.updatePhase('DAY');
             }
-            // If queue still has hunters, phase remains HUNTER_ACTION for the next one.
         }
     },
 
@@ -745,7 +777,6 @@ const App={
         }
     },
 
-    // [MODIFIED] Hunter trigger logic is now based on the identity being lost, not final player death.
     async kill(pid, cause, ps = null, lost = 1) {
         const players = ps || this.allPlayers;
         const p = players[pid];
@@ -753,7 +784,6 @@ const App={
 
         const activeRoleBeforeDeath = this.getActiveRole(p);
         
-        // Hunter skill triggers only on Wolf Kill ('NIGHT') or Vote Out ('VOTE') for the Hunter identity.
         const willTriggerHunter = activeRoleBeforeDeath === '猎人' && (cause === 'NIGHT' || cause === 'VOTE');
 
         const updates = {};
@@ -777,11 +807,11 @@ const App={
                 }
                 return queue;
             });
-            return true; // Signal that the hunter skill was triggered.
+            return true;
         }
 
         await this.checkWin();
-        return false; // No hunter skill was triggered by this death.
+        return false;
     },
 
     async checkWin(){

@@ -1,3 +1,10 @@
+---
+
+### 完整更新后的代码
+
+为了方便您使用，以下是包含了上述**所有修改**的完整 `index.html` 文件。您可以直接复制并替换掉您原有的文件内容。
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -60,7 +67,6 @@ details summary{cursor:pointer;font-weight:bold;color:var(--warning);padding:10p
 details summary:hover{color:var(--success)}
 .role-icon{display:inline-block;width:30px;height:30px;margin-right:10px;text-align:center;line-height:30px;border-radius:50%;background:rgba(255,255,255,.1)}
 .loading-spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:var(--accent);animation:spin 1s infinite ease-in-out}
-@keyframes spin{to{transform:rotate(360deg)}}
 .identity-card{background:rgba(255,255,255,.05);padding:20px;border-radius:15px;margin:10px 0;border:2px solid var(--border);transition:.3s all}
 .identity-card:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(0,0,0,.3)}
 #host-controls {text-align: center; margin: 20px 0; background: rgba(0,217,255,0.1); padding: 20px; border-radius: 15px; border: 1px solid var(--success);}
@@ -128,7 +134,7 @@ details summary:hover{color:var(--success)}
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - 2025-07-06 最终版
+   双身份狼人杀 - 2025-07-06 最终版 (已修复)
    ========================================================== */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -164,12 +170,48 @@ const App={
         }
     },
     
-    renderRoleSetup(){
-        let h='';
-        for(const r in DEFAULT_SETUP){h+=`<div class="role-setup-item"><span><span class="role-icon">${ROLES[r].icon}</span>${r}</span><input type="number" id="role-${r}" min="0" value="${DEFAULT_SETUP[r]}"></div>`}
-        this.$('role-setup').innerHTML=h;
-        const u=()=>{let t=0;this.$('role-setup').querySelectorAll('input').forEach(i=>t+=+i.value||0);this.$('total-roles').textContent=t;this.$('player-cnt').textContent=t%2===0?t/2:'身份总数必须为偶数'};
-        this.$('role-setup').oninput=u;u();
+    // [MODIFIED] 更健壮的渲染函数，避免UI显示问题
+    renderRoleSetup() {
+        const container = this.$('role-setup');
+        container.innerHTML = ''; // 确保容器是空的
+
+        // 使用更可靠的方式遍历对象并创建DOM元素
+        Object.keys(DEFAULT_SETUP).forEach(roleName => {
+            const roleData = ROLES[roleName];
+            if (!roleData) return; // 安全检查
+            const defaultValue = DEFAULT_SETUP[roleName];
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'role-setup-item';
+
+            const labelSpan = document.createElement('span');
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'role-icon';
+            iconSpan.textContent = roleData.icon;
+            
+            labelSpan.appendChild(iconSpan);
+            labelSpan.appendChild(document.createTextNode(` ${roleName}`));
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.id = `role-${roleName}`;
+            input.min = '0';
+            input.value = defaultValue;
+
+            itemDiv.appendChild(labelSpan);
+            itemDiv.appendChild(input);
+            container.appendChild(itemDiv);
+        });
+
+        // 更新计数的逻辑保持不变
+        const u = () => {
+            let t = 0;
+            this.$('role-setup').querySelectorAll('input').forEach(i => t += +i.value || 0);
+            this.$('total-roles').textContent = t;
+            this.$('player-cnt').textContent = t % 2 === 0 ? t / 2 : '身份总数必须为偶数';
+        };
+        this.$('role-setup').oninput = u;
+        u(); // 立即执行一次以显示初始总数
     },
 
     async createGame(){
@@ -255,7 +297,7 @@ const App={
         const f=id=>`${ROLES[id.role].icon} ${id.isThiefCopy?'<span class="thief-copy">'+id.role+'</span>':id.role}`;
         Object.values(this.allPlayers).forEach(p => {
             const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
-            const ids = p.identities;
+            const ids = p.identities, d = p.deaths;
             h += `<div class="identity-card">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="margin:0;">${p.id}号玩家</h3>
@@ -646,21 +688,29 @@ const App={
         }
     },
 
-    async kill(pid,cause,ps=null,lost=1){
-        const players=ps||this.allPlayers, p=players[pid];
-        if(!p||!p.isAlive)return false;
-        
-        if(this.getActiveRole(p)==='白痴'&&cause==='VOTE'){
-            await db.ref(`games/${this.gameId}/players/${pid}/isExposedIdiot`).set(true);
-            await this.checkWin();
-            return false;
+    // [MODIFIED] 修正白痴的死亡逻辑，并优化数据库更新
+    async kill(pid, cause, ps = null, lost = 1) {
+        const players = ps || this.allPlayers, p = players[pid];
+        if (!p || !p.isAlive) return false;
+
+        const updates = {}; // 创建一个对象来批量更新
+
+        // 如果白痴被投票出局，添加翻牌标记
+        if (this.getActiveRole(p) === '白痴' && cause === 'VOTE') {
+            updates['players/' + pid + '/isExposedIdiot'] = true;
+            // 注意：不再提前返回，让死亡逻辑继续
         }
-        
-        const newDeaths=Math.min(p.deaths+lost,2), isNowDead=newDeaths>=2;
-        const updates={'players/'+pid+'/deaths':newDeaths, 'players/'+pid+'/isAlive':!isNowDead};
+
+        // 正常计算新的死亡次数和存活状态
+        const newDeaths = Math.min(p.deaths + lost, 2), isNowDead = newDeaths >= 2;
+        updates['players/' + pid + '/deaths'] = newDeaths;
+        updates['players/' + pid + '/isAlive'] = !isNowDead;
+
+        // 一次性将所有更改更新到数据库
         await db.ref(`games/${this.gameId}`).update(updates);
-        
-        if(isNowDead && p.originalIdentities.some(i => i.role === '猎人') && cause !== 'POISON'){
+
+        // 后续的猎人技能和胜利判断逻辑保持不变
+        if (isNowDead && p.originalIdentities.some(i => i.role === '猎人') && cause !== 'POISON') {
             await this.updatePhase('HUNTER_ACTION');
             return true;
         }

@@ -327,7 +327,6 @@ const App={
 
     renderPlayerList(reveal = false){
         let h='';
-        const isDay = this.gameState.phase === 'DAY';
         this.$('player-list').innerHTML = ''; // Clear before re-rendering
         Object.values(this.allPlayers).forEach(p=>{
             const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
@@ -347,7 +346,7 @@ const App={
             controls.style.alignItems = 'center';
             controls.innerHTML = heart;
 
-            if (this.isHost && isDay && p.isAlive && !p.isExposedIdiot) {
+            if (this.isHost && this.gameState.phase === 'DAY' && p.isAlive && !p.isExposedIdiot) {
                 const voteBtn = document.createElement('button');
                 voteBtn.className = 'vote-out-btn';
                 voteBtn.textContent = '票出';
@@ -428,7 +427,7 @@ const App={
                 guard: roleExists('守卫') ? 'pending' : 'complete',
                 seer: roleExists('预言家') ? 'pending' : 'complete',
                 wolf: wolfActors.length > 0 ? 'pending' : 'complete',
-                witch: roleExists('女巫') ? 'locked' : 'complete'
+                witch: this.canWitchAct() ? 'locked' : 'complete'
             };
 
             if (targetStatus.wolf === 'complete' && targetStatus.witch === 'locked') {
@@ -438,8 +437,8 @@ const App={
             if (this.isHost) {
                 const initialStatus = { ...targetStatus };
                 const delayedUpdates = {};
+                
                 let hasDelayedActions = false;
-
                 ['guard', 'seer', 'wolf'].forEach(role => {
                     if (targetStatus[role] === 'complete') {
                         initialStatus[role] = 'pending';
@@ -448,15 +447,16 @@ const App={
                     }
                 });
 
-                if (targetStatus.wolf === 'complete' && roleExists('女巫')) {
+                if (targetStatus.wolf === 'complete' && this.canWitchAct()) {
                     initialStatus.witch = 'locked';
                     delayedUpdates.witch = 'pending';
+                    hasDelayedActions = true;
                 }
 
                 up['state/nightStatus'] = initialStatus;
                 await db.ref(`games/${this.gameId}`).update(up);
 
-                if (hasDelayedActions || (targetStatus.wolf === 'complete' && roleExists('女巫'))) {
+                if (hasDelayedActions) {
                     const randomDelay = Math.random() * 10000 + 5000;
                     setTimeout(() => {
                         db.ref(`games/${this.gameId}/state/nightStatus`).update(delayedUpdates);
@@ -517,7 +517,6 @@ const App={
         }
     },
 
-    // [FIXED] Centralized action logic into dedicated methods.
     async wolfConfirmKill() {
         const allVotes = (await db.ref(`games/${this.gameId}/wolfVotes`).once('value')).val() || {};
         if (Object.keys(allVotes).length === 0) return alert('请狼人先投票！');
@@ -527,12 +526,14 @@ const App={
         const finalTarget = Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b);
 
         await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
-        await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
+        const witchNextState = this.canWitchAct() ? 'pending' : 'complete';
+        await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete', witch: witchNextState});
     },
 
     async wolfSkipKill() {
         await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(null);
-        await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
+        const witchNextState = this.canWitchAct() ? 'pending' : 'complete';
+        await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete', witch: witchNextState});
     },
 
     panelWolf(){
@@ -743,6 +744,18 @@ const App={
             return !Object.values(this.allPlayers).some(p2 => p2.isAlive && p2.id !== p.id && this.getActiveRole(p2) === '狼人');
         }
         return true;
+    },
+    // [NEW] Smarter check for witch's ability to act.
+    canWitchAct() {
+        const witchPlayer = Object.values(this.allPlayers).find(p => p.isAlive && this.getActiveRole(p) === '女巫');
+        if (!witchPlayer) return false;
+        
+        const getPlayerSkillState = (player, key) => (player.skillStates || {})[`${player.deaths}_${key}`];
+
+        const hasCure = !getPlayerSkillState(witchPlayer, 'hasUsedCure');
+        const hasPoison = !getPlayerSkillState(witchPlayer, 'hasUsedPoison');
+        
+        return hasCure || hasPoison;
     },
     getSkillState(key){return(this.playerData.skillStates||{})[`${this.playerData.deaths}_${key}`]},
     setSkillState(key,val){return db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${this.playerData.deaths}_${key}`).set(val)},

@@ -159,7 +159,8 @@ const App={
         } else {
             this.showView('setup');
             this.renderRoleSetup();
-            this.$('btn-create').onclick=()=>this.createGame();
+            // [FIXED] Use arrow function for correct `this` context.
+            this.$('btn-create').onclick = () => this.createGame();
         }
     },
     
@@ -314,8 +315,9 @@ const App={
         const showSwap=this.gameState.phase==='SETUP'&&!this.playerData.isReady;
         this.$('swap-area').classList[showSwap?'remove':'add']('hidden');
         if(showSwap){
-            this.$('btn-swap').onclick=()=>{const[a,b]=this.playerData.identities;db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).set([b,a])};
-            this.$('btn-confirm').onclick=()=>{if(!this.playerData.isReady)db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).set(true)};
+            // [FIXED] Use arrow function for correct `this` context.
+            this.$('btn-swap').onclick = () => {const[a,b]=this.playerData.identities;db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).set([b,a])};
+            this.$('btn-confirm').onclick = () => {if(!this.playerData.isReady)db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).set(true)};
         }
     },
 
@@ -389,13 +391,12 @@ const App={
         }
         this.$('host-controls').innerHTML=h;
 
-        if(this.$('btn-start'))this.$('btn-start').onclick=()=>this.updatePhase('NIGHT',1);
-        if(this.$('btn-night'))this.$('btn-night').onclick=()=>this.updatePhase('NIGHT');
-        if(this.$('btn-day'))this.$('btn-day').onclick=()=>this.processNight();
-        if(this.$('btn-reveal'))this.$('btn-reveal').onclick=()=>this.renderPlayerList(true);
+        if(this.$('btn-start'))this.$('btn-start').onclick = () => this.updatePhase('NIGHT',1);
+        if(this.$('btn-night'))this.$('btn-night').onclick = () => this.updatePhase('NIGHT');
+        if(this.$('btn-day'))this.$('btn-day').onclick = () => this.processNight();
+        if(this.$('btn-reveal'))this.$('btn-reveal').onclick = () => this.renderPlayerList(true);
     },
 
-    // [MODIFIED] Host delay changed to 5-15s.
     async updatePhase(phase,round=null){
         const up={'state/phase':phase};
         if(round!==null){up['state/round']=round}
@@ -440,13 +441,13 @@ const App={
                 up['state/nightStatus'] = initialStatus;
                 await db.ref(`games/${this.gameId}`).update(up);
 
-                if (hasDelayedActions) {
+                if (hasDelayedActions || (targetStatus.wolf === 'complete' && roleExists('女巫'))) {
                     const randomDelay = Math.random() * 10000 + 5000; // 5-15 seconds
                     setTimeout(() => {
                         db.ref(`games/${this.gameId}/state/nightStatus`).update(delayedUpdates);
                     }, randomDelay);
                 }
-                return; // Host update is complete
+                return;
             } else {
                 up['state/nightStatus'] = targetStatus;
             }
@@ -469,13 +470,12 @@ const App={
         const activeRole = this.getActiveRole(this.playerData);
         const nightStatus = this.gameState.nightStatus || {};
 
-        let content = '';
-
         switch(phase){
             case 'DAY':
                 if(activeRole === '骑士' && !this.playerData.isExposedIdiot) this.panelKnight();
                 break;
             case 'NIGHT':
+                let content = '';
                 switch(activeRole) {
                     case '守卫':
                         if (nightStatus.guard === 'pending') { this.panelGuard(); return; }
@@ -502,7 +502,6 @@ const App={
         }
     },
 
-    // [MODIFIED] Added a skip button for wolves.
     panelWolf(){
         if(!this.wolfChatListener)this.initWolfListeners();
         const wolves = Object.values(this.allPlayers).filter(p=>p.isAlive && this.canWolfAct(p));
@@ -510,7 +509,7 @@ const App={
         const isLeader = this.playerId == leaderId;
 
         const vote=this.playerData.wolfVote;
-        const btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn ${vote==p.id?'selected':''}" data-id="${p.id}">${p.id}号</button>`).join('');
+        const btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn wolf-target" data-id="${p.id}">${p.id}号</button>`).join('');
         let h=`<h3>🐺 请选择击杀目标</h3><div>${btns}</div>`;
         if (isLeader) {
             h+='<div style="margin-top:20px;"><button id="wolf-confirm" class="confirm-btn">✅ 确定击杀</button><button id="wolf-skip" class="control-btn">⏭️ 空刀 (跳过)</button></div>';
@@ -518,10 +517,16 @@ const App={
             h+='<p style="margin-top:10px;font-size:14px;">等待领头狼确认</p>';
         }
         this.$('action-panel').innerHTML=h;
-        document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=()=>{db.ref(`games/${this.gameId}/players/${this.playerId}/wolfVote`).set(b.dataset.id); db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(b.dataset.id)});
+        document.querySelectorAll('.wolf-target').forEach(b => {
+            if(vote == b.dataset.id) b.classList.add('selected');
+            b.onclick = () => {
+                db.ref(`games/${this.gameId}/players/${this.playerId}/wolfVote`).set(b.dataset.id);
+                db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(b.dataset.id);
+            };
+        });
         
         if(isLeader) {
-            if (this.$('wolf-confirm')) this.$('wolf-confirm').onclick=async()=>{
+            if (this.$('wolf-confirm')) this.$('wolf-confirm').onclick = async () => {
                 const allVotes = (await db.ref(`games/${this.gameId}/wolfVotes`).once('value')).val() || {};
                 if (Object.keys(allVotes).length === 0) return alert('请狼人先投票！');
                 
@@ -532,8 +537,8 @@ const App={
                 await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
                 await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
             };
-            if (this.$('wolf-skip')) this.$('wolf-skip').onclick=async()=>{
-                await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(null); // Set to null for skip
+            if (this.$('wolf-skip')) this.$('wolf-skip').onclick = async () => {
+                await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(null);
                 await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
             };
         }
@@ -542,8 +547,8 @@ const App={
     async panelSeer(){
         const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">${p.id}号</button>`).join('');
         this.$('action-panel').innerHTML=`<h3>🔮 请选择查验目标</h3><div>${btns}</div><div style="margin-top:15px;"><button id="seer-skip" class="control-btn">⏭️ 跳过本回合</button></div>`;
-        document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>this.seer(b.dataset.id));
-        this.$('seer-skip').onclick=async ()=>{
+        document.querySelectorAll('.action-btn').forEach(b => b.onclick = () => this.seer(b.dataset.id));
+        this.$('seer-skip').onclick = async () => {
             await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过查验</p></div>';
         };
@@ -579,20 +584,19 @@ const App={
         const last=this.getSkillState('lastGuardTarget');
         const btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}" ${p.id==last?'disabled':''}>${p.id}号 ${p.id==last?'(不可连守)':''}</button>`).join('');
         this.$('action-panel').innerHTML=`<h3>🛡️ 请选择守护目标</h3><div>${btns}</div><div style="margin-top:15px;"><button id="guard-skip" class="control-btn">⏭️ 跳过本回合</button></div>`;
-        document.querySelectorAll('.action-btn').forEach(b=>b.onclick=async()=>{
+        document.querySelectorAll('.action-btn').forEach(b => b.onclick = async () => {
             if(b.dataset.id == last) return alert('不能连续守护同一个人！');
             await db.ref(`games/${this.gameId}/nightActions/guard`).set(b.dataset.id);
             await this.setSkillState('lastGuardTarget',b.dataset.id);
             await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>🛡️ 已守护</p></div>';
         });
-        this.$('guard-skip').onclick=async ()=>{
+        this.$('guard-skip').onclick = async () => {
             await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过守护</p></div>';
         };
     },
 
-    // [MODIFIED] Witch panel now conditionally shows wolf kill info.
     async panelWitch(){
         const cure = !this.getSkillState('hasUsedCure');
         const poison = !this.getSkillState('hasUsedPoison');
@@ -614,24 +618,24 @@ const App={
         }
 
         if(poison){
-            h+='<h4>使用毒药</h4><div>'+Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}">☠️ 毒杀 ${p.id}号</button>`).join('')+'</div>';
+            h+='<h4>使用毒药</h4><div>'+Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn witch-poison" data-id="${p.id}">☠️ 毒杀 ${p.id}号</button>`).join('')+'</div>';
         }
         h+='<div style="margin-top:15px;"><button id="witch-skip" class="control-btn">⏭️ 跳过本回合</button></div>';
         this.$('action-panel').innerHTML=h;
 
-        if(this.$('btn-cure'))this.$('btn-cure').onclick=async()=>{
+        if(this.$('btn-cure')) this.$('btn-cure').onclick = async () => {
             await this.setSkillState('hasUsedCure',true);
             await db.ref(`games/${this.gameId}/nightActions/witchCure`).set(true);
             await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>💉 已使用解药</p></div>';
         };
-        document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=async()=>{
+        document.querySelectorAll('.witch-poison').forEach(b => b.onclick = async () => {
             await this.setSkillState('hasUsedPoison',true);
             await db.ref(`games/${this.gameId}/nightActions/witchPoison`).set(b.dataset.id);
             await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
             this.$('action-panel').innerHTML=`<div class="action-feedback"><p>☠️ 已毒杀 ${b.dataset.id} 号</p></div>`;
         });
-        this.$('witch-skip').onclick=async()=>{
+        this.$('witch-skip').onclick = async () => {
             await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
             this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过</p></div>';
         };
@@ -640,7 +644,7 @@ const App={
     panelKnight(){
         const btns=Object.values(this.allPlayers).filter(p=>p.isAlive&&p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">⚔️ 决斗 ${p.id}号</button>`).join('');
         this.$('action-panel').innerHTML=`<h3>⚔️ 骑士决斗</h3><p style="font-size:14px;color:var(--warning)">若目标为狼人阵营则其死亡并立即天黑，否则骑士死亡，发言继续</p><div>${btns}</div>`;
-        document.querySelectorAll('.action-btn').forEach(b=>b.onclick=()=>this.knight(b.dataset.id));
+        document.querySelectorAll('.action-btn').forEach(b => b.onclick = () => this.knight(b.dataset.id));
     },
 
     async knight(id){
@@ -661,8 +665,8 @@ const App={
     panelHunter(){
         const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}" ${!p.isAlive?'disabled':''}>${p.id}号</button>`).join('');
         this.$('action-panel').innerHTML=`<h3>🔫 猎人开枪</h3><p>你的猎人身份已死亡，请选择一名玩家带走，或放弃开枪。</p><div>${btns}</div><div style="margin-top:10px;"><button id="hunter-skip" class="control-btn">🚫 放弃开枪</button></div>`;
-        document.querySelectorAll('.action-btn[data-id]').forEach(b=>b.onclick=()=>this.hunter(b.dataset.id));
-        this.$('hunter-skip').onclick=()=>this.hunter(null);
+        document.querySelectorAll('.action-btn').forEach(b => b.onclick = () => this.hunter(b.dataset.id));
+        this.$('hunter-skip').onclick = () => this.hunter(null);
     },
 
     async hunter(id){
@@ -730,7 +734,6 @@ const App={
         this.$('wolf-chat-area').classList.add('hidden');
     },
 
-    // [MODIFIED] Daybreak announcement is now simplified.
     async processNight(){
         const g = (await db.ref(`games/${this.gameId}`).once('value')).val();
         const na = g.nightActions || {};

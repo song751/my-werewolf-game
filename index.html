@@ -326,8 +326,7 @@ const App={
     },
 
     renderPlayerList(reveal = false){
-        let h='';
-        this.$('player-list').innerHTML = ''; // Clear before re-rendering
+        this.$('player-list').innerHTML = '';
         Object.values(this.allPlayers).forEach(p=>{
             const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
             let ids = '';
@@ -439,7 +438,7 @@ const App={
                 const delayedUpdates = {};
                 
                 let hasDelayedActions = false;
-                ['guard', 'seer', 'wolf'].forEach(role => {
+                ['guard', 'seer', 'wolf', 'witch'].forEach(role => {
                     if (targetStatus[role] === 'complete') {
                         initialStatus[role] = 'pending';
                         delayedUpdates[role] = 'complete';
@@ -565,24 +564,31 @@ const App={
         }
     },
     
+    // [FIXED] Corrected the logic for checking Invisible Wolf's condition.
     async seerCheck(id) {
         const targetPlayer = this.allPlayers[id];
-        const rolesAliveOfPlayer = (p) => p.originalIdentities.filter((_,idx) => p.deaths <= idx);
-        const targetCardsAlive = rolesAliveOfPlayer(targetPlayer);
+        const targetCardsAlive = targetPlayer.identities.filter((_,idx) => targetPlayer.deaths <= idx);
+        
         const hasVisibleBad = targetCardsAlive.some(i => ROLES[i.role].faction === 'bad' && !ROLES[i.role].isInvisible);
         const hasInvisWolf = targetCardsAlive.some(i => i.role === '隐狼');
 
-        let otherAliveBad = false;
+        // The Invisible Wolf is seen as good ONLY if a regular Wolf is alive.
+        let regularWolfIsAlive = false;
         Object.values(this.allPlayers).forEach(p => {
-            if (p.id == id || !p.isAlive) return;
-            rolesAliveOfPlayer(p).forEach(card => {
-                if (ROLES[card.role].faction === 'bad') otherAliveBad = true;
-            });
+            if (p.isAlive) {
+                const pActiveRole = this.getActiveRole(p);
+                if (pActiveRole === '狼人') {
+                    regularWolfIsAlive = true;
+                }
+            }
         });
         
         let res = '好人';
-        if (hasVisibleBad) { res = '狼人'; } 
-        else if (hasInvisWolf && !otherAliveBad) { res = '狼人'; }
+        if (hasVisibleBad) {
+            res = '狼人'; 
+        } else if (hasInvisWolf && !regularWolfIsAlive) {
+            res = '狼人';
+        }
 
         const results = this.getSkillState('seerResults') || {};
         results[id] = res;
@@ -745,7 +751,6 @@ const App={
         }
         return true;
     },
-    // [NEW] Smarter check for witch's ability to act.
     canWitchAct() {
         const witchPlayer = Object.values(this.allPlayers).find(p => p.isAlive && this.getActiveRole(p) === '女巫');
         if (!witchPlayer) return false;

@@ -159,7 +159,6 @@ const App={
         } else {
             this.showView('setup');
             this.renderRoleSetup();
-            // [FIXED] Use arrow function for correct `this` context.
             this.$('btn-create').onclick = () => this.createGame();
         }
     },
@@ -315,7 +314,6 @@ const App={
         const showSwap=this.gameState.phase==='SETUP'&&!this.playerData.isReady;
         this.$('swap-area').classList[showSwap?'remove':'add']('hidden');
         if(showSwap){
-            // [FIXED] Use arrow function for correct `this` context.
             this.$('btn-swap').onclick = () => {const[a,b]=this.playerData.identities;db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).set([b,a])};
             this.$('btn-confirm').onclick = () => {if(!this.playerData.isReady)db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).set(true)};
         }
@@ -330,6 +328,7 @@ const App={
     renderPlayerList(reveal = false){
         let h='';
         const isDay = this.gameState.phase === 'DAY';
+        this.$('player-list').innerHTML = ''; // Clear before re-rendering
         Object.values(this.allPlayers).forEach(p=>{
             const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
             let ids = '';
@@ -337,13 +336,29 @@ const App={
                 const fmt=i=>`${ROLES[i.role].icon} ${i.isThiefCopy?'<span class="thief-copy">'+i.role+'</span>':i.role}`;
                 ids=` [${fmt(p.originalIdentities[0])} + ${fmt(p.originalIdentities[1])}]`;
             }
-            let voteBtn = '';
+            
+            const item = document.createElement('div');
+            item.className = `player-list-item ${!p.isAlive?'dead-all':p.deaths?'dead':''}`;
+            
+            let content = `<span><strong>${p.id}号</strong>${ids} <small style="color:var(--warning)">${p.isExposedIdiot?'(已翻牌白痴)':''}</small></span>`;
+            
+            const controls = document.createElement('div');
+            controls.style.display = 'flex';
+            controls.style.alignItems = 'center';
+            controls.innerHTML = heart;
+
             if (this.isHost && isDay && p.isAlive && !p.isExposedIdiot) {
-                voteBtn = `<button class="vote-out-btn" onclick="App.voteOut(${p.id})">票出</button>`;
+                const voteBtn = document.createElement('button');
+                voteBtn.className = 'vote-out-btn';
+                voteBtn.textContent = '票出';
+                voteBtn.onclick = () => this.voteOut(p.id);
+                controls.appendChild(voteBtn);
             }
-            h+=`<div class="player-list-item ${!p.isAlive?'dead-all':p.deaths?'dead':''}"><span><strong>${p.id}号</strong>${ids} <small style="color:var(--warning)">${p.isExposedIdiot?'(已翻牌白痴)':''}</small></span><div style="display:flex;align-items:center;">${heart}${voteBtn}</div></div>`
+            
+            item.innerHTML = content;
+            item.appendChild(controls);
+            this.$('player-list').appendChild(item);
         });
-        this.$('player-list').innerHTML=h;
     },
     
     voteOut(pid) {
@@ -442,7 +457,7 @@ const App={
                 await db.ref(`games/${this.gameId}`).update(up);
 
                 if (hasDelayedActions || (targetStatus.wolf === 'complete' && roleExists('女巫'))) {
-                    const randomDelay = Math.random() * 10000 + 5000; // 5-15 seconds
+                    const randomDelay = Math.random() * 10000 + 5000;
                     setTimeout(() => {
                         db.ref(`games/${this.gameId}/state/nightStatus`).update(delayedUpdates);
                     }, randomDelay);
@@ -502,6 +517,24 @@ const App={
         }
     },
 
+    // [FIXED] Centralized action logic into dedicated methods.
+    async wolfConfirmKill() {
+        const allVotes = (await db.ref(`games/${this.gameId}/wolfVotes`).once('value')).val() || {};
+        if (Object.keys(allVotes).length === 0) return alert('请狼人先投票！');
+        
+        const voteCounts = {};
+        Object.values(allVotes).forEach(target => { voteCounts[target] = (voteCounts[target] || 0) + 1; });
+        const finalTarget = Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b);
+
+        await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
+        await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
+    },
+
+    async wolfSkipKill() {
+        await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(null);
+        await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
+    },
+
     panelWolf(){
         if(!this.wolfChatListener)this.initWolfListeners();
         const wolves = Object.values(this.allPlayers).filter(p=>p.isAlive && this.canWolfAct(p));
@@ -526,35 +559,12 @@ const App={
         });
         
         if(isLeader) {
-            if (this.$('wolf-confirm')) this.$('wolf-confirm').onclick = async () => {
-                const allVotes = (await db.ref(`games/${this.gameId}/wolfVotes`).once('value')).val() || {};
-                if (Object.keys(allVotes).length === 0) return alert('请狼人先投票！');
-                
-                const voteCounts = {};
-                Object.values(allVotes).forEach(target => { voteCounts[target] = (voteCounts[target] || 0) + 1; });
-                const finalTarget = Object.keys(voteCounts).reduce((a, b) => voteCounts[a] > voteCounts[b] ? a : b);
-
-                await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(finalTarget);
-                await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
-            };
-            if (this.$('wolf-skip')) this.$('wolf-skip').onclick = async () => {
-                await db.ref(`games/${this.gameId}/nightActions/wolfKill`).set(null);
-                await db.ref(`games/${this.gameId}/state/nightStatus`).update({wolf:'complete',witch:'pending'});
-            };
+            if (this.$('wolf-confirm')) this.$('wolf-confirm').onclick = () => this.wolfConfirmKill();
+            if (this.$('wolf-skip')) this.$('wolf-skip').onclick = () => this.wolfSkipKill();
         }
     },
     
-    async panelSeer(){
-        const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">${p.id}号</button>`).join('');
-        this.$('action-panel').innerHTML=`<h3>🔮 请选择查验目标</h3><div>${btns}</div><div style="margin-top:15px;"><button id="seer-skip" class="control-btn">⏭️ 跳过本回合</button></div>`;
-        document.querySelectorAll('.action-btn').forEach(b => b.onclick = () => this.seer(b.dataset.id));
-        this.$('seer-skip').onclick = async () => {
-            await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
-            this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过查验</p></div>';
-        };
-    },
-    
-    async seer(id){
+    async seerCheck(id) {
         const targetPlayer = this.allPlayers[id];
         const rolesAliveOfPlayer = (p) => p.originalIdentities.filter((_,idx) => p.deaths <= idx);
         const targetCardsAlive = rolesAliveOfPlayer(targetPlayer);
@@ -580,21 +590,59 @@ const App={
         this.$('action-panel').innerHTML = `<div class="action-feedback"><p style="font-size:20px;">${id}号是<strong style="color:${res==='狼人'?'var(--danger)':'var(--success)'}"> ${res==='狼人'?'🐺 狼人':'😇 好人'}</strong></p></div>`;
     },
 
+    async seerSkip() {
+        await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
+        this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过查验</p></div>';
+    },
+
+    async panelSeer(){
+        const btns=Object.values(this.allPlayers).filter(p=>p.id!=this.playerId).map(p=>`<button class="action-btn" data-id="${p.id}">${p.id}号</button>`).join('');
+        this.$('action-panel').innerHTML=`<h3>🔮 请选择查验目标</h3><div>${btns}</div><div style="margin-top:15px;"><button id="seer-skip" class="control-btn">⏭️ 跳过本回合</button></div>`;
+        document.querySelectorAll('.action-btn').forEach(b => b.onclick = () => this.seerCheck(b.dataset.id));
+        this.$('seer-skip').onclick = () => this.seerSkip();
+    },
+    
+    async guardProtect(id) {
+        await db.ref(`games/${this.gameId}/nightActions/guard`).set(id);
+        await this.setSkillState('lastGuardTarget', id);
+        await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
+        this.$('action-panel').innerHTML='<div class="action-feedback"><p>🛡️ 已守护</p></div>';
+    },
+
+    async guardSkip() {
+        await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
+        this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过守护</p></div>';
+    },
+
     async panelGuard(){
         const last=this.getSkillState('lastGuardTarget');
         const btns=Object.values(this.allPlayers).filter(p=>p.isAlive).map(p=>`<button class="action-btn" data-id="${p.id}" ${p.id==last?'disabled':''}>${p.id}号 ${p.id==last?'(不可连守)':''}</button>`).join('');
         this.$('action-panel').innerHTML=`<h3>🛡️ 请选择守护目标</h3><div>${btns}</div><div style="margin-top:15px;"><button id="guard-skip" class="control-btn">⏭️ 跳过本回合</button></div>`;
-        document.querySelectorAll('.action-btn').forEach(b => b.onclick = async () => {
-            if(b.dataset.id == last) return alert('不能连续守护同一个人！');
-            await db.ref(`games/${this.gameId}/nightActions/guard`).set(b.dataset.id);
-            await this.setSkillState('lastGuardTarget',b.dataset.id);
-            await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
-            this.$('action-panel').innerHTML='<div class="action-feedback"><p>🛡️ 已守护</p></div>';
+        document.querySelectorAll('.action-btn').forEach(b => {
+            if (!b.disabled) {
+                b.onclick = () => this.guardProtect(b.dataset.id);
+            }
         });
-        this.$('guard-skip').onclick = async () => {
-            await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
-            this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过守护</p></div>';
-        };
+        this.$('guard-skip').onclick = () => this.guardSkip();
+    },
+
+    async witchUseCure() {
+        await this.setSkillState('hasUsedCure',true);
+        await db.ref(`games/${this.gameId}/nightActions/witchCure`).set(true);
+        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+        this.$('action-panel').innerHTML='<div class="action-feedback"><p>💉 已使用解药</p></div>';
+    },
+
+    async witchUsePoison(id) {
+        await this.setSkillState('hasUsedPoison',true);
+        await db.ref(`games/${this.gameId}/nightActions/witchPoison`).set(id);
+        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+        this.$('action-panel').innerHTML=`<div class="action-feedback"><p>☠️ 已毒杀 ${id} 号</p></div>`;
+    },
+
+    async witchSkip() {
+        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+        this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过</p></div>';
     },
 
     async panelWitch(){
@@ -623,22 +671,9 @@ const App={
         h+='<div style="margin-top:15px;"><button id="witch-skip" class="control-btn">⏭️ 跳过本回合</button></div>';
         this.$('action-panel').innerHTML=h;
 
-        if(this.$('btn-cure')) this.$('btn-cure').onclick = async () => {
-            await this.setSkillState('hasUsedCure',true);
-            await db.ref(`games/${this.gameId}/nightActions/witchCure`).set(true);
-            await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
-            this.$('action-panel').innerHTML='<div class="action-feedback"><p>💉 已使用解药</p></div>';
-        };
-        document.querySelectorAll('.witch-poison').forEach(b => b.onclick = async () => {
-            await this.setSkillState('hasUsedPoison',true);
-            await db.ref(`games/${this.gameId}/nightActions/witchPoison`).set(b.dataset.id);
-            await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
-            this.$('action-panel').innerHTML=`<div class="action-feedback"><p>☠️ 已毒杀 ${b.dataset.id} 号</p></div>`;
-        });
-        this.$('witch-skip').onclick = async () => {
-            await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
-            this.$('action-panel').innerHTML='<div class="action-feedback"><p>⏭️ 已跳过</p></div>';
-        };
+        if(this.$('btn-cure')) this.$('btn-cure').onclick = () => this.witchUseCure();
+        document.querySelectorAll('.witch-poison').forEach(b => b.onclick = () => this.witchUsePoison(b.dataset.id));
+        this.$('witch-skip').onclick = () => this.witchSkip();
     },
 
     panelKnight(){

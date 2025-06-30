@@ -69,6 +69,10 @@ details summary:hover{color:var(--success)}
 .status-item.pending {background: rgba(255,183,0,0.2); color: var(--warning);}
 .status-item.locked {background: rgba(255,255,255,0.05); opacity: 0.6;}
 #god-player-list {display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;}
+#god-raw-data-view { margin-top: 30px; }
+#god-raw-data-view details { background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); }
+#god-raw-data-view summary { padding: 15px; font-size: 1.1em; }
+#god-raw-data-view pre { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 0 0 8px 8px; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; color: var(--text); }
 @media(max-width:600px){#app{padding:20px}h1{font-size:1.5em}button{padding:10px 16px;font-size:14px}}
 </style>
 </head>
@@ -119,6 +123,7 @@ details summary:hover{color:var(--success)}
     <div id="god-view" class="hidden">
         <h2>👑 上帝视角后台</h2>
         <div id="god-player-list"></div>
+        <div id="god-raw-data-view"></div>
     </div>
 </div>
 
@@ -141,6 +146,7 @@ const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','�
 const App={
     gameId:null,playerId:null,isHost:false,gameState:null,allPlayers:{},playerData:null,
     wolfChatListener:null,wolfVotesListener:null,
+    fullGameData: null, // [NEW] Store full game data for God view
 
     $(id){return document.getElementById(id)},
     showView(v){this.$('setup-view').classList.add('hidden');this.$('game-view').classList.add('hidden');this.$('god-view').classList.add('hidden');this.$(v+'-view').classList.remove('hidden')},
@@ -256,6 +262,7 @@ const App={
         db.ref(`games/${this.gameId}`).on('value',s=>{
             if(!s.exists()){document.body.innerHTML='<h1>游戏已结束或不存在</h1>';return}
             const g=s.val();
+            this.fullGameData = g; // [MODIFIED] Store full game data
             this.gameState=g.state;
             this.allPlayers=g.players;
             
@@ -281,14 +288,16 @@ const App={
         if(this.isHost) this.renderHostControls();
     },
 
+    // [MODIFIED] Enhanced God View
     renderGodView() {
         this.$('game-title').textContent = `后台监控 - ${this.gameId}`;
-        let h = '';
+        let playerListHtml = '';
         const f=id=>`${ROLES[id.role].icon} ${id.isThiefCopy?'<span class="thief-copy">'+id.role+'</span>':id.role}`;
+        
         Object.values(this.allPlayers).forEach(p => {
             const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
             const ids = p.identities, d = p.deaths;
-            h += `<div class="identity-card">
+            playerListHtml += `<div class="identity-card">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="margin:0;">${p.id}号玩家</h3>
                     <span>${heart}</span>
@@ -303,7 +312,23 @@ const App={
                 <p style="margin-top:10px;"><b>状态:</b> ${p.isAlive ? '存活' : '死亡'} ${p.isExposedIdiot ? '<span style="color:var(--warning)">(白痴已翻牌)</span>' : ''}</p>
             </div>`;
         });
-        this.$('god-player-list').innerHTML = h;
+        this.$('god-player-list').innerHTML = playerListHtml;
+
+        // [NEW] Render raw game data
+        const renderObjectToHtml = (obj) => `<pre><code>${JSON.stringify(obj, null, 2) || '无'}</code></pre>`;
+        let rawDataHtml = `<h2>⚙️ 游戏原始数据</h2>`;
+        const dataToShow = {
+            "游戏状态 (state)": this.fullGameData.state,
+            "夜晚行动 (nightActions)": this.fullGameData.nightActions,
+            "狼人投票 (wolfVotes)": this.fullGameData.wolfVotes,
+            "完整玩家数据 (players)": this.fullGameData.players,
+            "游戏配置 (config)": this.fullGameData.config,
+        };
+
+        for (const [key, value] of Object.entries(dataToShow)) {
+            rawDataHtml += `<details><summary>${key}</summary>${renderObjectToHtml(value)}</details>`;
+        }
+        this.$('god-raw-data-view').innerHTML = rawDataHtml;
     },
 
     renderPlayerInfo(){
@@ -392,7 +417,8 @@ const App={
             const done=Object.values(ns).every(s=>s==='complete');
             const getSymbol = s => s==='complete'?'✅':(s==='pending'?'⏳':'🔒');
             const getStatusClass = s => s==='complete'?'complete':(s==='pending'?'pending':'locked');
-            h+=`<button id="btn-day" class="control-btn" ${!done?'disabled':''}>☀️ 天亮了 (结算夜晚)</button>
+            h+=`<p>夜晚行动进行中... <strong>${done ? '所有行动已完成' : '等待玩家行动'}</strong></p>
+                <button id="btn-day" class="control-btn" ${!done?'disabled':''}>☀️ 天亮了 (结算夜晚)</button>
                 <div id="night-status-board">
                     <div class="status-item ${getStatusClass(ns.guard)}">🛡️守卫: ${getSymbol(ns.guard)}</div>
                     <div class="status-item ${getStatusClass(ns.seer)}">🔮预言家: ${getSymbol(ns.seer)}</div>
@@ -410,6 +436,7 @@ const App={
         if(this.$('btn-reveal'))this.$('btn-reveal').onclick = () => this.renderPlayerList(true);
     },
 
+    // [MODIFIED] Simplified night phase update logic
     async updatePhase(phase,round=null){
         const up={'state/phase':phase};
         if(round!==null){up['state/round']=round}
@@ -422,86 +449,70 @@ const App={
             const roleExists = (role) => alivePlayers.some(p => this.getActiveRole(p) === role);
             const wolfActors = alivePlayers.filter(p => this.canWolfAct(p));
 
-            const targetStatus = {
+            const nightStatus = {
                 guard: roleExists('守卫') ? 'pending' : 'complete',
                 seer: roleExists('预言家') ? 'pending' : 'complete',
                 wolf: wolfActors.length > 0 ? 'pending' : 'complete',
                 witch: this.canWitchAct() ? 'locked' : 'complete'
             };
 
-            if (targetStatus.wolf === 'complete' && targetStatus.witch === 'locked') {
-                targetStatus.witch = 'pending';
+            // If wolves don't need to act, the witch can act immediately.
+            if (nightStatus.wolf === 'complete' && nightStatus.witch === 'locked') {
+                nightStatus.witch = 'pending';
             }
             
-            if (this.isHost) {
-                const initialStatus = { ...targetStatus };
-                const delayedUpdates = {};
-                
-                let hasDelayedActions = false;
-                ['guard', 'seer', 'wolf', 'witch'].forEach(role => {
-                    if (targetStatus[role] === 'complete') {
-                        initialStatus[role] = 'pending';
-                        delayedUpdates[role] = 'complete';
-                        hasDelayedActions = true;
-                    }
-                });
-
-                if (targetStatus.wolf === 'complete' && this.canWitchAct()) {
-                    initialStatus.witch = 'locked';
-                    delayedUpdates.witch = 'pending';
-                    hasDelayedActions = true;
-                }
-
-                up['state/nightStatus'] = initialStatus;
-                await db.ref(`games/${this.gameId}`).update(up);
-
-                if (hasDelayedActions) {
-                    const randomDelay = Math.random() * 10000 + 5000;
-                    setTimeout(() => {
-                        db.ref(`games/${this.gameId}/state/nightStatus`).update(delayedUpdates);
-                    }, randomDelay);
-                }
-                return;
-            } else {
-                up['state/nightStatus'] = targetStatus;
-            }
+            up['state/nightStatus'] = nightStatus;
         }
         await db.ref(`games/${this.gameId}`).update(up);
     },
 
     renderActionPanel(){
+        this.$('action-panel').innerHTML = ''; // Clear panel first
+        this.$('action-panel').classList.remove('hidden');
+
+        if(this.gameState.phase === 'GAME_OVER') {
+            this.$('action-panel').classList.add('hidden');
+            return;
+        }
+
         if(this.gameState.phase === 'HUNTER_ACTION'){
              const hunterQueue = this.gameState.hunterQueue || [];
              if (hunterQueue.length > 0 && this.playerData.id == hunterQueue[0]) {
                 this.panelHunter();
+             } else {
+                this.$('action-panel').innerHTML = `<div class="action-feedback"><p>等待猎人开枪...</p></div>`;
              }
              return;
         }
 
-        if(!this.playerData.isAlive) return;
+        if(!this.playerData.isAlive) {
+            this.$('action-panel').classList.add('hidden');
+            return;
+        }
 
         const phase = this.gameState.phase;
         const activeRole = this.getActiveRole(this.playerData);
         const nightStatus = this.gameState.nightStatus || {};
+        let content = '';
 
         switch(phase){
             case 'DAY':
                 if(activeRole === '骑士' && !this.playerData.isExposedIdiot) this.panelKnight();
+                else this.$('action-panel').classList.add('hidden');
                 break;
             case 'NIGHT':
-                let content = '';
                 switch(activeRole) {
                     case '守卫':
                         if (nightStatus.guard === 'pending') { this.panelGuard(); return; }
-                        else content = '<p>你已行动或无需行动，请耐心等待...</p>';
+                        content = '<p>你已行动或无需行动，请耐心等待...</p>';
                         break;
                     case '预言家':
                         if (nightStatus.seer === 'pending') { this.panelSeer(); return; }
-                        else content = '<p>你已行动或无需行动，请耐心等待...</p>';
+                        content = '<p>你已行动或无需行动，请耐心等待...</p>';
                         break;
                     case '狼人': case '隐狼':
                         if (this.canWolfAct(this.playerData) && nightStatus.wolf === 'pending') { this.panelWolf(); return; }
-                        else content = '<p>你无需行动，请耐心等待...</p>';
+                        content = '<p>你无需行动，请耐心等待...</p>';
                         break;
                     case '女巫':
                         if (nightStatus.witch === 'pending') { this.panelWitch(); return; }
@@ -513,6 +524,8 @@ const App={
                 }
                 this.$('action-panel').innerHTML = `<div class="action-feedback">${content}</div>`;
                 break;
+            default:
+                 this.$('action-panel').classList.add('hidden');
         }
     },
 
@@ -564,7 +577,6 @@ const App={
         }
     },
     
-    // [FIXED] Corrected the logic for checking Invisible Wolf's condition.
     async seerCheck(id) {
         const targetPlayer = this.allPlayers[id];
         const targetCardsAlive = targetPlayer.identities.filter((_,idx) => targetPlayer.deaths <= idx);
@@ -572,7 +584,6 @@ const App={
         const hasVisibleBad = targetCardsAlive.some(i => ROLES[i.role].faction === 'bad' && !ROLES[i.role].isInvisible);
         const hasInvisWolf = targetCardsAlive.some(i => i.role === '隐狼');
 
-        // The Invisible Wolf is seen as good ONLY if a regular Wolf is alive.
         let regularWolfIsAlive = false;
         Object.values(this.allPlayers).forEach(p => {
             if (p.isAlive) {
@@ -711,8 +722,12 @@ const App={
         this.$('hunter-skip').onclick = () => this.hunter(null);
     },
 
+    // [MODIFIED] Fixed Hunter bug
     async hunter(id){
         if(id && !confirm(`确定要带走 ${id}号 玩家吗?`))return;
+
+        // Immediately disable the panel to prevent multiple clicks
+        this.$('action-panel').innerHTML = `<div class="action-feedback"><p>正在处理你的选择...</p></div>`;
         
         let shotPlayerId = null;
         if(id){
@@ -731,12 +746,14 @@ const App={
         });
 
         if (shotPlayerId) {
-            await this.kill(shotPlayerId, 'SHOT');
+            // Kill with 1 damage
+            await this.kill(shotPlayerId, 'SHOT', null, 1);
         }
 
         const isGameOver = await this.checkWin();
         if (!isGameOver) {
             if (!newQueue || newQueue.length === 0) {
+                // Return to day phase after all hunter actions are resolved
                 await this.updatePhase('DAY');
             }
         }
@@ -892,22 +909,25 @@ const App={
         const g=(await db.ref(`games/${this.gameId}`).once('value')).val();
         if(g.state.phase==='GAME_OVER') return true;
         
-        let wolfCount=0, godCount=0, goldBabyCount=0;
+        let wolfCount=0, godCount=0, civilianCount=0, totalAlive=0;
         Object.values(g.players).forEach(p=>{
             if(!p.isAlive)return;
-            const rs=p.originalIdentities.map(i=>ROLES[i.role]);
-            const isGoodOnly=rs.every(r=>r.faction==='good');
+            totalAlive++;
+            const activeRole = ROLES[this.getActiveRole(p)];
             
-            if(rs.some(r=>r.faction==='bad')) wolfCount++;
-            if(rs.every(r=>r.name==='平民')) goldBabyCount++;
-            if(isGoodOnly && !rs.every(r=>r.name==='平民') && rs.some(r=>r.isGod) && !p.isExposedIdiot) godCount++;
+            if(activeRole.faction === 'bad') {
+                wolfCount++;
+            } else {
+                if(activeRole.isGod && !p.isExposedIdiot) godCount++;
+                else civilianCount++;
+            }
         });
         
         let win=null;
         if(wolfCount === 0) win='😇 好人胜利 (狼人全灭)';
         else if(g.state.peaceNightStreak>=3) win='😇 好人胜利 (三夜平安)';
-        else if(godCount === 0) win='🐺 狼人胜利 (神职全灭)';
-        else if(goldBabyCount === 0) win='🐺 狼人胜利 (金宝宝全灭)';
+        else if(godCount === 0) win='🐺 狼人胜利 (屠边神职)';
+        else if(civilianCount === 0) win='🐺 狼人胜利 (屠边平民)';
         
         if(win){
             await db.ref(`games/${this.gameId}/state`).update({phase:'GAME_OVER',winner:win});

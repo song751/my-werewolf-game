@@ -132,7 +132,7 @@ details summary:hover{color:var(--success)}
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - 2025-07-06 最终版 (已修复)
+   双身份狼人杀 - 2025-07-07 最终版 (已修复)
    ========================================================== */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -146,7 +146,7 @@ const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','�
 const App={
     gameId:null,playerId:null,isHost:false,gameState:null,allPlayers:{},playerData:null,
     wolfChatListener:null,wolfVotesListener:null,
-    fullGameData: null, // [NEW] Store full game data for God view
+    fullGameData: null,
 
     $(id){return document.getElementById(id)},
     showView(v){this.$('setup-view').classList.add('hidden');this.$('game-view').classList.add('hidden');this.$('god-view').classList.add('hidden');this.$(v+'-view').classList.remove('hidden')},
@@ -262,7 +262,7 @@ const App={
         db.ref(`games/${this.gameId}`).on('value',s=>{
             if(!s.exists()){document.body.innerHTML='<h1>游戏已结束或不存在</h1>';return}
             const g=s.val();
-            this.fullGameData = g; // [MODIFIED] Store full game data
+            this.fullGameData = g;
             this.gameState=g.state;
             this.allPlayers=g.players;
             
@@ -288,7 +288,6 @@ const App={
         if(this.isHost) this.renderHostControls();
     },
 
-    // [MODIFIED] Enhanced God View
     renderGodView() {
         this.$('game-title').textContent = `后台监控 - ${this.gameId}`;
         let playerListHtml = '';
@@ -314,7 +313,6 @@ const App={
         });
         this.$('god-player-list').innerHTML = playerListHtml;
 
-        // [NEW] Render raw game data
         const renderObjectToHtml = (obj) => `<pre><code>${JSON.stringify(obj, null, 2) || '无'}</code></pre>`;
         let rawDataHtml = `<h2>⚙️ 游戏原始数据</h2>`;
         const dataToShow = {
@@ -403,6 +401,7 @@ const App={
         this.$('persist').classList[h?'remove':'add']('hidden');
     },
 
+    // [MODIFIED] Simplified host controls for night phase
     renderHostControls(){
         this.$('host-controls').classList.remove('hidden');
         const ph=this.gameState.phase;
@@ -415,16 +414,10 @@ const App={
         } else if(ph==='NIGHT'){
             const ns=this.gameState.nightStatus||{};
             const done=Object.values(ns).every(s=>s==='complete');
-            const getSymbol = s => s==='complete'?'✅':(s==='pending'?'⏳':'🔒');
-            const getStatusClass = s => s==='complete'?'complete':(s==='pending'?'pending':'locked');
-            h+=`<p>夜晚行动进行中... <strong>${done ? '所有行动已完成' : '等待玩家行动'}</strong></p>
-                <button id="btn-day" class="control-btn" ${!done?'disabled':''}>☀️ 天亮了 (结算夜晚)</button>
-                <div id="night-status-board">
-                    <div class="status-item ${getStatusClass(ns.guard)}">🛡️守卫: ${getSymbol(ns.guard)}</div>
-                    <div class="status-item ${getStatusClass(ns.seer)}">🔮预言家: ${getSymbol(ns.seer)}</div>
-                    <div class="status-item ${getStatusClass(ns.wolf)}">🐺狼人: ${getSymbol(ns.wolf)}</div>
-                    <div class="status-item ${getStatusClass(ns.witch)}">🧪女巫: ${getSymbol(ns.witch)}</div>
-                </div>`;
+            h+=`<p style="font-size: 1.2em; margin-bottom: 15px;">
+                   ${done ? '✅ 所有行动已完成' : '⏳ 等待玩家行动...'}
+                </p>
+                <button id="btn-day" class="control-btn" ${!done?'disabled':''}>☀️ 天亮了 (结算夜晚)</button>`;
         } else if (ph === 'GAME_OVER') {
             h += `<button id="btn-reveal" class="control-btn">👁️ 复盘：显示所有身份</button>`;
         }
@@ -436,7 +429,6 @@ const App={
         if(this.$('btn-reveal'))this.$('btn-reveal').onclick = () => this.renderPlayerList(true);
     },
 
-    // [MODIFIED] Simplified night phase update logic
     async updatePhase(phase,round=null){
         const up={'state/phase':phase};
         if(round!==null){up['state/round']=round}
@@ -456,7 +448,6 @@ const App={
                 witch: this.canWitchAct() ? 'locked' : 'complete'
             };
 
-            // If wolves don't need to act, the witch can act immediately.
             if (nightStatus.wolf === 'complete' && nightStatus.witch === 'locked') {
                 nightStatus.witch = 'pending';
             }
@@ -467,7 +458,7 @@ const App={
     },
 
     renderActionPanel(){
-        this.$('action-panel').innerHTML = ''; // Clear panel first
+        this.$('action-panel').innerHTML = '';
         this.$('action-panel').classList.remove('hidden');
 
         if(this.gameState.phase === 'GAME_OVER') {
@@ -577,28 +568,28 @@ const App={
         }
     },
     
+    // [MODIFIED] Seer check based on fundamental player faction
     async seerCheck(id) {
         const targetPlayer = this.allPlayers[id];
-        const targetCardsAlive = targetPlayer.identities.filter((_,idx) => targetPlayer.deaths <= idx);
         
-        const hasVisibleBad = targetCardsAlive.some(i => ROLES[i.role].faction === 'bad' && !ROLES[i.role].isInvisible);
-        const hasInvisWolf = targetCardsAlive.some(i => i.role === '隐狼');
-
-        let regularWolfIsAlive = false;
-        Object.values(this.allPlayers).forEach(p => {
-            if (p.isAlive) {
-                const pActiveRole = this.getActiveRole(p);
-                if (pActiveRole === '狼人') {
-                    regularWolfIsAlive = true;
-                }
-            }
+        // Check if a regular "Wolf" role is alive
+        const regularWolfIsAlive = Object.values(this.allPlayers).some(p => {
+            if (!p.isAlive) return false;
+            // Check original identities for the '狼人' role specifically
+            return p.originalIdentities.some(identity => identity.role === '狼人');
         });
         
+        const targetClassification = this.getPlayerClassification(targetPlayer);
         let res = '好人';
-        if (hasVisibleBad) {
-            res = '狼人'; 
-        } else if (hasInvisWolf && !regularWolfIsAlive) {
-            res = '狼人';
+
+        if (targetClassification.faction === 'bad') {
+            const isHiddenWolf = targetPlayer.originalIdentities.some(i => i.role === '隐狼');
+            // If target is a hidden wolf AND a regular wolf is alive, they appear as good.
+            if (isHiddenWolf && regularWolfIsAlive) {
+                res = '好人';
+            } else {
+                res = '狼人';
+            }
         }
 
         const results = this.getSkillState('seerResults') || {};
@@ -700,11 +691,13 @@ const App={
         document.querySelectorAll('.action-btn').forEach(b => b.onclick = () => this.knight(b.dataset.id));
     },
 
+    // [MODIFIED] Knight duel based on fundamental player faction
     async knight(id){
         if(!confirm(`确定要与 ${id}号 玩家决斗吗?`))return;
         const targetPlayer=this.allPlayers[id];
-        const isBad = targetPlayer.originalIdentities.some(i => ROLES[i.role].faction === 'bad');
-        if(isBad){
+        const targetClassification = this.getPlayerClassification(targetPlayer);
+
+        if(targetClassification.faction === 'bad'){
             alert(`决斗成功！${id}号是狼人阵营，已被击杀。`);
             const hunterTriggered = await this.kill(id,'DUEL');
             await this.handlePostDeath(hunterTriggered, 'NIGHT');
@@ -722,11 +715,9 @@ const App={
         this.$('hunter-skip').onclick = () => this.hunter(null);
     },
 
-    // [MODIFIED] Fixed Hunter bug
     async hunter(id){
         if(id && !confirm(`确定要带走 ${id}号 玩家吗?`))return;
 
-        // Immediately disable the panel to prevent multiple clicks
         this.$('action-panel').innerHTML = `<div class="action-feedback"><p>正在处理你的选择...</p></div>`;
         
         let shotPlayerId = null;
@@ -746,17 +737,35 @@ const App={
         });
 
         if (shotPlayerId) {
-            // Kill with 1 damage
             await this.kill(shotPlayerId, 'SHOT', null, 1);
         }
 
         const isGameOver = await this.checkWin();
         if (!isGameOver) {
             if (!newQueue || newQueue.length === 0) {
-                // Return to day phase after all hunter actions are resolved
                 await this.updatePhase('DAY');
             }
         }
+    },
+
+    // [NEW] Core logic for classifying a player's fundamental role
+    getPlayerClassification(player) {
+        const identities = player.originalIdentities;
+        
+        // Check for bad faction first
+        const isBadFaction = identities.some(i => ROLES[i.role].faction === 'bad');
+        if (isBadFaction) {
+            return { faction: 'bad', type: 'wolf' };
+        }
+
+        // If not bad, must be good. Now determine if god or civilian.
+        const isGod = identities.some(i => ROLES[i.role].isGod);
+        if (isGod) {
+            return { faction: 'good', type: 'god' };
+        }
+
+        // If not bad and not a god, must be a civilian.
+        return { faction: 'good', type: 'civilian' };
     },
 
     getActiveRole(p){return p.isAlive?p.identities[p.deaths].role:null},
@@ -905,29 +914,35 @@ const App={
         return false;
     },
 
+    // [MODIFIED] Rewritten win condition check
     async checkWin(){
         const g=(await db.ref(`games/${this.gameId}`).once('value')).val();
         if(g.state.phase==='GAME_OVER') return true;
         
-        let wolfCount=0, godCount=0, civilianCount=0, totalAlive=0;
+        let wolfCount = 0, godCount = 0, civilianCount = 0;
+        
         Object.values(g.players).forEach(p=>{
-            if(!p.isAlive)return;
-            totalAlive++;
-            const activeRole = ROLES[this.getActiveRole(p)];
+            if(!p.isAlive) return;
             
-            if(activeRole.faction === 'bad') {
+            const classification = this.getPlayerClassification(p);
+
+            if (classification.faction === 'bad') {
                 wolfCount++;
-            } else {
-                if(activeRole.isGod && !p.isExposedIdiot) godCount++;
-                else civilianCount++;
+            } else { // Good faction
+                // Exposed idiots do not count as gods for win condition
+                if (classification.type === 'god' && !p.isExposedIdiot) {
+                    godCount++;
+                } else if (classification.type === 'civilian') {
+                    civilianCount++;
+                }
             }
         });
         
         let win=null;
         if(wolfCount === 0) win='😇 好人胜利 (狼人全灭)';
         else if(g.state.peaceNightStreak>=3) win='😇 好人胜利 (三夜平安)';
-        else if(godCount === 0) win='🐺 狼人胜利 (屠边神职)';
-        else if(civilianCount === 0) win='🐺 狼人胜利 (屠边平民)';
+        else if(godCount === 0) win='🐺 狼人胜利 (神职全灭)';
+        else if(civilianCount === 0) win='🐺 狼人胜利 (平民全灭)';
         
         if(win){
             await db.ref(`games/${this.gameId}/state`).update({phase:'GAME_OVER',winner:win});

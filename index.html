@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官 (V6 终极增强版)</title>
+<title>双身份狼人杀 - 电子法官 (V6.1 终极修复版)</title>
 
 <!-- ========= 视觉样式 (无变动) ========= -->
 <style>
@@ -17,7 +17,7 @@ body{display:flex;justify-content:center;align-items:flex-start;padding:20px;bac
  radial-gradient(circle at 20% 50%,rgba(233,69,96,.1)0%,transparent 50%),
  radial-gradient(circle at 80% 80%,rgba(0,217,255,.1)0%,transparent 50%)}
 #app{width:100%;max-width:900px;background:var(--card);border-radius:20px;padding:30px;box-shadow:var(--shadow);border:1px solid var(--border);animation:fadeIn .5s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform: translateY(0)}}
 h1,h2,h3{color:var(--text);margin-bottom:20px;text-align:center;letter-spacing:1px}
 h1{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:2em;margin-bottom:30px}
 h2{color:var(--success);font-size:1.5em;border-bottom:2px solid var(--border);padding-bottom:10px}
@@ -147,7 +147,8 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6 终极增强版
+   双身份狼人杀 - V6.1 终极修复版
+   - 修复了主持人视角下，警长投票和白天投票状态不更新的bug
    - 合并了V6修复版的所有修复
    - 增加了全局输入验证，防止恶意操作
    - 恢复了修复版中缺失的狼人确认逻辑
@@ -261,7 +262,6 @@ const App={
 
         const { action, id, value, gameid } = target.dataset;
         
-        // NEW: 全局输入验证，防止恶意ID注入
         if (id !== undefined && !/^\d+$/.test(id)) {
             this.showNotification('检测到无效操作ID，已阻止。', 'error');
             console.error(`Invalid non-numeric ID "${id}" for action "${action}" was blocked.`);
@@ -333,7 +333,6 @@ const App={
             case 'seer-skip': provideImmediateFeedback(target); this.seerSkip(); break;
             case 'wolf-vote': db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(id); break;
             case 'wolf-skip': db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set('0'); break;
-            // RE-ADDED: This case was missing in the fix snippet but is crucial.
             case 'wolf-confirm': provideImmediateFeedback(target); this.wolfConfirmKill(id); break;
             case 'wolf-send': this.sendWolfMessage(); break;
             case 'witch-cure': provideImmediateFeedback(target); this.witchUseCure(id); break;
@@ -357,7 +356,6 @@ const App={
                 }
                 const p = document.createElement('p');
                 p.innerHTML = `<strong>[${new Date(log.timestamp).toLocaleTimeString()}]</strong> `;
-                // Use createTextNode for the user-provided message to prevent HTML injection
                 p.appendChild(document.createTextNode(log.message));
                 logContent.insertBefore(p, logContent.firstChild);
                 if (!this.isHost) {
@@ -662,7 +660,8 @@ const App={
         let h=`<h3>👑 主持人面板</h3>`;
         
         const renderStatusGrid = (title, totalList, doneList) => {
-            const doneIds = Array.isArray(doneList) ? doneList.map(p => p.id.toString()) : Object.keys(doneList);
+            // This function now consistently expects `doneList` to be an array of player objects.
+            const doneIds = doneList.map(p => p.id.toString());
             const pendingList = totalList.filter(p => !doneIds.includes(p.id.toString()));
             let gridHtml = `<div class="info-box">${title}：${doneIds.length} / ${totalList.length}</div>`;
             if (pendingList.length > 0) {
@@ -706,19 +705,38 @@ const App={
             case 'SHERIFF_SPEECH':
                 h += `<button data-action="host-sheriff-vote" class="control-btn">进入投票阶段</button>`;
                 break;
+            
+            // ================== FIX STARTS HERE ==================
             case 'SHERIFF_VOTE':
                 const voters = Object.values(this.allPlayers).filter(p => p.isAlive && !p.isExposedIdiot);
-                const voted = this.fullGameData.sheriff?.votes || {};
-                h += renderStatusGrid('警长投票', voters, voted);
-                h += `<button data-action="host-tally-sheriff" class="control-btn" ${Object.keys(voted).length < voters.length ? 'disabled' : ''}>📊 统计警长票</button>`;
+                const votedData = this.fullGameData.sheriff?.votes || {};
+                // Convert voter IDs from the raw data object into an array of player objects.
+                const votedPlayers = Object.keys(votedData)
+                    .map(id => this.allPlayers[id])
+                    .filter(Boolean); // Ensures no undefined players in the array.
+
+                // Pass the consistent, correct format (array of player objects) to the renderer.
+                h += renderStatusGrid('警长投票', voters, votedPlayers);
+
+                // Use the length of the processed array for the condition.
+                h += `<button data-action="host-tally-sheriff" class="control-btn" ${votedPlayers.length < voters.length ? 'disabled' : ''}>📊 统计警长票</button>`;
                 h += `<button data-action="host-force-tally-sheriff" class="action-btn">强制计票</button>`;
                 break;
+
             case 'DAY':
                 const dayVoters = Object.values(this.allPlayers).filter(p => p.isAlive && !p.isExposedIdiot);
-                const dayVoted = this.fullGameData.dayVotes?.[this.gameState.round] || {};
-                h += renderStatusGrid('放逐投票', dayVoters, dayVoted);
-                h += `<button data-action="host-tally-day" class="control-btn" ${Object.keys(dayVoted).length < dayVoters.length ? 'disabled' : ''}>📊 统计放逐票</button>`;
+                const dayVotedData = this.fullGameData.dayVotes?.[this.gameState.round] || {};
+                // Apply the same fix for day votes.
+                const dayVotedPlayers = Object.keys(dayVotedData)
+                    .map(id => this.allPlayers[id])
+                    .filter(Boolean);
+                
+                h += renderStatusGrid('放逐投票', dayVoters, dayVotedPlayers);
+                
+                h += `<button data-action="host-tally-day" class="control-btn" ${dayVotedPlayers.length < dayVoters.length ? 'disabled' : ''}>📊 统计放逐票</button>`;
                 break;
+            // =================== FIX ENDS HERE ===================
+
             case 'SHERIFF_TRANSFER':
                 const transferState = this.gameState.postDeathState || {};
                 h += `<h4>警长 ${transferState.deadSheriffId}号 已阵亡</h4><p>请选择操作：</p>`;
@@ -838,7 +856,6 @@ const App={
         panelEl.innerHTML = content;
     },
 
-    // Panel functions
     panelWolf() {
         const teammates = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
         const canAct = this.canWolfAct(this.playerData);
@@ -982,8 +999,6 @@ const App={
         panelEl.innerHTML = h;
     },
 
-    // Action handlers
-    // FIX: 发送消息前做长度校验，防止恶意巨量数据
     sendWolfMessage() {
         const input = this.$('wolf-chat-input');
         if (!input) return;
@@ -1004,7 +1019,7 @@ const App={
     async wolfConfirmKill(targetId) {
         const actionRef = db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/wolf`);
         actionRef.transaction(currentData => {
-            if (currentData) { return; } // Action already confirmed, do nothing.
+            if (currentData) { return; }
             return { target: targetId, actorId: this.playerId };
         }).then(async (result) => {
             if (result.committed) {
@@ -1159,8 +1174,6 @@ const App={
 
         Object.entries(votes).forEach(([voterId, targetId]) => {
             if (targetId !== '0') {
-                // CLARIFICATION: Using integer weights to avoid floating point issues.
-                // 3 for sheriff, 2 for normal player, representing 1.5 and 1 votes respectively.
                 const voteWeight = voterId == sheriffId ? 3 : 2;
                 voteCounts[targetId] = (voteCounts[targetId] || 0) + voteWeight;
             }
@@ -1231,8 +1244,6 @@ const App={
             
             if (roleBeforeDeath === '白痴' && cause === 'VOTE' && !p.isExposedIdiot) {
                 p.isExposedIdiot = true;
-                // Idiot is effectively out of the game for win/loss conditions but can still speak.
-                // Setting isAlive to false simplifies many checks, while isExposedIdiot handles the exception.
                 p.isAlive = false; 
                 p.deaths = 2;
                 return p;
@@ -1375,7 +1386,6 @@ const App={
         return { gods, wolves, civilians };
     },
 
-    // Helper functions
     getActiveRole(p) {
         if (!p || !p.isAlive) return null;
         if (p.deaths >= p.identities.length) return null;
@@ -1421,7 +1431,6 @@ const App={
         await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${stateKey}`).set(value);
     },
 
-    // FIX: 调用 stopWolfListeners(false)，只解绑，不隐藏 UI
     initWolfListeners() {
         this.stopWolfListeners(false);
 
@@ -1459,7 +1468,6 @@ const App={
         
         this.wolfVotesListener = db.ref(`games/${this.gameId}/wolfVotes`);
         this.wolfVotesListener.on('value', this.wolfVotesCallbackRef);
-        // FIX: 立刻执行一次，保证第一帧就有数据
         this.wolfVotesListener.once('value').then(this.wolfVotesCallbackRef);
 
         const chatRef = db.ref(`games/${this.gameId}/wolfChat`);
@@ -1482,7 +1490,6 @@ const App={
         });
     },
 
-    // FIX: 为 stopWolfListeners 增加 hideUI 参数，默认 true
     stopWolfListeners(hideUI = true) {
         if (this.wolfVotesListener) {
             db.ref(`games/${this.gameId}/wolfVotes`).off('value', this.wolfVotesCallbackRef);

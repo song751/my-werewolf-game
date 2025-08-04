@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官 (V6 终极版)</title>
+<title>双身份狼人杀 - 电子法官 (V6 终极增强版)</title>
 
 <!-- ========= 视觉样式 (无变动) ========= -->
 <style>
@@ -147,7 +147,11 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6 终极版 (修复版 5 - 规则与UI修复)
+   双身份狼人杀 - V6 终极增强版
+   - 合并了V6修复版的所有修复
+   - 增加了全局输入验证，防止恶意操作
+   - 恢复了修复版中缺失的狼人确认逻辑
+   - 提升了代码健壮性和清晰度
    ========================================================== */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -156,7 +160,6 @@ const db=firebase.database();
 
 const ROLES={'平民':{name:'平民',faction:'good',isGod:false,icon:'👤'},'守卫':{name:'守卫',faction:'good',isGod:true,icon:'🛡️'},'白痴':{name:'白痴',faction:'good',isGod:true,icon:'🤪'},'预言家':{name:'预言家',faction:'good',isGod:true,icon:'🔮'},'骑士':{name:'骑士',faction:'good',isGod:true,icon:'⚔️'},'隐狼':{name:'隐狼',faction:'bad',isGod:false,isInvisible:true,icon:'🌑'},'女巫':{name:'女巫',faction:'good',isGod:true,icon:'🧪'},'猎人':{name:'猎人',faction:'good',isGod:true,icon:'🔫'},'狼人':{name:'狼人',faction:'bad',isGod:false,icon:'🐺'},'盗贼':{name:'盗贼',faction:'neutral',isGod:false,isThief:true,icon:'🎭'}};
 const DEFAULT_SETUP={'平民':6,'守卫':1,'白痴':1,'预言家':1,'骑士':1,'女巫':1,'猎人':1,'狼人':2,'隐狼':1,'盗贼':1};
-// Corrected FORBIDDEN_RAW: Removed ['狼人', '狼人']
 const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','狼人'],['盗贼','隐狼'],['隐狼','狼人'], ['隐狼', '隐狼']];
 
 const App={
@@ -258,6 +261,13 @@ const App={
 
         const { action, id, value, gameid } = target.dataset;
         
+        // NEW: 全局输入验证，防止恶意ID注入
+        if (id !== undefined && !/^\d+$/.test(id)) {
+            this.showNotification('检测到无效操作ID，已阻止。', 'error');
+            console.error(`Invalid non-numeric ID "${id}" for action "${action}" was blocked.`);
+            return;
+        }
+
         if (action === 'join-as-creator') {
             this.gameId = gameid;
             this.playerId = '1';
@@ -321,9 +331,9 @@ const App={
             case 'guard-skip': provideImmediateFeedback(target); this.guardSkip(); break;
             case 'seer-check': provideImmediateFeedback(target); this.seerCheck(id); break;
             case 'seer-skip': provideImmediateFeedback(target); this.seerSkip(); break;
-            // Wolf vote logic is now simpler, no immediate feedback needed as the UI will update
             case 'wolf-vote': db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(id); break;
             case 'wolf-skip': db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set('0'); break;
+            // RE-ADDED: This case was missing in the fix snippet but is crucial.
             case 'wolf-confirm': provideImmediateFeedback(target); this.wolfConfirmKill(id); break;
             case 'wolf-send': this.sendWolfMessage(); break;
             case 'witch-cure': provideImmediateFeedback(target); this.witchUseCure(id); break;
@@ -347,7 +357,8 @@ const App={
                 }
                 const p = document.createElement('p');
                 p.innerHTML = `<strong>[${new Date(log.timestamp).toLocaleTimeString()}]</strong> `;
-                p.appendChild(document.createTextNode(this.escapeHTML(log.message)));
+                // Use createTextNode for the user-provided message to prevent HTML injection
+                p.appendChild(document.createTextNode(log.message));
                 logContent.insertBefore(p, logContent.firstChild);
                 if (!this.isHost) {
                     this.showNotification(log.message, 'info');
@@ -375,7 +386,7 @@ const App={
             this.$('total-roles').textContent = t;
             const pCount = t > 0 && t % 2 === 0 ? t / 2 : '身份总数必须为偶数';
             this.$('player-cnt').textContent = pCount;
-            this.$('player-count-warning').textContent = pCount > 9 ? '(推荐≤9人)' : '';
+            this.$('player-count-warning').textContent = typeof pCount === 'number' && pCount > 9 ? '(推荐≤9人)' : '';
         };
         this.$('role-setup').oninput = u; u();
     },
@@ -396,13 +407,14 @@ const App={
             for(let k=0;k<count;k++)pool.push(r);
         });
         
+        if(pool.length === 0 || pool.length % 2 !== 0){
+            this.showSetupError('身份总数需为偶数且大于0');
+            return;
+        }
+
         const playerCount = pool.length / 2;
         if(playerCount > 12) {
             this.showSetupError('玩家过多，建议不超过12人。');
-            return;
-        }
-        if(pool.length===0||pool.length%2){
-            this.showSetupError('身份总数需为偶数且大于0');
             return;
         }
         
@@ -840,7 +852,7 @@ const App={
         
         const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
         h += `<h4>选择今夜袭击目标：</h4>`;
-        h += targets.map(p => `<button class="action-btn ${myVote === p.id ? 'selected' : ''}" data-action="wolf-vote" data-id="${p.id}" ${!canAct ? 'disabled' : ''}>${p.id}号</button>`).join('');
+        h += targets.map(p => `<button class="action-btn ${myVote === p.id.toString() ? 'selected' : ''}" data-action="wolf-vote" data-id="${p.id}" ${!canAct ? 'disabled' : ''}>${p.id}号</button>`).join('');
         h += `<button class="control-btn ${myVote === '0' ? 'selected' : ''}" data-action="wolf-skip" ${!canAct ? 'disabled' : ''}>🚫 今夜空刀</button>`;
         
         const panelEl = this.$('action-panel');
@@ -863,7 +875,6 @@ const App={
             });
         }
         
-        // Corrected logic: Render HTML first, then attach listeners
         this.initWolfListeners();
     },
 
@@ -972,24 +983,28 @@ const App={
     },
 
     // Action handlers
+    // FIX: 发送消息前做长度校验，防止恶意巨量数据
     sendWolfMessage() {
         const input = this.$('wolf-chat-input');
         if (!input) return;
-        const msg = input.value.trim();
-        if (msg) {
-            db.ref(`games/${this.gameId}/wolfChat`).push({
-                pid: this.playerId,
-                msg: msg,
-                ts: firebase.database.ServerValue.TIMESTAMP
-            });
-            input.value = '';
+        const msg = (input.value || '').trim();
+        if (!msg) return;
+        if (msg.length > 120) {
+            this.showNotification('消息过长 (≤120 字)。', 'error');
+            return;
         }
+        db.ref(`games/${this.gameId}/wolfChat`).push({
+            pid: this.playerId,
+            msg,
+            ts: firebase.database.ServerValue.TIMESTAMP
+        });
+        input.value = '';
     },
 
     async wolfConfirmKill(targetId) {
         const actionRef = db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/wolf`);
         actionRef.transaction(currentData => {
-            if (currentData) { return; }
+            if (currentData) { return; } // Action already confirmed, do nothing.
             return { target: targetId, actorId: this.playerId };
         }).then(async (result) => {
             if (result.committed) {
@@ -1144,6 +1159,8 @@ const App={
 
         Object.entries(votes).forEach(([voterId, targetId]) => {
             if (targetId !== '0') {
+                // CLARIFICATION: Using integer weights to avoid floating point issues.
+                // 3 for sheriff, 2 for normal player, representing 1.5 and 1 votes respectively.
                 const voteWeight = voterId == sheriffId ? 3 : 2;
                 voteCounts[targetId] = (voteCounts[targetId] || 0) + voteWeight;
             }
@@ -1214,7 +1231,9 @@ const App={
             
             if (roleBeforeDeath === '白痴' && cause === 'VOTE' && !p.isExposedIdiot) {
                 p.isExposedIdiot = true;
-                p.isAlive = false;
+                // Idiot is effectively out of the game for win/loss conditions but can still speak.
+                // Setting isAlive to false simplifies many checks, while isExposedIdiot handles the exception.
+                p.isAlive = false; 
                 p.deaths = 2;
                 return p;
             }
@@ -1402,8 +1421,9 @@ const App={
         await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${stateKey}`).set(value);
     },
 
+    // FIX: 调用 stopWolfListeners(false)，只解绑，不隐藏 UI
     initWolfListeners() {
-        this.stopWolfListeners();
+        this.stopWolfListeners(false);
 
         const alphaWolfId = this.getAlphaWolfId();
 
@@ -1439,6 +1459,8 @@ const App={
         
         this.wolfVotesListener = db.ref(`games/${this.gameId}/wolfVotes`);
         this.wolfVotesListener.on('value', this.wolfVotesCallbackRef);
+        // FIX: 立刻执行一次，保证第一帧就有数据
+        this.wolfVotesListener.once('value').then(this.wolfVotesCallbackRef);
 
         const chatRef = db.ref(`games/${this.gameId}/wolfChat`);
         const chatBox = this.$('wolf-chat-messages');
@@ -1460,7 +1482,8 @@ const App={
         });
     },
 
-    stopWolfListeners() {
+    // FIX: 为 stopWolfListeners 增加 hideUI 参数，默认 true
+    stopWolfListeners(hideUI = true) {
         if (this.wolfVotesListener) {
             db.ref(`games/${this.gameId}/wolfVotes`).off('value', this.wolfVotesCallbackRef);
             this.wolfVotesListener = null;
@@ -1470,8 +1493,10 @@ const App={
             db.ref(`games/${this.gameId}/wolfChat`).off('child_added', this.wolfChatListener);
             this.wolfChatListener = null;
         }
-        const chatEl = this.$('wolf-chat-area');
-        if(chatEl) chatEl.classList.add('hidden');
+        if (hideUI) {
+            const chatEl = this.$('wolf-chat-area');
+            if(chatEl) chatEl.classList.add('hidden');
+        }
     }
 };
 

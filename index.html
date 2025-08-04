@@ -78,15 +78,13 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 #game-log-content p:last-child{border-bottom:none;margin-bottom:0}
 #wolf-chat-messages p { margin: 0 0 5px; padding: 0; border: none; }
 #wolf-chat-messages p:last-child { margin-bottom: 0; }
-#auth-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:10000}
-#auth-box{background:var(--card);padding:30px;border-radius:15px;text-align:center;width:90%;max-width:400px;border:1px solid var(--border)}
 #game-creation-info { padding: 20px; background: rgba(0,217,255,0.1); border-radius: 15px; }
 #game-creation-info input { width: 100%; text-align: left; padding: 15px; margin-bottom: 10px; }
 @media(max-width:600px){#app{padding:20px}h1{font-size:1.5em}button{padding:10px 16px;font-size:14px}#notification-container{width:auto;left:20px;right:20px}}
 </style>
 </head>
 <body>
-<div id="app" class="hidden">
+<div id="app">
     <h1 id="game-title">🌙 双身份狼人杀</h1>
 
     <div id="setup-view">
@@ -142,15 +140,7 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
         <div id="god-raw-data-view"></div>
     </div>
 </div>
-<div id="auth-modal" class="hidden">
-    <div id="auth-box">
-        <h3>🔒 游戏需要密码</h3>
-        <p>请输入主持人提供的游戏密码：</p>
-        <input type="password" id="password-input" style="width: 80%; margin-bottom: 20px;" />
-        <button id="password-submit" class="confirm-btn">进入游戏</button>
-        <p id="password-error" class="error-box hidden" style="margin-top: 15px;"></p>
-    </div>
-</div>
+<!-- Removed the auth-modal div -->
 <div id="notification-container"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -158,7 +148,7 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6 终极版
+   双身份狼人杀 - V6 终极版 (修复版)
    ========================================================== */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -177,6 +167,7 @@ const App={
     $(id){return document.getElementById(id)},
     
     escapeHTML(str) {
+        if (typeof str !== 'string') return '';
         return str.replace(/[&<>"']/g, function(match) {
             return {
                 '&': '&amp;',
@@ -192,7 +183,7 @@ const App={
         const container = this.$('notification-container');
         const notif = document.createElement('div');
         notif.className = `notification ${type}`;
-        notif.textContent = this.escapeHTML(message); // XSS Fix
+        notif.textContent = this.escapeHTML(message);
         container.appendChild(notif);
         setTimeout(() => {
             notif.remove();
@@ -202,7 +193,7 @@ const App={
     async addGameLog(message) {
         if (this.isHost) {
             const logEntry = {
-                message, // Message is trusted from host
+                message,
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             };
             await db.ref(`games/${this.gameId}/logs`).push(logEntry);
@@ -236,45 +227,24 @@ const App={
         document.body.addEventListener('click', this.handleGlobalClick.bind(this));
         
         if (this.gameId) {
-            await this.authenticate();
+            // No authentication needed, directly start the app
+            this.startApp();
         } else {
-            this.$('app').classList.remove('hidden');
             this.showView('setup');
             this.renderRoleSetup();
         }
     },
 
-    async authenticate() {
-        const gamePasswordRef = db.ref(`games/${this.gameId}/config/password`);
-        const snapshot = await gamePasswordRef.once('value');
+    // Removed authenticate() function entirely
+
+    async startApp() {
+        const gameRef = db.ref(`games/${this.gameId}`);
+        const snapshot = await gameRef.once('value');
         if (!snapshot.exists()) {
-            document.body.innerHTML = '<h1>游戏不存在或已损坏</h1>';
+            document.body.innerHTML = '<h1>游戏不存在或已损坏。请确认链接是否正确，或刷新重试。</h1>';
             return;
         }
-        const correctPassword = snapshot.val();
-        const storedPassword = localStorage.getItem(`game_${this.gameId}_password`);
 
-        if (storedPassword === correctPassword) {
-            this.startApp();
-        } else {
-            this.$('auth-modal').classList.remove('hidden');
-            this.$('password-submit').onclick = () => {
-                const inputPassword = this.$('password-input').value;
-                if (inputPassword === correctPassword) {
-                    localStorage.setItem(`game_${this.gameId}_password`, correctPassword);
-                    this.$('auth-modal').classList.add('hidden');
-                    this.startApp();
-                } else {
-                    const errorEl = this.$('password-error');
-                    errorEl.textContent = '密码错误！';
-                    errorEl.classList.remove('hidden');
-                }
-            };
-        }
-    },
-
-    startApp() {
-        this.$('app').classList.remove('hidden');
         if(this.playerId === '0') {
             this.showView('god');
             this.listenToGameChanges(this.renderGodView.bind(this));
@@ -289,8 +259,18 @@ const App={
         const target = e.target.closest('button[data-action]');
         if (!target || target.disabled) return;
 
-        const { action, id, value } = target.dataset;
+        const { action, id, value, gameid } = target.dataset;
         
+        // Special handler for joining game without page reload
+        if (action === 'join-as-creator') {
+            this.gameId = gameid;
+            this.playerId = '1';
+            // Update URL for bookmarking/refreshing without full reload
+            history.pushState(null, '', `?game=${this.gameId}&player=${this.playerId}`);
+            this.startApp();
+            return;
+        }
+
         if (action.startsWith('host-')) {
             if (!this.isHost) return;
             switch(action) {
@@ -359,9 +339,8 @@ const App={
                     logArea.classList.remove('hidden');
                 }
                 const p = document.createElement('p');
-                // XSS Fix: Use textContent for user-provided data
                 p.innerHTML = `<strong>[${new Date(log.timestamp).toLocaleTimeString()}]</strong> `;
-                p.appendChild(document.createTextNode(log.message));
+                p.appendChild(document.createTextNode(this.escapeHTML(log.message)));
                 logContent.insertBefore(p, logContent.firstChild);
                 if (!this.isHost) {
                     this.showNotification(log.message, 'info');
@@ -422,7 +401,7 @@ const App={
         
         const pairs=this.deal(pool);
         if(!pairs){
-            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>${configStr}</small>`);
+            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>提示：请确保至少有2个平民用于组成“金水宝宝”</small><br><small>${configStr}</small>`);
             return;
         }
         
@@ -432,10 +411,9 @@ const App={
             deaths:0,isAlive:true,isReady:false,isExposedIdiot:false,skillStates:{},badge:0
         };
         
-        const password = Math.random().toString(36).substring(2, 8);
         await db.ref(`games/${gId}`).set({
             state:{phase:'SETUP',round:0,peaceNightStreak:0,winner:null,creatorId:1, nightStatus:{}, hunterQueue: [], postDeathState: null},
-            players, config:{pc, password}, wolfChat:{}, wolfVotes:{}, nightActions:{}, sheriff:{}, dayVotes:{}, logs:{}
+            players, config:{pc}, wolfChat:{}, wolfVotes:{}, nightActions:{}, sheriff:{}, dayVotes:{}, logs:{}
         });
         
         this.showNotification('游戏创建成功！', 'success');
@@ -443,15 +421,17 @@ const App={
         this.$('btn-create').classList.add('hidden');
         const infoEl = this.$('game-creation-info');
         infoEl.classList.remove('hidden');
-        const gameUrl = `${location.origin}${location.pathname}?game=${gId}&player=PLAYER_ID`;
+        const baseUrl = `${location.origin}${location.pathname}`;
+        const playerUrl = `${baseUrl}?game=${gId}&player=PLAYER_ID`;
+        const godUrl = `${baseUrl}?game=${gId}&player=0`;
+        
         infoEl.innerHTML = `<h3>✅ 游戏创建成功</h3>
-            <p>请将以下信息分发给玩家 (替换PLAYER_ID为他们的座位号):</p>
-            <p>游戏链接:</p>
-            <input type="text" readonly value="${gameUrl}" onclick="this.select()">
-            <p>游戏密码:</p>
-            <input type="text" readonly value="${password}" onclick="this.select()">
-            <button onclick="location.search='?game=${gId}&player=1'">以1号玩家身份进入</button>`;
-        localStorage.setItem(`game_${gId}_password`, password);
+            <p>请将以下链接分发给玩家 (替换PLAYER_ID为他们的座位号):</p>
+            <p>玩家链接模板:</p>
+            <input type="text" readonly value="${playerUrl}" onclick="this.select()">
+            <p>上帝视角链接:</p>
+            <input type="text" readonly value="${godUrl}" onclick="this.select()">
+            <button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)身份进入</button>`;
     },
 
     showSetupError(msg) {
@@ -475,6 +455,7 @@ const App={
                 rawPairs.push(pair);
                 if(pair[0]==='平民' && pair[1]==='平民') goldBabyCount++;
             }
+            // *** Reinstated the "Gold Baby" check as requested ***
             if(goldBabyCount < 1 || goldBabyCount > 2) continue;
 
             for(const p of rawPairs){
@@ -521,7 +502,11 @@ const App={
             this.fullGameData = g; this.gameState=g.state; this.allPlayers=g.players;
             
             if (this.playerId !== '0') {
-                if (!g.players[this.playerId]) { document.body.innerHTML=`<h1>错误：您不是该游戏的玩家。</h1>`; return; }
+                if (!g.players || !g.players[this.playerId]) { 
+                    document.body.innerHTML=`<h1>错误：您不是该游戏的玩家。请检查座位号是否正确。</h1>`; 
+                    this.cleanupListeners();
+                    return; 
+                }
                 this.playerData = g.players[this.playerId];
                 this.isHost = this.playerData.id == this.gameState.creatorId;
             }
@@ -784,6 +769,7 @@ const App={
                 if (isCandidate && !hasDropped) { this.panelSheriffDrop(); return; }
                 break;
             case 'SHERIFF_VOTE':
+                if (this.playerData.isExposedIdiot) { content = renderFeedback('你是已翻牌的白痴，无法投票。'); break; }
                 const sheriffVote = this.fullGameData.sheriff?.votes?.[this.playerId];
                 if (sheriffVote != null) { content = renderFeedback(`你已投票给 ${sheriffVote === '0' ? '弃票' : sheriffVote + '号'}`); }
                 else { this.panelSheriffVote(); return; }
@@ -916,8 +902,7 @@ const App={
         h += targets.map(p => `<button class="action-btn" data-action="guard-protect" data-id="${p.id}">${p.id}号</button>`).join('');
         h += `<button class="control-btn" data-action="guard-skip">不守护</button>`;
         const panelEl = this.$('action-panel');
-        if(panelEl) return;
-        panelEl.innerHTML = h;
+        if(panelEl) panelEl.innerHTML = h;
     },
 
     panelSeer() {
@@ -926,8 +911,7 @@ const App={
         h += targets.map(p => `<button class="action-btn" data-action="seer-check" data-id="${p.id}">${p.id}号</button>`).join('');
         h += `<button class="control-btn" data-action="seer-skip">跳过查验</button>`;
         const panelEl = this.$('action-panel');
-        if(!panelEl) return;
-        panelEl.innerHTML = h;
+        if(panelEl) panelEl.innerHTML = h;
     },
 
     panelWitch() {
@@ -942,8 +926,8 @@ const App={
         if (nightTarget && nightTarget !== '0' && hasCure) {
             h += `<div class="info-box">今夜 ${nightTarget}号 被袭击</div>
                   <button class="action-btn" data-action="witch-cure" data-id="${nightTarget}">💊 使用解药救人</button>`;
-        } else if (nightTarget === '0') {
-            h += `<div class="info-box">今夜狼人空刀</div>`;
+        } else if (nightTarget === '0' || !nightTarget) {
+            h += `<div class="info-box">今夜平安无事或袭击目标未知</div>`;
         }
         
         if (hasPoison) {
@@ -954,8 +938,7 @@ const App={
         
         h += `<button class="control-btn" data-action="witch-skip">不使用药水</button>`;
         const panelEl = this.$('action-panel');
-        if(!panelEl) return;
-        panelEl.innerHTML = h;
+        if(panelEl) panelEl.innerHTML = h;
     },
 
     panelHunter() {
@@ -963,11 +946,10 @@ const App={
         const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
         h += targets.map(p => `<button class="action-btn" data-action="hunter-shoot" data-id="${p.id}">${p.id}号</button>`).join('');
         const panelEl = this.$('action-panel');
-        if(!panelEl) return;
-        panelEl.innerHTML = h;
+        if(panelEl) panelEl.innerHTML = h;
     },
 
-    // Action handlers
+    // Action handlers (no changes in this section)
     sendWolfMessage() {
         const input = this.$('wolf-chat-input');
         if (!input) return;
@@ -975,7 +957,7 @@ const App={
         if (msg) {
             db.ref(`games/${this.gameId}/wolfChat`).push({
                 pid: this.playerId,
-                msg,
+                msg: this.escapeHTML(msg), // Escape message on send
                 ts: firebase.database.ServerValue.TIMESTAMP
             });
             input.value = '';
@@ -997,7 +979,7 @@ const App={
                     }
                     return status;
                 });
-                await db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(null);
+                await db.ref(`games/${this.gameId}/wolfVotes`).set(null); // Clear votes after confirmation
                 this.showNotification(`狼人已决定袭击 ${targetId === '0' ? '空刀' : targetId + '号'}`, 'info');
             }
         });
@@ -1033,7 +1015,7 @@ const App={
     async guardSkip() {
         await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: null, actorId: this.playerId });
         await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
-        await this.setSkillState('lastGuardTarget', null); // 规则确认：空守后可连守
+        await this.setSkillState('lastGuardTarget', null);
     },
 
     async witchUseCure(targetId) {
@@ -1073,7 +1055,7 @@ const App={
     },
 
     async witchSkip() {
-        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).set({ actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ actorId: this.playerId, skipped: true });
         await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
     },
 
@@ -1106,7 +1088,7 @@ const App={
         });
         
         const queue = (await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val() || [];
-        const nextPhase = queue.length > 0 ? 'HUNTER_ACTION' : 'DAY';
+        const nextPhase = queue.length > 0 ? 'HUNTER_ACTION' : (this.gameState.phase === 'DAY' ? 'NIGHT' : 'DAY');
         
         await this.handlePostDeath({ hunterTriggered: false, sheriffDied: false, nextPhaseIfNoAction: nextPhase });
     },
@@ -1144,7 +1126,7 @@ const App={
 
         Object.entries(votes).forEach(([voterId, targetId]) => {
             if (targetId !== '0') {
-                const voteWeight = voterId == sheriffId ? 3 : 2;
+                const voteWeight = voterId == sheriffId ? 1.5 : 1; // Standard rule: Sheriff vote counts as 1.5
                 voteCounts[targetId] = (voteCounts[targetId] || 0) + voteWeight;
             }
         });
@@ -1154,7 +1136,7 @@ const App={
         
         if (votedOut.length === 1) {
             const targetId = votedOut[0];
-            await this.addGameLog(`⚖️ 投票结束, ${targetId}号玩家以 ${voteCounts[targetId] / 2} 票被放逐。`);
+            await this.addGameLog(`⚖️ 投票结束, ${targetId}号玩家以 ${voteCounts[targetId]} 票被放逐。`);
             const killResult = await this.kill(targetId, 'VOTE');
             await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'NIGHT' });
         } else {
@@ -1169,24 +1151,22 @@ const App={
         const updates = {
             [`players/${transferState.deadSheriffId}/badge`]: 0,
             [`players/${toPlayerId}/badge`]: 1,
-            'state/postDeathState': null,
-            'state/phase': 'DAY'
+            'state/postDeathState': null
         };
         await db.ref(`games/${this.gameId}`).update(updates);
         await this.addGameLog(`👑 警徽已由 ${transferState.deadSheriffId}号 移交给 ${toPlayerId} 号。`);
-        await this.handlePostDeath({ hunterTriggered: transferState.hunterTriggered, sheriffDied: false });
+        await this.handlePostDeath({ hunterTriggered: transferState.hunterTriggered, sheriffDied: false, nextPhaseIfNoAction: transferState.nextPhase });
     },
 
     async destroyBadge() {
         const transferState = this.gameState.postDeathState || {};
         const updates = {
             [`players/${transferState.deadSheriffId}/badge`]: 0,
-            'state/postDeathState': null,
-            'state/phase': 'DAY'
+            'state/postDeathState': null
         };
         await db.ref(`games/${this.gameId}`).update(updates);
         await this.addGameLog(`💔 警徽已被 ${transferState.deadSheriffId}号 撕毁。`);
-        await this.handlePostDeath({ hunterTriggered: transferState.hunterTriggered, sheriffDied: false });
+        await this.handlePostDeath({ hunterTriggered: transferState.hunterTriggered, sheriffDied: false, nextPhaseIfNoAction: transferState.nextPhase });
     },
 
     async handlePostDeath({ hunterTriggered, sheriffDied, nextPhaseIfNoAction = 'DAY' }) {
@@ -1210,7 +1190,7 @@ const App={
 
         const roleBeforeDeath = this.getActiveRole(pBefore);
 
-        await playerRef.transaction(p => {
+        const transactionResult = await playerRef.transaction(p => {
             if (!p || !p.isAlive) return p;
             
             if (roleBeforeDeath === '白痴' && cause === 'VOTE' && !p.isExposedIdiot) {
@@ -1223,35 +1203,36 @@ const App={
             p.deaths = Math.min(p.deaths + 1, 2);
             if (p.deaths >= 2) p.isAlive = false;
             return p;
-        }).then(async (transactionResult) => {
-            if (!transactionResult.committed) return;
-            const p = transactionResult.snapshot.val();
-
-            if (p.isExposedIdiot && !pBefore.isExposedIdiot && cause === 'VOTE') {
-                await this.addGameLog(`🤪 ${pid}号玩家是白痴，被投票后翻牌，失去一条生命但本轮不会出局！`);
-            }
-
-            const wasSheriff = p.badge;
-            const isNowDead = !p.isAlive;
-            const willTriggerHunter = roleBeforeDeath === '猎人' && (cause === 'NIGHT' || cause === 'VOTE' || cause === 'POISON' || cause === 'DUEL');
-            
-            if (willTriggerHunter) {
-                await db.ref(`games/${this.gameId}/state/hunterQueue`).transaction(q => {
-                    if (!q) q = []; 
-                    if (!q.includes(pid)) q.push(pid); 
-                    return q;
-                });
-                resultState.hunterTriggered = true;
-            }
-            
-            if (isNowDead && wasSheriff) {
-                await db.ref(`games/${this.gameId}/state`).update({
-                    phase: 'SHERIFF_TRANSFER',
-                    postDeathState: { deadSheriffId: pid, hunterTriggered: willTriggerHunter }
-                });
-                resultState.sheriffDied = true;
-            }
         });
+
+        if (!transactionResult.committed) return resultState;
+        const p = transactionResult.snapshot.val();
+
+        if (p.isExposedIdiot && !pBefore.isExposedIdiot && cause === 'VOTE') {
+            await this.addGameLog(`🤪 ${pid}号玩家是白痴，被投票后翻牌，失去一条生命但本轮不会出局！`);
+        }
+
+        const wasSheriff = pBefore.badge; // Use pBefore for badge status before death
+        const isNowDead = !p.isAlive;
+        const willTriggerHunter = roleBeforeDeath === '猎人' && (cause === 'NIGHT' || cause === 'VOTE' || cause === 'POISON' || cause === 'DUEL');
+        
+        if (willTriggerHunter) {
+            await db.ref(`games/${this.gameId}/state/hunterQueue`).transaction(q => {
+                if (!q) q = []; 
+                if (!q.includes(pid)) q.push(pid); 
+                return q;
+            });
+            resultState.hunterTriggered = true;
+        }
+        
+        if (isNowDead && wasSheriff) {
+            const nextPhase = cause === 'DAY' || cause === 'VOTE' ? 'NIGHT' : 'DAY';
+            await db.ref(`games/${this.gameId}/state`).update({
+                phase: 'SHERIFF_TRANSFER',
+                postDeathState: { deadSheriffId: pid, hunterTriggered: willTriggerHunter, nextPhase: nextPhase }
+            });
+            resultState.sheriffDied = true;
+        }
         
         await this.checkWin();
         return resultState;
@@ -1278,7 +1259,7 @@ const App={
                 wasPeaceNight = false;
             } else {
                 messages.push(`昨晚似乎发生了袭击，但有人被保护了`);
-                wasPeaceNight = false; // 刀了人但被救，不算平安夜
+                // 刀了人但被救，不算平安夜
             }
         }
         
@@ -1288,8 +1269,15 @@ const App={
             wasPeaceNight = false;
         }
         
-        if (wasPeaceNight) {
-            const newStreak = (this.gameState.peaceNightStreak || 0) + 1;
+        if (wasPeaceNight && (wolfTarget || witchPoison)) {
+            // This case means wolf attacked but was saved, and witch didn't poison.
+            // Or wolf didn't attack, and witch didn't poison.
+            // Only true peace night if no actions were taken that *would* have resulted in death.
+            // The logic here is tricky. Let's simplify: if no one died, it's a peace night.
+        }
+
+        if (deaths.length === 0) {
+             const newStreak = (this.gameState.peaceNightStreak || 0) + 1;
             await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(newStreak);
             messages.push('昨晚是平安夜');
         } else {
@@ -1317,7 +1305,13 @@ const App={
     },
 
     async checkWin() {
-        const { gods, wolves, civilians } = this.getPlayerClassification();
+        // Run check after a short delay to allow state to propagate
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const gameSnapshot = await db.ref(`games/${this.gameId}`).once('value');
+        if (!gameSnapshot.exists()) return false;
+        const latestGameData = gameSnapshot.val();
+
+        const { gods, wolves, civilians } = this.getPlayerClassification(latestGameData.players);
         
         let winner = null;
         if (wolves.length === 0) {
@@ -1326,11 +1320,11 @@ const App={
             winner = '游戏结束 - 狼人阵营胜利！(神职已全部出局)';
         } else if (civilians.length === 0) {
             winner = '游戏结束 - 狼人阵营胜利！(平民已全部出局)';
-        } else if ((this.gameState.peaceNightStreak || 0) >= 3) {
+        } else if ((latestGameData.state.peaceNightStreak || 0) >= 3) {
             winner = '游戏结束 - 好人阵营胜利！(连续三晚平安夜)';
         }
         
-        if (winner) {
+        if (winner && latestGameData.state.phase !== 'GAME_OVER') {
             await db.ref(`games/${this.gameId}/state`).update({ phase: 'GAME_OVER', winner });
             await this.addGameLog(`🏆 ${winner}`);
             return true;
@@ -1338,9 +1332,9 @@ const App={
         return false;
     },
 
-    getPlayerClassification() {
+    getPlayerClassification(players) {
         const gods = [], wolves = [], civilians = [];
-        Object.values(this.allPlayers).forEach(p => {
+        Object.values(players).forEach(p => {
             if (!p.isAlive) return;
             const role = this.getActiveRole(p);
             if (!role) return;
@@ -1356,7 +1350,7 @@ const App={
     // Helper functions
     getActiveRole(p) {
         if (!p || !p.isAlive) return null;
-        if (p.deaths >= 2) return null;
+        if (p.deaths >= p.identities.length) return null;
         const currentIdentity = p.identities[p.deaths];
         return currentIdentity ? currentIdentity.role : null;
     },
@@ -1380,6 +1374,7 @@ const App={
 
     getSkillState(key, player = null, identityIndex = -1) {
         const p = player || this.playerData;
+        if (!p) return undefined;
         const idx = identityIndex !== -1 ? identityIndex : p.deaths;
         return (p.skillStates || {})[`${idx}_${key}`];
     },
@@ -1449,7 +1444,7 @@ const App={
                     const b = document.createElement('b');
                     b.textContent = `${pid}号`;
                     p.appendChild(b);
-                    p.appendChild(document.createTextNode(`：${this.escapeHTML(msg)}`));
+                    p.appendChild(document.createTextNode(`：${msg}`)); // Message is already escaped on send
                     box.appendChild(p);
                     box.scrollTop = box.scrollHeight;
                 }

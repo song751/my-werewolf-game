@@ -49,12 +49,13 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 .game-over-banner.bad{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%)}
 .role-icon{display:inline-block;width:30px;height:30px;margin-right:10px;text-align:center;line-height:30px;border-radius:50%;background:rgba(255,255,255,.1)}
 .loading-spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:var(--accent);animation:spin 1s infinite ease-in-out}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 .identity-card{background:rgba(255,255,255,.05);padding:20px;border-radius:15px;margin:10px 0;border:2px solid var(--border);transition:.3s all}
 #host-controls {text-align: center; margin: 20px 0; background: rgba(0,217,255,0.1); padding: 20px; border-radius: 15px; border: 1px solid var(--success);}
 #god-player-list {display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;}
 #god-raw-data-view { margin-top: 30px; }
 #god-raw-data-view details { background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); }
-#god-raw-data-view summary { padding: 15px; font-size: 1.1em; }
+#god-raw-data-view summary { padding: 15px; font-size: 1.1em; cursor: pointer; }
 #god-raw-data-view pre { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 0 0 8px 8px; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; color: var(--text); }
 .status-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;}
 .status-item {background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; transition: all .3s ease;}
@@ -462,9 +463,26 @@ const App={
         this.$('action-panel').innerHTML = content;
     },
 
-    // ... All panel functions (panelWolf, panelSeer, etc.) from the reference code are kept here ...
-    // They are mostly correct and will be called by renderActionPanel.
-    // Below are the new/modified panels and logic.
+    // All panel functions
+    panelWolf() {
+        this.initWolfListeners();
+        const wolves = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
+        let h = `<h3>🐺 狼人行动</h3><p>🌙 今晚你的身份：${this.getActiveRole(this.playerData)}</p>`;
+        h += `<div class="info-box">🐺 队友：${wolves.map(p => `${p.id}号(${this.getActiveRole(p)})`).join('、')}</div>`;
+        
+        const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
+        h += `<h4>选择今夜袭击目标：</h4>`;
+        h += targets.map(p => `<button class="action-btn wolf-target" data-id="${p.id}">${p.id}号</button>`).join('');
+        h += `<button class="control-btn" onclick="App.wolfSkipKill()">🚫 今夜空刀</button>`;
+        
+        this.$('action-panel').innerHTML = h;
+        this.$('wolf-chat-area').classList.remove('hidden');
+        this.$('wolf-chat-area').innerHTML = `<h4>💬 狼人内部讨论</h4><div id="wolf-votes-display"></div>`;
+        
+        this.$('action-panel').querySelectorAll('.wolf-target').forEach(b => {
+            b.onclick = () => db.ref(`games/${this.gameId}/players/${this.playerId}/wolfVote`).set(b.dataset.id);
+        });
+    },
 
     panelSheriffCand() {
         this.$('action-panel').innerHTML = `<h3>👑 是否上警？</h3>
@@ -492,6 +510,7 @@ const App={
     },
 
     panelDayVote() {
+        const activeRole = this.getActiveRole(this.playerData);
         let h = `<h3>🗳️ 放逐投票</h3>`;
         if (activeRole === '骑士' && !this.playerData.isExposedIdiot) {
             h += `<div style="border:1px solid var(--warning); padding:10px; border-radius:10px; margin-bottom:15px;">
@@ -508,7 +527,151 @@ const App={
              b.onclick = () => db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set(b.dataset.id);
         });
     },
-    
+
+    panelGuard() {
+        const last = this.getSkillState('lastGuardTarget');
+        let h = `<h3>🛡️ 守卫行动</h3>`;
+        if (last) h += `<p style="color:var(--warning)">上回合守护：${last}号（不可连续守护同一人）</p>`;
+        const targets = Object.values(this.allPlayers).filter(p => p.isAlive && p.id != last);
+        h += targets.map(p => `<button class="action-btn" onclick="App.guardProtect('${p.id}')">${p.id}号</button>`).join('');
+        h += `<button class="control-btn" onclick="App.guardSkip()">不守护</button>`;
+        this.$('action-panel').innerHTML = h;
+    },
+
+    panelSeer() {
+        let h = `<h3>🔮 预言家行动</h3>`;
+        const targets = Object.values(this.allPlayers).filter(p => p.isAlive && p.id != this.playerId);
+        h += targets.map(p => `<button class="action-btn" onclick="App.seerCheck('${p.id}')">${p.id}号</button>`).join('');
+        h += `<button class="control-btn" onclick="App.seerSkip()">跳过查验</button>`;
+        this.$('action-panel').innerHTML = h;
+    },
+
+    panelWitch() {
+        const hasCure = !this.getSkillState('hasUsedCure');
+        const hasPoison = !this.getSkillState('hasUsedPoison');
+        const nightTarget = this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
+        
+        let h = `<h3>🧪 女巫行动</h3>`;
+        h += `<p>解药: ${hasCure ? '✅' : '❌'} | 毒药: ${hasPoison ? '✅' : '❌'}</p>`;
+        
+        if (nightTarget && hasCure) {
+            h += `<div class="info-box">今夜 ${nightTarget}号 被袭击</div>
+                  <button class="action-btn" onclick="App.witchUseCure('${nightTarget}')">💊 使用解药救人</button>`;
+        }
+        
+        if (hasPoison) {
+            h += `<h4>使用毒药：</h4>`;
+            const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
+            h += targets.map(p => `<button class="action-btn" onclick="App.witchUsePoison('${p.id}')">☠️ 毒杀 ${p.id}号</button>`).join('');
+        }
+        
+        h += `<button class="control-btn" onclick="App.witchSkip()">不使用药水</button>`;
+        this.$('action-panel').innerHTML = h;
+    },
+
+    panelHunter() {
+        let h = `<h3>🔫 猎人开枪</h3><p>你已死亡，请选择带走目标：</p>`;
+        const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
+        h += targets.map(p => `<button class="action-btn" onclick="App.hunter('${p.id}')">${p.id}号</button>`).join('');
+        this.$('action-panel').innerHTML = h;
+    },
+
+    // Action handlers
+    async wolfSkipKill() {
+        await db.ref(`games/${this.gameId}/players/${this.playerId}/wolfVote`).set('0');
+    },
+
+    async wolfConfirmKill(targetId) {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/wolf`).set({ target: targetId, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/wolf`).set('complete');
+        alert(`狼人已决定袭击 ${targetId === '0' ? '空刀' : targetId + '号'}`);
+        this.stopWolfListeners();
+    },
+
+    async seerCheck(targetId) {
+        const target = this.allPlayers[targetId];
+        const role = this.getActiveRole(target);
+        const result = ['狼人', '隐狼'].includes(role) ? '狼人' : '好人';
+        
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target: targetId, result, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
+        
+        const results = this.getSkillState('seerResults') || {};
+        results[targetId] = result;
+        await this.setSkillState('seerResults', results);
+        
+        alert(`查验结果：${targetId}号是${result === '狼人' ? '🐺 狼人' : '😇 好人'}`);
+    },
+
+    async seerSkip() {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target: null, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
+    },
+
+    async guardProtect(targetId) {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: targetId, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
+        await this.setSkillState('lastGuardTarget', targetId);
+        alert(`你守护了 ${targetId}号`);
+    },
+
+    async guardSkip() {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: null, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
+        await this.setSkillState('lastGuardTarget', null);
+    },
+
+    async witchUseCure(targetId) {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).set({ cure: targetId, poison: null, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+        await this.setSkillState('hasUsedCure', true);
+        alert(`你使用解药救了 ${targetId}号`);
+    },
+
+    async witchUsePoison(targetId) {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).set({ cure: null, poison: targetId, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+        await this.setSkillState('hasUsedPoison', true);
+        alert(`你使用毒药毒杀了 ${targetId}号`);
+    },
+
+    async witchSkip() {
+        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).set({ cure: null, poison: null, actorId: this.playerId });
+        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+    },
+
+    async knight(targetId) {
+        const target = this.allPlayers[targetId];
+        const targetRole = this.getActiveRole(target);
+        const isEvil = ['狼人', '隐狼'].includes(targetRole);
+        
+        const loser = isEvil ? targetId : this.playerId;
+        alert(`决斗结果：${loser}号阵亡！`);
+        await this.kill(loser, 'DUEL');
+        await this.checkWin();
+    },
+
+    async hunter(targetId) {
+        alert(`猎人开枪带走了 ${targetId}号！`);
+        await this.kill(targetId, 'HUNTER');
+        
+        await db.ref(`games/${this.gameId}/state/hunterQueue`).transaction(q => {
+            if (!q || q.length === 0) return [];
+            q.shift();
+            return q.length > 0 ? q : null;
+        });
+        
+        const isGameOver = await this.checkWin();
+        if (!isGameOver) {
+            const queue = (await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val() || [];
+            if (queue.length > 0) {
+                await this.updatePhase('HUNTER_ACTION');
+            } else {
+                await this.updatePhase('DAY');
+            }
+        }
+    },
+
     async tallySheriffVotes() {
         const sheriffData = this.fullGameData.sheriff;
         const votes = sheriffData.votes || {};
@@ -630,21 +793,106 @@ const App={
                 phase: 'SHERIFF_TRANSFER',
                 postDeathState: { deadSheriffId: pid, hunterTriggered: willTriggerHunter }
             });
-            return { hunterTriggered: false, sheriffDied: true }; // Prevent further action until transfer is done
+            return { hunterTriggered: false, sheriffDied: true };
         }
 
         await this.checkWin();
         return { hunterTriggered: willTriggerHunter, sheriffDied: false };
     },
 
-    // ... Other functions like processNight, checkWin, getPlayerClassification, etc. are kept from the reference code ...
-    // Minor fixes applied where necessary. For brevity, only showing the most critical ones above.
-    // All other helper functions from the reference code are assumed to be present and correct.
-    
-    // Helper function to get the current active role
+    async processNight() {
+        const actions = this.fullGameData.nightActions?.[this.gameState.round] || {};
+        const deaths = [];
+        let messages = [];
+        
+        const wolfTarget = actions.wolf?.target;
+        const guardTarget = actions.guard?.target;
+        const witchCure = actions.witch?.cure;
+        const witchPoison = actions.witch?.poison;
+        
+        if (wolfTarget && wolfTarget !== '0') {
+            const isGuarded = guardTarget === wolfTarget;
+            const isCured = witchCure === wolfTarget;
+            
+            if (!isGuarded && !isCured) {
+                deaths.push({ pid: wolfTarget, cause: 'NIGHT' });
+                messages.push(`${wolfTarget}号玩家夜晚死亡`);
+            } else {
+                messages.push(`${wolfTarget}号玩家被保护了`);
+            }
+        }
+        
+        if (witchPoison) {
+            deaths.push({ pid: witchPoison, cause: 'POISON' });
+            messages.push(`${witchPoison}号玩家被毒杀`);
+        }
+        
+        if (deaths.length === 0) {
+            const streak = this.gameState.peaceNightStreak + 1;
+            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(streak);
+            messages.push('平安夜');
+        } else {
+            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);
+        }
+        
+        alert(messages.join('\n'));
+        
+        let hunterTriggered = false;
+        for (const death of deaths) {
+            const result = await this.kill(death.pid, death.cause);
+            if (result.hunterTriggered) hunterTriggered = true;
+            if (result.sheriffDied) return; // Sheriff transfer takes priority
+        }
+        
+        await this.handlePostDeath({ hunterTriggered, nextPhaseIfNoAction: 'SHERIFF_CAND' });
+    },
+
+    async checkWin() {
+        const classification = this.getPlayerClassification();
+        const gods = classification.gods.filter(p => p.isAlive);
+        const wolves = classification.wolves.filter(p => p.isAlive);
+        const civilians = classification.civilians.filter(p => p.isAlive);
+        
+        let winner = null;
+        if (wolves.length === 0) {
+            winner = '游戏结束 - 好人阵营胜利！';
+        } else if (gods.length === 0 || civilians.length === 0) {
+            winner = '游戏结束 - 狼人阵营胜利！';
+        } else if (wolves.length >= gods.length + civilians.length) {
+            winner = '游戏结束 - 狼人阵营胜利！';
+        }
+        
+        if (winner) {
+            await db.ref(`games/${this.gameId}/state`).update({ phase: 'GAME_OVER', winner });
+            return true;
+        }
+        return false;
+    },
+
+    getPlayerClassification() {
+        const players = Object.values(this.allPlayers);
+        const gods = [], wolves = [], civilians = [];
+        
+        players.forEach(p => {
+            const role = this.getActiveRole(p);
+            if (!role) return;
+            
+            const roleData = ROLES[role];
+            if (roleData.faction === 'bad') {
+                wolves.push(p);
+            } else if (roleData.isGod) {
+                gods.push(p);
+            } else {
+                civilians.push(p);
+            }
+        });
+        
+        return { gods, wolves, civilians };
+    },
+
+    // Helper functions
     getActiveRole(p){return p.isAlive?p.identities[p.deaths].role:null},
     
-    // Helper to check if a wolf can act
     canWolfAct(p){
         const role = this.getActiveRole(p);
         if(!['狼人','隐狼'].includes(role)) return false;
@@ -654,35 +902,77 @@ const App={
         return true;
     },
     
-    // Corrected helper to check if the witch can act
     canWitchAct() {
         const witchPlayer = Object.values(this.allPlayers).find(p => p.isAlive && this.getActiveRole(p) === '女巫');
         if (!witchPlayer) return false;
         
-        const getPlayerSkillState = (player, key) => (player.skillStates || {})[`${player.deaths}_${key}`];
-        const hasCure = !getPlayerSkillState(witchPlayer, 'hasUsedCure');
-        const hasPoison = !getPlayerSkillState(witchPlayer, 'hasUsedPoison');
+        const hasCure = !this.getSkillState('hasUsedCure', witchPlayer);
+        const hasPoison = !this.getSkillState('hasUsedPoison', witchPlayer);
         
         return hasCure || hasPoison;
     },
 
-    // All other functions from the provided "final version" are included below this line.
-    // For the sake of brevity in this response, they are omitted but are part of the complete, functional script.
-    // This includes: panelWolf, panelSeer, panelGuard, panelWitch, panelKnight, panelHunter,
-    // wolfConfirmKill, wolfSkipKill, seerCheck, seerSkip, guardProtect, guardSkip,
-    // witchUseCure, witchUsePoison, witchSkip, knight, hunter, getPlayerClassification,
-    // getSkillState, setSkillState, initWolfListeners, stopWolfListeners, processNight, checkWin.
-    // The implementations of these functions are taken from your provided reference file, with minor corrections.
+    getSkillState(key, player = null) {
+        const p = player || this.playerData;
+        return (p.skillStates || {})[`${p.deaths}_${key}`];
+    },
+
+    async setSkillState(key, value) {
+        const stateKey = `${this.playerData.deaths}_${key}`;
+        await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${stateKey}`).set(value);
+    },
+
+    initWolfListeners() {
+        if (this.wolfVotesListener) return;
+        
+        this.wolfVotesListener = db.ref(`games/${this.gameId}/players`).on('value', s => {
+            const players = s.val();
+            const wolves = Object.values(players).filter(p => p.isAlive && this.canWolfAct(p));
+            const votes = {};
+            
+            wolves.forEach(w => {
+                if (w.wolfVote != null) votes[w.id] = w.wolfVote;
+            });
+            
+            const voteCounts = {};
+            Object.values(votes).forEach(v => {
+                voteCounts[v] = (voteCounts[v] || 0) + 1;
+            });
+            
+            let display = '<div class="info-box">';
+            Object.entries(votes).forEach(([pid, target]) => {
+                display += `<p>${pid}号 → ${target === '0' ? '空刀' : target + '号'}</p>`;
+            });
+            display += '</div>';
+            
+            if (Object.keys(votes).length === wolves.length && wolves.length > 0) {
+                const maxVotes = Math.max(...Object.values(voteCounts));
+                const consensus = Object.keys(voteCounts).filter(t => voteCounts[t] === maxVotes);
+                
+                if (consensus.length === 1) {
+                    display += `<div style="text-align:center;margin-top:15px;">
+                        <p style="color:var(--success);font-size:1.2em;">达成共识：${consensus[0] === '0' ? '空刀' : '袭击' + consensus[0] + '号'}</p>
+                        <button class="confirm-btn" onclick="App.wolfConfirmKill('${consensus[0]}')">确认行动</button>
+                    </div>`;
+                } else {
+                    display += '<p style="color:var(--warning);text-align:center;">票数不一致，请继续讨论</p>';
+                }
+            }
+            
+            this.$('wolf-votes-display').innerHTML = display;
+        });
+    },
+
+    stopWolfListeners() {
+        if (this.wolfVotesListener) {
+            db.ref(`games/${this.gameId}/players`).off('value', this.wolfVotesListener);
+            this.wolfVotesListener = null;
+        }
+        this.$('wolf-chat-area').classList.add('hidden');
+    }
 };
 
-// Add a placeholder for the activeRole variable in panelDayVote to avoid reference errors
-let activeRole;
-
-document.addEventListener('DOMContentLoaded',()=>{
-    // Assign activeRole before calling panelDayVote
-    activeRole = App.getActiveRole(App.playerData);
-    App.init()
-});
+document.addEventListener('DOMContentLoaded', () => App.init());
 </script>
 </body>
 </html>

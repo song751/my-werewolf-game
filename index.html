@@ -147,7 +147,7 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6 终极版 (修复版 4 - 拍板狼规则)
+   双身份狼人杀 - V6 终极版 (修复版 5 - 规则与UI修复)
    ========================================================== */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -156,7 +156,8 @@ const db=firebase.database();
 
 const ROLES={'平民':{name:'平民',faction:'good',isGod:false,icon:'👤'},'守卫':{name:'守卫',faction:'good',isGod:true,icon:'🛡️'},'白痴':{name:'白痴',faction:'good',isGod:true,icon:'🤪'},'预言家':{name:'预言家',faction:'good',isGod:true,icon:'🔮'},'骑士':{name:'骑士',faction:'good',isGod:true,icon:'⚔️'},'隐狼':{name:'隐狼',faction:'bad',isGod:false,isInvisible:true,icon:'🌑'},'女巫':{name:'女巫',faction:'good',isGod:true,icon:'🧪'},'猎人':{name:'猎人',faction:'good',isGod:true,icon:'🔫'},'狼人':{name:'狼人',faction:'bad',isGod:false,icon:'🐺'},'盗贼':{name:'盗贼',faction:'neutral',isGod:false,isThief:true,icon:'🎭'}};
 const DEFAULT_SETUP={'平民':6,'守卫':1,'白痴':1,'预言家':1,'骑士':1,'女巫':1,'猎人':1,'狼人':2,'隐狼':1,'盗贼':1};
-const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','狼人'],['盗贼','隐狼'],['隐狼','狼人'], ['隐狼', '隐狼'], ['狼人', '狼人']];
+// Corrected FORBIDDEN_RAW: Removed ['狼人', '狼人']
+const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','狼人'],['盗贼','隐狼'],['隐狼','狼人'], ['隐狼', '隐狼']];
 
 const App={
     gameId:null,playerId:null,isHost:false,gameState:null,allPlayers:{},playerData:null,
@@ -299,11 +300,11 @@ const App={
             return;
         }
         
-        const provideImmediateFeedback = () => {
-            target.classList.add('selected');
-            const panel = target.closest('.action-panel, #wolf-chat-area');
+        const provideImmediateFeedback = (targetButton) => {
+            const panel = targetButton.closest('.action-panel');
             if (panel) {
-                panel.querySelectorAll('button[data-action]').forEach(btn => btn.disabled = true);
+                 panel.querySelectorAll('button[data-action]').forEach(btn => btn.disabled = true);
+                 targetButton.classList.add('selected');
             }
         };
 
@@ -316,17 +317,18 @@ const App={
             case 'sheriff-vote': db.ref(`games/${this.gameId}/sheriff/votes/${this.playerId}`).set(id); break;
             case 'day-vote': db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set(id); break;
             case 'knight-duel': this.knight(id); break;
-            case 'guard-protect': provideImmediateFeedback(); this.guardProtect(id); break;
-            case 'guard-skip': provideImmediateFeedback(); this.guardSkip(); break;
-            case 'seer-check': provideImmediateFeedback(); this.seerCheck(id); break;
-            case 'seer-skip': provideImmediateFeedback(); this.seerSkip(); break;
-            case 'wolf-vote': provideImmediateFeedback(); db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(id); break;
-            case 'wolf-skip': provideImmediateFeedback(); db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set('0'); break;
-            case 'wolf-confirm': this.wolfConfirmKill(id); break;
+            case 'guard-protect': provideImmediateFeedback(target); this.guardProtect(id); break;
+            case 'guard-skip': provideImmediateFeedback(target); this.guardSkip(); break;
+            case 'seer-check': provideImmediateFeedback(target); this.seerCheck(id); break;
+            case 'seer-skip': provideImmediateFeedback(target); this.seerSkip(); break;
+            // Wolf vote logic is now simpler, no immediate feedback needed as the UI will update
+            case 'wolf-vote': db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(id); break;
+            case 'wolf-skip': db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set('0'); break;
+            case 'wolf-confirm': provideImmediateFeedback(target); this.wolfConfirmKill(id); break;
             case 'wolf-send': this.sendWolfMessage(); break;
-            case 'witch-cure': provideImmediateFeedback(); this.witchUseCure(id); break;
-            case 'witch-poison': provideImmediateFeedback(); this.witchUsePoison(id); break;
-            case 'witch-skip': provideImmediateFeedback(); this.witchSkip(); break;
+            case 'witch-cure': provideImmediateFeedback(target); this.witchUseCure(id); break;
+            case 'witch-poison': provideImmediateFeedback(target); this.witchUsePoison(id); break;
+            case 'witch-skip': provideImmediateFeedback(target); this.witchSkip(); break;
             case 'hunter-shoot': this.hunter(id); break;
         }
     },
@@ -453,14 +455,12 @@ const App={
     deal(pool){
         for(let t=0; t<5000; t++){
             const s=this._shuffle([...pool]);
-            let isValid=true, goldBabyCount=0;
+            let isValid=true;
             const rawPairs = [];
             for(let i=0; i<s.length; i+=2) {
                 const pair = [s[i], s[i+1]].sort();
                 rawPairs.push(pair);
-                if(pair[0]==='平民' && pair[1]==='平民') goldBabyCount++;
             }
-            if(goldBabyCount < 1 || goldBabyCount > 2) continue;
 
             for(const p of rawPairs){
                 if(FORBIDDEN_RAW.some(([r1,r2])=>(r1===p[0]&&r2===p[1])||(r1===p[1]&&r2===p[0]))){
@@ -828,7 +828,6 @@ const App={
 
     // Panel functions
     panelWolf() {
-        this.initWolfListeners();
         const teammates = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
         const canAct = this.canWolfAct(this.playerData);
         const myVote = this.fullGameData.wolfVotes?.[this.playerId];
@@ -839,14 +838,10 @@ const App={
         }
         h += `<div class="info-box">🐺 队友：${teammates.map(p => `${p.id}号(${this.getActiveRole(p) || '未知'})`).join('、')}</div>`;
         
-        if (myVote) {
-             h += `<div class="action-feedback">你已投票给 ${myVote === '0' ? '空刀' : myVote + '号'}，等待拍板狼决定...</div>`;
-        } else {
-            const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
-            h += `<h4>选择今夜袭击目标：</h4>`;
-            h += targets.map(p => `<button class="action-btn" data-action="wolf-vote" data-id="${p.id}" ${!canAct ? 'disabled' : ''}>${p.id}号</button>`).join('');
-            h += `<button class="control-btn" data-action="wolf-skip" ${!canAct ? 'disabled' : ''}>🚫 今夜空刀</button>`;
-        }
+        const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
+        h += `<h4>选择今夜袭击目标：</h4>`;
+        h += targets.map(p => `<button class="action-btn ${myVote === p.id ? 'selected' : ''}" data-action="wolf-vote" data-id="${p.id}" ${!canAct ? 'disabled' : ''}>${p.id}号</button>`).join('');
+        h += `<button class="control-btn ${myVote === '0' ? 'selected' : ''}" data-action="wolf-skip" ${!canAct ? 'disabled' : ''}>🚫 今夜空刀</button>`;
         
         const panelEl = this.$('action-panel');
         if(panelEl) panelEl.innerHTML = h;
@@ -856,6 +851,7 @@ const App={
             chatEl.classList.remove('hidden');
             chatEl.innerHTML = `
                 <div id="wolf-votes-display"></div>
+                <h4>💬 狼人内部讨论</h4>
                 <div id="wolf-chat-messages" style="max-height:150px;overflow-y:auto;background:rgba(255,255,255,.05);padding:10px;border-radius:8px;margin-bottom:10px;text-align:left;"></div>
                 <div style="display:flex;gap:6px;">
                     <input id="wolf-chat-input" placeholder="输入聊天内容…" 
@@ -866,6 +862,9 @@ const App={
                 if (e.key === 'Enter') this.sendWolfMessage();
             });
         }
+        
+        // Corrected logic: Render HTML first, then attach listeners
+        this.initWolfListeners();
     },
 
     panelSheriffCand() {
@@ -1384,7 +1383,7 @@ const App={
 
     getAlphaWolfId() {
         const livingWolves = Object.values(this.allPlayers)
-            .filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
+            .filter(p => p.isAlive && this.canWolfAct(p));
         if (livingWolves.length === 0) return null;
         const wolfIds = livingWolves.map(p => p.id);
         return Math.min(...wolfIds).toString();
@@ -1418,7 +1417,7 @@ const App={
             
             livingWolves.forEach(wolf => {
                 const voteTarget = votes[wolf.id];
-                const voteText = voteTarget ? (voteTarget === '0' ? '空刀' : `${voteTarget}号`) : '尚未投票';
+                const voteText = voteTarget != null ? (voteTarget === '0' ? '空刀' : `${voteTarget}号`) : '尚未投票';
                 display += `<p>${wolf.id}号 ${wolf.id == alphaWolfId ? '<strong>(拍板狼)</strong>' : ''} → ${voteText}</p>`;
             });
             display += '</div>';

@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官 (V6.8 隐狼修正版)</title>
+<title>双身份狼人杀 - 电子法官 (V7.1 优化版)</title>
 
-<!-- ========= 视觉样式 (无变动) ========= -->
+<!-- ========= 视觉样式 (部分修改) ========= -->
 <style>
 :root{--bg:#1a1a2e;--card:#16213e;--border:#0f3460;--accent:#e94560;
 --text:#eaeaea;--success:#00d9ff;--danger:#ff006e;--warning:#ffb700;
@@ -54,11 +54,13 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 .identity-card{background:rgba(255,255,255,.05);padding:20px;border-radius:15px;margin:10px 0;border:2px solid var(--border);transition:.3s all}
 #host-controls {text-align: center; margin: 20px 0; background: rgba(0,217,255,0.1); padding: 20px; border-radius: 15px; border: 1px solid var(--success);}
-#god-player-list {display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;}
-#god-raw-data-view { margin-top: 30px; }
-#god-raw-data-view details { background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); }
-#god-raw-data-view summary { padding: 15px; font-size: 1.1em; cursor: pointer; }
-#god-raw-data-view pre { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 0 0 8px 8px; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; color: var(--text); }
+#god-player-list { display: flex; flex-direction: column; gap: 12px; }
+.god-player-row { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border-left: 4px solid var(--border); transition: all .3s ease; flex-wrap: wrap; }
+.god-player-row.dead-all { opacity: 0.5; background: rgba(100,100,100,0.1); border-left-color: #555; }
+.god-player-row .player-id { font-weight: bold; font-size: 1.4em; min-width: 60px; }
+.god-player-row .player-health { min-width: 60px; }
+.god-player-row .player-identities { display: flex; align-items: center; gap: 10px; font-size: 1.1em; flex-grow: 1; }
+.god-player-row .player-status-tags { font-size: 0.9em; color: var(--warning); }
 .status-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;}
 .status-item {background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; transition: all .3s ease;}
 .status-item.pending {background: rgba(255,183,0,0.2); color: var(--warning);}
@@ -72,10 +74,10 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 .notification.info{border-left-color:var(--warning)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes fadeOut{from{opacity:1}to{opacity:0;transform:translateY(-20px)}}
-#game-log-area{margin-top:20px;overflow-y:auto;padding:15px;background:rgba(0,0,0,0.2);border-radius:10px;border:1px solid var(--border)}
-#game-log-area h3{margin-top:0;font-size:1.1em;color:var(--success)}
-#game-log-content p{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05)}
-#game-log-content p:last-child{border-bottom:none;margin-bottom:0}
+#game-log-area, #god-log-area {margin-top:20px;max-height: 300px; overflow-y:auto;padding:15px;background:rgba(0,0,0,0.2);border-radius:10px;border:1px solid var(--border)}
+#game-log-area h3, #god-log-area h3 {margin-top:0;font-size:1.1em;color:var(--success)}
+#game-log-content p, #god-log-content p {margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05)}
+#game-log-content p:last-child, #god-log-content p:last-child {border-bottom:none;margin-bottom:0}
 #wolf-chat-messages p { margin: 0 0 5px; padding: 0; border: none; }
 #wolf-chat-messages p:last-child { margin-bottom: 0; }
 #game-creation-info { padding: 20px; background: rgba(0,217,255,0.1); border-radius: 15px; }
@@ -138,7 +140,10 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
     <div id="god-view" class="hidden">
         <h2>👑 上帝视角后台</h2>
         <div id="god-player-list"></div>
-        <div id="god-raw-data-view"></div>
+        <div id="god-log-area" class="hidden">
+            <h3>🤫 上帝专属日志 (含夜晚信息)</h3>
+            <div id="god-log-content"></div>
+        </div>
     </div>
 </div>
 <div id="notification-container"></div>
@@ -148,13 +153,11 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6.8 隐狼修正版
-   - 修正隐狼逻辑：普通狼看不到隐狼，隐狼看得到所有狼但不能聊天。
-   - 骑士决斗成功后直接进入夜晚。
-   - 关键技能发动计入日志。
-   - 日志UI优化：自动增长，新日志在下，自动滚动。
-   - 创建游戏后界面简化，增加一键复制链接功能。
-   - 增加玩家ID输入页面，提升链接使用容错性。
+   双身份狼人杀 - V7.1 优化版
+   - 平安夜逻辑重构，判断更准确。
+   - 白痴规则修正：身份死亡时正常掉血，但会全局播报并获得标记。
+   - 日志系统规范化：玩家日志只显示公开信息，上帝视角增加专属的、包含夜晚秘密行动的详细日志。
+   - 上帝视角UI重构：用紧凑清晰的列表取代原始数据，一目了然地展示玩家状态。
    ========================================================== */
 
 // --- 全局常量定义 ---
@@ -185,12 +188,13 @@ const App={
         container.appendChild(notif);
         setTimeout(() => { notif.remove(); }, duration);
     },
-    async addGameLog(message) {
-        if (this.isHost) {
-            const logEntry = {
+    async addGameLog(message, isSecret = false) {
+        if (this.isHost || this.playerId === '0') {
+             const logEntry = {
                 message,
                 round: this.gameState.round || 0,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                isSecret: isSecret // 新增字段，标记为秘密日志
             };
             await db.ref(`games/${this.gameId}/logs`).push(logEntry);
         }
@@ -359,9 +363,9 @@ const App={
         const logRef = db.ref(`games/${this.gameId}/logs`);
         if (this.logListener) logRef.off('child_added', this.logListener);
         
-        this.logListener = logRef.limitToLast(50).on('child_added', snapshot => {
+        this.logListener = logRef.limitToLast(100).on('child_added', snapshot => {
             const log = snapshot.val();
-            if (log) {
+            if (log && !log.isSecret) { // 只显示非秘密日志
                 const logArea = this.$('game-log-area');
                 const logContent = this.$('game-log-content');
                 if(logArea.classList.contains('hidden')) logArea.classList.remove('hidden');
@@ -586,30 +590,59 @@ const App={
 
     renderGodView() {
         this.$('game-title').textContent = `后台监控 - ${this.gameId}`;
-        const f=id=>`${ROLES[id.role].icon} ${id.isThiefCopy?'<span class="thief-copy">'+id.role+'</span>':id.role}`;
-        this.$('god-player-list').innerHTML = Object.values(this.allPlayers).map(p => {
-            const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
-            const ids = p.identities, d = p.deaths;
-            return `<div class="identity-card">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="margin:0;">${p.id}号 ${p.badge?'👑':''}</h3><span>${heart}</span>
-                </div><hr style="margin:10px 0;">
-                <div style="font-size: 1.2em;">
-                    ${d>=1?'<span class="dead-identity">':''}${f(ids[0])}${d>=1?'</span>':''} 
-                    <span style="margin:0 10px;">+</span> 
-                    ${d>=2?'<span class="dead-identity">':''}${f(ids[1])}${d>=2?'</span>':''}
+        const playerListEl = this.$('god-player-list');
+        playerListEl.innerHTML = ''; // 清空
+    
+        const f = (id) => `${ROLES[id.role].icon} ${id.isThiefCopy ? `<span class="thief-copy">${id.role}</span>` : id.role}`;
+    
+        Object.values(this.allPlayers).sort((a,b) => a.id - b.id).forEach(p => {
+            const live = 2 - p.deaths;
+            const heart = `<span class="life-heart ${live < 1 ? 'lost' : ''}">❤</span><span class="life-heart ${live < 2 ? 'lost' : ''}">❤</span>`;
+            const ids = p.originalIdentities; // 始终显示原始身份
+            const d = p.deaths;
+    
+            let statusTags = [];
+            if (p.isExposedIdiot) statusTags.push('白痴已翻牌');
+            if (!p.isAlive) statusTags.push('已淘汰');
+    
+            const row = document.createElement('div');
+            row.className = `god-player-row ${!p.isAlive ? 'dead-all' : ''}`;
+            row.innerHTML = `
+                <div class="player-id">${p.id}号 ${p.badge ? '👑' : ''}</div>
+                <div class="player-health">${heart}</div>
+                <div class="player-identities">
+                    <span class="${d >= 1 ? 'dead-identity' : ''}">${f(ids[0])}</span>
+                    <span>+</span>
+                    <span class="${d >= 2 ? 'dead-identity' : ''}">${f(ids[1])}</span>
                 </div>
-                <p style="margin-top:10px;"><b>状态:</b> ${p.isAlive ? '存活' : '死亡'} ${p.isExposedIdiot ? '<span style="color:var(--warning)">(白痴已翻牌)</span>' : ''}</p>
-                <p><b>当前生效身份:</b> ${p.isAlive ? (p.deaths === 0 ? f(ids[0]) : (p.deaths === 1 ? f(ids[1]) : '无')) : '无'}</p>
-            </div>`;
-        }).join('');
-        const renderObjectToHtml = (obj) => `<pre><code>${JSON.stringify(obj, null, 2) || '无'}</code></pre>`;
-        let rawDataHtml = `<h2>⚙️ 游戏原始数据</h2>`;
-        const dataToShow = { "游戏状态 (state)": this.fullGameData.state, "游戏日志 (logs)": this.fullGameData.logs, "警长 (sheriff)": this.fullGameData.sheriff, "白天投票 (dayVotes)": this.fullGameData.dayVotes, "夜晚行动 (nightActions)": this.fullGameData.nightActions, "狼人投票 (wolfVotes)": this.fullGameData.wolfVotes, "狼人聊天 (wolfChat)": this.fullGameData.wolfChat, "完整玩家数据 (players)": this.fullGameData.players };
-        for (const [key, value] of Object.entries(dataToShow)) {
-            rawDataHtml += `<details><summary>${key}</summary>${renderObjectToHtml(value)}</details>`;
+                <div class="player-status-tags">${statusTags.join(', ')}</div>
+            `;
+            playerListEl.appendChild(row);
+        });
+    
+        // 渲染上帝专属日志
+        const godLogArea = this.$('god-log-area');
+        const godLogContent = this.$('god-log-content');
+        godLogArea.classList.remove('hidden');
+        godLogContent.innerHTML = ''; // 清空
+    
+        const allLogs = Object.values(this.fullGameData.logs || {});
+        if (allLogs.length > 0) {
+            allLogs.sort((a, b) => a.timestamp - b.timestamp).forEach(log => {
+                const p = document.createElement('p');
+                const prefix = log.round > 0 ? `<strong>[第 ${log.round} 轮]</strong> ` : '';
+                p.innerHTML = prefix;
+                p.appendChild(document.createTextNode(log.message));
+                if (log.isSecret) {
+                    p.style.color = 'var(--warning)';
+                    p.style.fontStyle = 'italic';
+                }
+                godLogContent.appendChild(p);
+            });
+            godLogArea.scrollTop = godLogArea.scrollHeight;
+        } else {
+            godLogContent.innerHTML = '<p>暂无日志记录。</p>';
         }
-        this.$('god-raw-data-view').innerHTML = rawDataHtml;
     },
 
     renderPlayerInfo(){
@@ -729,7 +762,6 @@ const App={
         panelEl.innerHTML = content;
     },
 
-    // MODIFIED: panelWolf now handles different perspectives for regular and invisible wolves
     panelWolf() {
         const myRole = this.getActiveRole(this.playerData);
         const allLivingWolves = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
@@ -802,7 +834,6 @@ const App={
         await db.ref(`games/${this.gameId}`).update(up);
     },
 
-    // MODIFIED: Added check to prevent invisible wolf from chatting
     sendWolfMessage() {
         const myRole = this.getActiveRole(this.playerData);
         if (myRole === '隐狼') {
@@ -821,6 +852,7 @@ const App={
         actionRef.transaction(currentData => { if (currentData) return; return { target: targetId, actorId: this.playerId }; })
         .then(async (result) => {
             if (result.committed) {
+                await this.addGameLog(`🐺 狼队决定袭击 ${targetId === '0' ? '空刀' : targetId + '号'} (由${this.playerId}号确认)`, true);
                 await db.ref(`games/${this.gameId}/state/nightStatus`).transaction(status => {
                     if (!status) return status;
                     status.wolf = 'complete';
@@ -832,13 +864,13 @@ const App={
         });
     },
 
-    async seerCheck(targetId) { const target = this.allPlayers[targetId]; const role = this.getActiveRole(target); const result = ['狼人', '隐狼'].includes(role) ? '狼人' : '好人'; await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target: targetId, result, actorId: this.playerId }); await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete'); const results = this.getSkillState('seerResults') || {}; results[targetId] = result; await this.setSkillState('seerResults', results); this.showNotification(`查验结果：${targetId}号是${result === '狼人' ? '🐺 狼人' : '😇 好人'}`, 'success'); },
-    async seerSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target: null, actorId: this.playerId }); await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete'); },
-    async guardProtect(targetId) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: targetId, actorId: this.playerId }); await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete'); await this.setSkillState('lastGuardTarget', targetId); this.showNotification(`你守护了 ${targetId}号`, 'success'); },
-    async guardSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: null, actorId: this.playerId }); await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete'); await this.setSkillState('lastGuardTarget', null); },
-    async witchUseCure(targetId) { const identityIndex = this.playerData.deaths; const actionRef = db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`); actionRef.transaction(states => { if (!states) states = {}; const key = `${identityIndex}_hasUsedCure`; if (states[key]) return; states[key] = true; return states; }).then(async (result) => { if (result.committed) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ cure: targetId }); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); this.showNotification(`你使用解药救了 ${targetId}号`, 'success'); } }); },
-    async witchUsePoison(targetId) { const identityIndex = this.playerData.deaths; const actionRef = db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`); actionRef.transaction(states => { if (!states) states = {}; const key = `${identityIndex}_hasUsedPoison`; if (states[key]) return; states[key] = true; return states; }).then(async (result) => { if (result.committed) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ poison: targetId }); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); this.showNotification(`你使用毒药毒杀了 ${targetId}号`, 'error'); } }); },
-    async witchSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ actorId: this.playerId, skipped: true }); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); },
+    async seerCheck(targetId) { const target = this.allPlayers[targetId]; const role = this.getActiveRole(target); const result = ['狼人', '隐狼'].includes(role) ? '狼人' : '好人'; await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target: targetId, result, actorId: this.playerId }); await this.addGameLog(`🔮 预言家(${this.playerId}号)查验 ${targetId}号, 结果为 ${result}`, true); await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete'); const results = this.getSkillState('seerResults') || {}; results[targetId] = result; await this.setSkillState('seerResults', results); this.showNotification(`查验结果：${targetId}号是${result === '狼人' ? '🐺 狼人' : '😇 好人'}`, 'success'); },
+    async seerSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target: null, actorId: this.playerId }); await this.addGameLog(`🔮 预言家(${this.playerId}号)跳过查验`, true); await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete'); },
+    async guardProtect(targetId) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: targetId, actorId: this.playerId }); await this.addGameLog(`🛡️ 守卫(${this.playerId}号)守护了 ${targetId}号`, true); await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete'); await this.setSkillState('lastGuardTarget', targetId); this.showNotification(`你守护了 ${targetId}号`, 'success'); },
+    async guardSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target: null, actorId: this.playerId }); await this.addGameLog(`🛡️ 守卫(${this.playerId}号)空守`, true); await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete'); await this.setSkillState('lastGuardTarget', null); },
+    async witchUseCure(targetId) { const identityIndex = this.playerData.deaths; const actionRef = db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`); actionRef.transaction(states => { if (!states) states = {}; const key = `${identityIndex}_hasUsedCure`; if (states[key]) return; states[key] = true; return states; }).then(async (result) => { if (result.committed) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ cure: targetId }); await this.addGameLog(`🧪 女巫(${this.playerId}号)使用解药救了 ${targetId}号`, true); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); this.showNotification(`你使用解药救了 ${targetId}号`, 'success'); } }); },
+    async witchUsePoison(targetId) { const identityIndex = this.playerData.deaths; const actionRef = db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`); actionRef.transaction(states => { if (!states) states = {}; const key = `${identityIndex}_hasUsedPoison`; if (states[key]) return; states[key] = true; return states; }).then(async (result) => { if (result.committed) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ poison: targetId }); await this.addGameLog(`🧪 女巫(${this.playerId}号)使用毒药毒杀了 ${targetId}号`, true); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); this.showNotification(`你使用毒药毒杀了 ${targetId}号`, 'error'); } }); },
+    async witchSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ actorId: this.playerId, skipped: true }); await this.addGameLog(`🧪 女巫(${this.playerId}号)没有使用药水`, true); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); },
     
     async knight(targetId) {
         await this.setSkillState('hasUsedDuel', true);
@@ -969,22 +1001,31 @@ const App={
         if (!pBefore || !pBefore.isAlive) return resultState;
 
         const roleBeforeDeath = this.getActiveRole(pBefore);
+        let idiotFlipped = false;
+        
         const transactionResult = await playerRef.transaction(p => {
             if (!p || !p.isAlive) return p;
+            
+            const diedIdentityIndex = p.deaths;
+            const diedIdentity = p.identities[diedIdentityIndex];
+
             p.deaths = Math.min(p.deaths + 1, 2);
             if (p.deaths >= 2) p.isAlive = false;
+
+            if (diedIdentity && diedIdentity.role === '白痴' && !p.isExposedIdiot) {
+                p.isExposedIdiot = true;
+                idiotFlipped = true;
+            }
             return p;
         });
 
         if (!transactionResult.committed) return resultState;
-        const p = transactionResult.snapshot.val();
         
-        const diedIdentityIndex = p.deaths - 1;
-        if (pBefore && pBefore.identities[diedIdentityIndex]?.role === '白痴' && !pBefore.isExposedIdiot) {
-            await db.ref(`games/${this.gameId}/players/${pid}/isExposedIdiot`).set(true);
-            await this.addGameLog(`🤪 ${pid}号玩家的白痴身份已死亡并翻牌。`);
+        if (idiotFlipped) {
+            await this.addGameLog(`🤪 ${pid}号玩家的白痴身份已死亡并翻牌！`);
         }
 
+        const p = transactionResult.snapshot.val();
         const wasSheriff = pBefore.badge;
         const isNowDead = !p.isAlive;
         const willTriggerHunter = roleBeforeDeath === '猎人' && (cause === 'NIGHT' || cause === 'VOTE' || cause === 'POISON' || cause === 'DUEL');
@@ -1029,19 +1070,23 @@ const App={
                  nightDeaths.push({ pid: witchPoison, cause: 'POISON' });
             }
         }
-
-        if (nightDeaths.length > 0) {
-            const deadPlayerIds = nightDeaths.map(d => d.pid).sort((a,b) => a-b).join('号、');
-            await this.addGameLog(`死亡的玩家是：${deadPlayerIds}号`);
-        }
         
         let anyHunterTriggered = false;
         let anySheriffDied = false;
 
-        for (const death of nightDeaths) {
-            const result = await this.kill(death.pid, death.cause);
-            if (result.hunterTriggered) anyHunterTriggered = true;
-            if (result.sheriffDied) { anySheriffDied = true; break; }
+        if (nightDeaths.length > 0) {
+            const deadPlayerIds = [...new Set(nightDeaths.map(d => d.pid))].sort((a,b) => a-b).join('号、');
+            await this.addGameLog(`死亡的玩家是：${deadPlayerIds}号`);
+            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);
+            for (const death of nightDeaths) {
+                const result = await this.kill(death.pid, death.cause);
+                if (result.hunterTriggered) anyHunterTriggered = true;
+                if (result.sheriffDied) { anySheriffDied = true; break; }
+            }
+        } else {
+            await this.addGameLog(`昨夜是平安夜。`);
+            const newStreak = (this.gameState.peaceNightStreak || 0) + 1;
+            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(newStreak);
         }
         
         const nextPhase = 'DAY';
@@ -1066,17 +1111,9 @@ const App={
         if (areAllWolvesDead) {
             winner = '游戏结束 - 好人阵营胜利！(狼人已全部出局)';
         }
-
-        const playersBefore = Object.values(this.allPlayers).filter(p => p.isAlive).length;
-        const playersAfter = allPlayers.filter(p => p.isAlive).length;
-        if (g.state.phase === 'NIGHT' && playersBefore === playersAfter) {
-            const newStreak = (g.state.peaceNightStreak || 0) + 1;
-            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(newStreak);
-            if (newStreak >= 3) {
-                 winner = '游戏结束 - 好人阵营胜利！(连续三晚平安夜)';
-            }
-        } else if (g.state.phase === 'NIGHT') {
-             await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);
+        
+        if (g.state.peaceNightStreak >= 3) {
+             winner = '游戏结束 - 好人阵营胜利！(连续三晚平安夜)';
         }
 
         if (!winner) {
@@ -1103,7 +1140,6 @@ const App={
     getActiveRole(p) { if (!p || !p.isAlive) return null; if (p.deaths >= p.identities.length) return null; const currentIdentity = p.identities[p.deaths]; return currentIdentity ? currentIdentity.role : null; },
     isAnyWolfInGame() { return Object.values(this.allPlayers).some(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p))); },
     
-    // MODIFIED: Correct logic for who can vote as a wolf
     canWolfAct(p) {
         const role = this.getActiveRole(p);
         if (!['狼人', '隐狼'].includes(role)) return false;
@@ -1115,7 +1151,6 @@ const App={
         return false;
     },
 
-    // MODIFIED: Correct logic for determining the Alpha wolf (who confirms the kill)
     getAlphaWolfId() {
         const livingRegularWolves = Object.values(this.allPlayers).filter(p => p.isAlive && this.getActiveRole(p) === '狼人');
         if (livingRegularWolves.length > 0) {
@@ -1130,7 +1165,6 @@ const App={
     getSkillState(key, player = null, identityIndex = -1) { const p = player || this.playerData; if (!p) return undefined; const idx = identityIndex !== -1 ? identityIndex : p.deaths; return (p.skillStates || {})[`${idx}_${key}`]; },
     async setSkillState(key, value) { const identityIndex = this.playerData.deaths; const stateKey = `${identityIndex}_${key}`; await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${stateKey}`).set(value); },
 
-    // MODIFIED: Complete refactor to handle different wolf perspectives
     initWolfListeners() {
         this.stopWolfListeners(false);
         const myRole = this.getActiveRole(this.playerData);
@@ -1174,7 +1208,6 @@ const App={
         this.wolfVotesListener.on('value', this.wolfVotesCallbackRef);
         this.wolfVotesListener.once('value').then(this.wolfVotesCallbackRef);
 
-        // Only regular wolves get the chat listener
         if (myRole === '狼人') {
             const chatRef = db.ref(`games/${this.gameId}/wolfChat`);
             const chatBox = this.$('wolf-chat-messages');

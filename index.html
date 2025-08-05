@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官 (V6.7 增强版)</title>
+<title>双身份狼人杀 - 电子法官 (V6.8 隐狼修正版)</title>
 
-<!-- ========= 视觉样式 (部分修改) ========= -->
+<!-- ========= 视觉样式 (无变动) ========= -->
 <style>
 :root{--bg:#1a1a2e;--card:#16213e;--border:#0f3460;--accent:#e94560;
 --text:#eaeaea;--success:#00d9ff;--danger:#ff006e;--warning:#ffb700;
@@ -72,7 +72,6 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 .notification.info{border-left-color:var(--warning)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes fadeOut{from{opacity:1}to{opacity:0;transform:translateY(-20px)}}
-/* MODIFIED: Removed max-height to allow log to grow */
 #game-log-area{margin-top:20px;overflow-y:auto;padding:15px;background:rgba(0,0,0,0.2);border-radius:10px;border:1px solid var(--border)}
 #game-log-area h3{margin-top:0;font-size:1.1em;color:var(--success)}
 #game-log-content p{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05)}
@@ -149,7 +148,8 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6.7 增强版
+   双身份狼人杀 - V6.8 隐狼修正版
+   - 修正隐狼逻辑：普通狼看不到隐狼，隐狼看得到所有狼但不能聊天。
    - 骑士决斗成功后直接进入夜晚。
    - 关键技能发动计入日志。
    - 日志UI优化：自动增长，新日志在下，自动滚动。
@@ -213,14 +213,11 @@ const App={
         if(target) target.classList.remove('hidden');
     },
 
-    /**
-     * NEW: Helper function to copy link to clipboard
-     */
     copyLink(inputId) {
         const input = this.$(inputId);
         if (!input) return;
         input.select();
-        input.setSelectionRange(0, 99999); // For mobile devices
+        input.setSelectionRange(0, 99999);
         navigator.clipboard.writeText(input.value).then(() => {
             this.showNotification('链接已复制到剪贴板!', 'success');
         }, (err) => {
@@ -234,9 +231,6 @@ const App={
         this.gameId=q.get('game');
         this.playerId=q.get('player');
 
-        /**
-         * NEW: Handle generic player link (?player=PLAYER_ID)
-         */
         if (this.gameId && this.playerId === 'PLAYER_ID') {
             const appEl = this.$('app');
             appEl.innerHTML = `
@@ -258,7 +252,7 @@ const App={
                     this.showNotification('请输入一个有效的座位号。', 'error');
                 }
             });
-            return; // Stop further execution
+            return;
         }
 
         document.body.addEventListener('click', this.handleGlobalClick.bind(this));
@@ -291,7 +285,6 @@ const App={
         if (!target || target.disabled) return;
         const { action, id, value, gameid, inputid } = target.dataset;
 
-        // NEW: Handle copy action
         if (action === 'copy-link') {
             this.copyLink(inputid);
             return;
@@ -378,7 +371,6 @@ const App={
                 p.innerHTML = prefix;
                 p.appendChild(document.createTextNode(log.message));
                 
-                // MODIFIED: Append to bottom and auto-scroll
                 logContent.appendChild(p);
                 logArea.scrollTop = logArea.scrollHeight;
                 
@@ -478,7 +470,7 @@ const App={
         
         const pairs=this.deal(pool);
         if(!pairs){
-            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>提示：请确保“金宝宝”总数（包括盗贼生成的）在1-2个之间，且身份组合不违反禁配规则。</small><br><small>${configStr}</small>`);
+            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>提示：请确保“金水宝宝”总数（包括盗贼生成的）在1-2个之间，且身份组合不违反禁配规则。</small><br><small>${configStr}</small>`);
             return;
         }
         
@@ -503,7 +495,6 @@ const App={
         const baseUrl = `${location.origin}${location.pathname}`;
         const playerUrl = `${baseUrl}?game=${gId}&player=PLAYER_ID`;
         
-        // MODIFIED: Simplified creation info with copy button
         infoEl.innerHTML = `<h3>✅ 游戏创建成功</h3>
             <p>请将以下链接模板分发给玩家，让他们将 "PLAYER_ID" 替换为自己的座位号:</p>
             <div class="link-container">
@@ -738,7 +729,50 @@ const App={
         panelEl.innerHTML = content;
     },
 
-    panelWolf() { const teammates = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p))); const canAct = this.canWolfAct(this.playerData); const myVote = this.fullGameData.wolfVotes?.[this.playerId]; let h = `<h3>🐺 狼人行动</h3>`; if (!canAct) { h += `<p style="color:var(--warning)">你是隐狼，当有其他狼人存活时，你不能行动，但可以参与讨论。</p>`; } h += `<div class="info-box">🐺 队友：${teammates.map(p => `${p.id}号(${this.getActiveRole(p) || '未知'})`).join('、')}</div>`; const targets = Object.values(this.allPlayers).filter(p => p.isAlive); h += `<h4>选择今夜袭击目标：</h4>`; h += targets.map(p => `<button class="action-btn ${myVote === p.id.toString() ? 'selected' : ''}" data-action="wolf-vote" data-id="${p.id}" ${!canAct ? 'disabled' : ''}>${p.id}号</button>`).join(''); h += `<button class="control-btn ${myVote === '0' ? 'selected' : ''}" data-action="wolf-skip" ${!canAct ? 'disabled' : ''}>🚫 今夜空刀</button>`; const panelEl = this.$('action-panel'); if(panelEl) panelEl.innerHTML = h; const chatEl = this.$('wolf-chat-area'); if(chatEl) { chatEl.classList.remove('hidden'); chatEl.innerHTML = ` <div id="wolf-votes-display"></div> <h4>💬 狼人内部讨论</h4> <div id="wolf-chat-messages" style="max-height:150px;overflow-y:auto;background:rgba(255,255,255,.05);padding:10px;border-radius:8px;margin-bottom:10px;text-align:left;"></div> <div style="display:flex;gap:6px;"> <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.2);color:var(--text); width: auto;" /> <button class="action-btn" data-action="wolf-send" style="padding: 8px 16px;">发送</button> </div>`; this.$('wolf-chat-input').addEventListener('keyup', (e) => { if (e.key === 'Enter') this.sendWolfMessage(); }); } this.initWolfListeners(); },
+    // MODIFIED: panelWolf now handles different perspectives for regular and invisible wolves
+    panelWolf() {
+        const myRole = this.getActiveRole(this.playerData);
+        const allLivingWolves = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
+        const livingRegularWolves = allLivingWolves.filter(p => this.getActiveRole(p) === '狼人');
+
+        let teammatesToDisplay;
+        if (myRole === '隐狼') {
+            teammatesToDisplay = allLivingWolves.filter(p => p.id != this.playerId);
+        } else { // '狼人'
+            teammatesToDisplay = livingRegularWolves.filter(p => p.id != this.playerId);
+        }
+
+        const canAct = this.canWolfAct(this.playerData);
+        const myVote = this.fullGameData.wolfVotes?.[this.playerId];
+        let h = `<h3>🐺 狼人行动</h3>`;
+        if (myRole === '隐狼' && livingRegularWolves.length > 0) {
+            h += `<p style="color:var(--warning)">你是隐狼，当有其他普通狼人存活时，你不能行动。</p>`;
+        }
+        
+        h += `<div class="info-box">🐺 队友：${teammatesToDisplay.length > 0 ? teammatesToDisplay.map(p => `${p.id}号(${this.getActiveRole(p)})`).join('、') : '无'}</div>`;
+        
+        const targets = Object.values(this.allPlayers).filter(p => p.isAlive);
+        h += `<h4>选择今夜袭击目标：</h4>`;
+        h += targets.map(p => `<button class="action-btn ${myVote === p.id.toString() ? 'selected' : ''}" data-action="wolf-vote" data-id="${p.id}" ${!canAct ? 'disabled' : ''}>${p.id}号</button>`).join('');
+        h += `<button class="control-btn ${myVote === '0' ? 'selected' : ''}" data-action="wolf-skip" ${!canAct ? 'disabled' : ''}>🚫 今夜空刀</button>`;
+        
+        this.$('action-panel').innerHTML = h;
+
+        const chatEl = this.$('wolf-chat-area');
+        if (myRole === '狼人') {
+             if(chatEl) {
+                chatEl.classList.remove('hidden');
+                chatEl.innerHTML = ` <div id="wolf-votes-display"></div> <h4>💬 狼人内部讨论</h4> <div id="wolf-chat-messages" style="max-height:150px;overflow-y:auto;background:rgba(255,255,255,.05);padding:10px;border-radius:8px;margin-bottom:10px;text-align:left;"></div> <div style="display:flex;gap:6px;"> <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.2);color:var(--text); width: auto;" /> <button class="action-btn" data-action="wolf-send" style="padding: 8px 16px;">发送</button> </div>`;
+                this.$('wolf-chat-input').addEventListener('keyup', (e) => { if (e.key === 'Enter') this.sendWolfMessage(); });
+            }
+        } else { // 隐狼没有聊天区，但有投票区
+            if(chatEl) {
+                chatEl.classList.remove('hidden');
+                chatEl.innerHTML = `<div id="wolf-votes-display"></div>`;
+            }
+        }
+        this.initWolfListeners();
+    },
     panelSheriffCand() { this.$('action-panel').innerHTML = `<h3>👑 是否上警？</h3><button data-action="sheriff-cand" data-value="1" class="action-btn">我要上警</button><button data-action="sheriff-cand" data-value="0" class="control-btn">不上警</button>`; },
     panelSheriffDrop() { this.$('action-panel').innerHTML = `<button data-action="sheriff-drop" class="action-btn">💧 退水</button>`; },
     panelSheriffVote() { const candidates = Object.keys(this.fullGameData.sheriff.candidates || {}).filter(id => this.fullGameData.sheriff.candidates[id] && !this.fullGameData.sheriff.drops?.[id]); let h = `<h3>👑 为警长投票</h3>`; h += candidates.map(id => `<button class="action-btn" data-action="sheriff-vote" data-id="${id}">${id}号</button>`).join(''); h += `<button class="control-btn" data-action="sheriff-vote" data-id="0">弃票</button>`; this.$('action-panel').innerHTML = h; },
@@ -768,7 +802,13 @@ const App={
         await db.ref(`games/${this.gameId}`).update(up);
     },
 
+    // MODIFIED: Added check to prevent invisible wolf from chatting
     sendWolfMessage() {
+        const myRole = this.getActiveRole(this.playerData);
+        if (myRole === '隐狼') {
+            this.showNotification('隐狼不能参与狼人讨论。', 'error');
+            return;
+        }
         const input = this.$('wolf-chat-input'); if (!input) return;
         const msg = (input.value || '').trim(); if (!msg) return;
         if (msg.length > 120) { this.showNotification('消息过长 (≤120 字)。', 'error'); return; }
@@ -811,12 +851,12 @@ const App={
         await this.addGameLog(`⚔️ 骑士 ${this.playerId}号 对 ${targetId}号 发动决斗！`);
         const killResult = await this.kill(loserId, 'DUEL');
         
-        if (isEvil) { // MODIFIED: Knight wins
+        if (isEvil) {
             await this.addGameLog(`决斗成功！${loserId}号 (${loserRole}) 阵亡！游戏直接进入夜晚。`);
             await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'NIGHT' });
-        } else { // MODIFIED: Knight fails
+        } else {
             await this.addGameLog(`决斗失败！骑士 ${loserId}号 阵亡！`);
-            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'DAY' }); // Continue the day
+            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'DAY' });
         }
     },
 
@@ -1059,43 +1099,93 @@ const App={
         return false;
     },
 
-    getPlayerClassification(players) { const gods = [], wolves = [], civilians = []; Object.values(players).forEach(p => { if (!p.isAlive) return; const role = this.getActiveRole(p); if (!role) return; const roleData = ROLES[role]; if (roleData.faction === 'bad') wolves.push(p); else if (roleData.isGod) gods.push(p); else civilians.push(p); }); return { gods, wolves, civilians }; },
+    // --- 辅助工具函数 (部分修改) ---
     getActiveRole(p) { if (!p || !p.isAlive) return null; if (p.deaths >= p.identities.length) return null; const currentIdentity = p.identities[p.deaths]; return currentIdentity ? currentIdentity.role : null; },
     isAnyWolfInGame() { return Object.values(this.allPlayers).some(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p))); },
-    canWolfAct(p) { const role = this.getActiveRole(p); if (!['狼人', '隐狼'].includes(role)) return false; if (role === '狼人') return true; if (role === '隐狼') { const livingWolves = Object.values(this.allPlayers).filter(p2 => p2.isAlive && this.getActiveRole(p2) === '狼人'); return livingWolves.length === 0; } return false; },
-    getAlphaWolfId() { const livingWolves = Object.values(this.allPlayers).filter(p => p.isAlive && this.canWolfAct(p)); if (livingWolves.length === 0) return null; const wolfIds = livingWolves.map(p => p.id); return Math.min(...wolfIds).toString(); },
+    
+    // MODIFIED: Correct logic for who can vote as a wolf
+    canWolfAct(p) {
+        const role = this.getActiveRole(p);
+        if (!['狼人', '隐狼'].includes(role)) return false;
+        if (role === '狼人') return true;
+        if (role === '隐狼') {
+            const livingRegularWolves = Object.values(this.allPlayers).filter(p2 => p2.isAlive && this.getActiveRole(p2) === '狼人');
+            return livingRegularWolves.length === 0;
+        }
+        return false;
+    },
+
+    // MODIFIED: Correct logic for determining the Alpha wolf (who confirms the kill)
+    getAlphaWolfId() {
+        const livingRegularWolves = Object.values(this.allPlayers).filter(p => p.isAlive && this.getActiveRole(p) === '狼人');
+        if (livingRegularWolves.length > 0) {
+            return Math.min(...livingRegularWolves.map(p => p.id)).toString();
+        }
+        const livingInvisibleWolves = Object.values(this.allPlayers).filter(p => p.isAlive && this.getActiveRole(p) === '隐狼');
+        if (livingInvisibleWolves.length > 0) {
+            return Math.min(...livingInvisibleWolves.map(p => p.id)).toString();
+        }
+        return null;
+    },
     getSkillState(key, player = null, identityIndex = -1) { const p = player || this.playerData; if (!p) return undefined; const idx = identityIndex !== -1 ? identityIndex : p.deaths; return (p.skillStates || {})[`${idx}_${key}`]; },
     async setSkillState(key, value) { const identityIndex = this.playerData.deaths; const stateKey = `${identityIndex}_${key}`; await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${stateKey}`).set(value); },
 
+    // MODIFIED: Complete refactor to handle different wolf perspectives
     initWolfListeners() {
         this.stopWolfListeners(false);
+        const myRole = this.getActiveRole(this.playerData);
+        if (!['狼人', '隐狼'].includes(myRole)) return;
+
         const alphaWolfId = this.getAlphaWolfId();
+
         this.wolfVotesCallbackRef = (s) => {
             const votes = s.val() || {};
             const displayEl = this.$('wolf-votes-display');
             if (!displayEl) return;
+
+            let wolvesToDisplayInVotePanel;
+            if (myRole === '隐狼') {
+                wolvesToDisplayInVotePanel = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
+            } else { // '狼人'
+                wolvesToDisplayInVotePanel = Object.values(this.allPlayers).filter(p => p.isAlive && this.getActiveRole(p) === '狼人');
+            }
+            
             let display = '<h4>投票情况</h4><div class="info-box">';
-            const livingWolves = Object.values(this.allPlayers).filter(p => p.isAlive && ['狼人', '隐狼'].includes(this.getActiveRole(p)));
-            livingWolves.forEach(wolf => { const voteTarget = votes[wolf.id]; const voteText = voteTarget != null ? (voteTarget === '0' ? '空刀' : `${voteTarget}号`) : '尚未投票'; display += `<p>${wolf.id}号 ${wolf.id == alphaWolfId ? '<strong>(拍板狼)</strong>' : ''} → ${voteText}</p>`; });
+            wolvesToDisplayInVotePanel.forEach(wolf => {
+                const voteTarget = votes[wolf.id];
+                const voteText = voteTarget != null ? (voteTarget === '0' ? '空刀' : `${voteTarget}号`) : '尚未投票';
+                const isAlpha = wolf.id.toString() === alphaWolfId;
+                display += `<p>${wolf.id}号 ${isAlpha ? '<strong>(拍板狼)</strong>' : ''} → ${voteText}</p>`;
+            });
             display += '</div>';
-            const alphaWolfVote = votes[alphaWolfId];
-            if (this.playerId === alphaWolfId && alphaWolfVote != null) { display += `<div style="text-align:center;margin-top:15px;"><p style="color:var(--success);font-size:1.2em;">你是拍板狼，请确认行动</p><button class="confirm-btn" data-action="wolf-confirm" data-id="${alphaWolfVote}">确认袭击 ${alphaWolfVote === '0' ? '空刀' : alphaWolfVote + '号'}</button></div>`; } 
-            else if (!alphaWolfId) { display += '<p style="text-align:center;">没有狼人可以行动。</p>'; } 
-            else if (alphaWolfVote == null) { display += `<p style="text-align:center;">等待 ${alphaWolfId}号 (拍板狼) 投票...</p>`; }
+            
+            if (this.playerId === alphaWolfId && votes[alphaWolfId] != null) {
+                const alphaVote = votes[alphaWolfId];
+                display += `<div style="text-align:center;margin-top:15px;"><p style="color:var(--success);font-size:1.2em;">你是拍板狼，请确认行动</p><button class="confirm-btn" data-action="wolf-confirm" data-id="${alphaVote}">确认袭击 ${alphaVote === '0' ? '空刀' : alphaVote + '号'}</button></div>`;
+            } else if (!alphaWolfId) {
+                display += '<p style="text-align:center;">没有狼人可以行动。</p>';
+            } else if (votes[alphaWolfId] == null) {
+                display += `<p style="text-align:center;">等待 ${alphaWolfId}号 (拍板狼) 投票...</p>`;
+            }
             displayEl.innerHTML = display;
         };
+
         this.wolfVotesListener = db.ref(`games/${this.gameId}/wolfVotes`);
         this.wolfVotesListener.on('value', this.wolfVotesCallbackRef);
         this.wolfVotesListener.once('value').then(this.wolfVotesCallbackRef);
-        const chatRef = db.ref(`games/${this.gameId}/wolfChat`);
-        const chatBox = this.$('wolf-chat-messages');
-        if (chatBox) chatBox.innerHTML = '';
-        this.wolfChatListener = chatRef.limitToLast(50).on('child_added', s => {
-            if (!s.exists()) return;
-            const {pid, msg} = s.val();
-            const box = this.$('wolf-chat-messages');
-            if(box){ const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = `${pid}号`; p.appendChild(b); p.appendChild(document.createTextNode(`：${this.escapeHTML(msg)}`)); box.appendChild(p); box.scrollTop = box.scrollHeight; }
-        });
+
+        // Only regular wolves get the chat listener
+        if (myRole === '狼人') {
+            const chatRef = db.ref(`games/${this.gameId}/wolfChat`);
+            const chatBox = this.$('wolf-chat-messages');
+            if (chatBox) chatBox.innerHTML = '';
+            this.wolfChatListener = chatRef.limitToLast(50).on('child_added', s => {
+                if (!s.exists()) return;
+                const {pid, msg} = s.val();
+                const box = this.$('wolf-chat-messages');
+                if(box){ const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = `${pid}号`; p.appendChild(b); p.appendChild(document.createTextNode(`：${this.escapeHTML(msg)}`)); box.appendChild(p); box.scrollTop = box.scrollHeight; }
+            });
+        }
     },
 
     stopWolfListeners(hideUI = true) {
@@ -1110,4 +1200,3 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 </script>
 </body>
 </html>
-

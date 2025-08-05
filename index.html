@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官 (V6.6 修改版)</title>
+<title>双身份狼人杀 - 电子法官 (V6.7 增强版)</title>
 
-<!-- ========= 视觉样式 (无变动) ========= -->
+<!-- ========= 视觉样式 (部分修改) ========= -->
 <style>
 :root{--bg:#1a1a2e;--card:#16213e;--border:#0f3460;--accent:#e94560;
 --text:#eaeaea;--success:#00d9ff;--danger:#ff006e;--warning:#ffb700;
@@ -72,14 +72,16 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 .notification.info{border-left-color:var(--warning)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes fadeOut{from{opacity:1}to{opacity:0;transform:translateY(-20px)}}
-#game-log-area{margin-top:20px;max-height:200px;overflow-y:auto;padding:15px;background:rgba(0,0,0,0.2);border-radius:10px;border:1px solid var(--border)}
+/* MODIFIED: Removed max-height to allow log to grow */
+#game-log-area{margin-top:20px;overflow-y:auto;padding:15px;background:rgba(0,0,0,0.2);border-radius:10px;border:1px solid var(--border)}
 #game-log-area h3{margin-top:0;font-size:1.1em;color:var(--success)}
 #game-log-content p{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05)}
 #game-log-content p:last-child{border-bottom:none;margin-bottom:0}
 #wolf-chat-messages p { margin: 0 0 5px; padding: 0; border: none; }
 #wolf-chat-messages p:last-child { margin-bottom: 0; }
 #game-creation-info { padding: 20px; background: rgba(0,217,255,0.1); border-radius: 15px; }
-#game-creation-info input { width: 100%; text-align: left; padding: 15px; margin-bottom: 10px; }
+#game-creation-info .link-container { display: flex; align-items: center; margin-bottom: 10px; }
+#game-creation-info input { flex-grow: 1; text-align: left; padding: 15px; margin-bottom: 0; margin-right: 10px; }
 @media(max-width:600px){#app{padding:20px}h1{font-size:1.5em}button{padding:10px 16px;font-size:14px}#notification-container{width:auto;left:20px;right:20px}}
 </style>
 </head>
@@ -147,13 +149,12 @@ input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V6.6 修改版
-   - 警徽移交由警长本人操作，主持人仅保留强制撕毁。
-   - 白痴技能调整为死亡后翻牌，无免死效果。
-   - 统一并简化了死亡日志和播报格式。
-   - 日志时间戳改为游戏轮次。
-   - 调整游戏流程，确保上警在第一夜结算前进行。
-   - 日志中增加详细票型记录。
+   双身份狼人杀 - V6.7 增强版
+   - 骑士决斗成功后直接进入夜晚。
+   - 关键技能发动计入日志。
+   - 日志UI优化：自动增长，新日志在下，自动滚动。
+   - 创建游戏后界面简化，增加一键复制链接功能。
+   - 增加玩家ID输入页面，提升链接使用容错性。
    ========================================================== */
 
 // --- 全局常量定义 ---
@@ -212,10 +213,54 @@ const App={
         if(target) target.classList.remove('hidden');
     },
 
+    /**
+     * NEW: Helper function to copy link to clipboard
+     */
+    copyLink(inputId) {
+        const input = this.$(inputId);
+        if (!input) return;
+        input.select();
+        input.setSelectionRange(0, 99999); // For mobile devices
+        navigator.clipboard.writeText(input.value).then(() => {
+            this.showNotification('链接已复制到剪贴板!', 'success');
+        }, (err) => {
+            this.showNotification('复制失败，请手动复制。', 'error');
+            console.error('Could not copy text: ', err);
+        });
+    },
+    
     async init(){
         const q=new URLSearchParams(location.search);
         this.gameId=q.get('game');
         this.playerId=q.get('player');
+
+        /**
+         * NEW: Handle generic player link (?player=PLAYER_ID)
+         */
+        if (this.gameId && this.playerId === 'PLAYER_ID') {
+            const appEl = this.$('app');
+            appEl.innerHTML = `
+                <h1>输入你的座位号</h1>
+                <div class="info-box" style="text-align:center;">
+                    <p>请输入法官分配给你的座位号（数字），然后点击加入游戏。</p>
+                    <input type="number" id="player-id-input" placeholder="座位号" style="width:120px; margin-bottom: 20px; padding: 15px; font-size: 1.2em;">
+                    <br>
+                    <button id="join-game-btn" class="confirm-btn">加入游戏</button>
+                </div>
+            `;
+            this.$('join-game-btn').addEventListener('click', () => {
+                const enteredId = this.$('player-id-input').value;
+                if (enteredId && !isNaN(enteredId) && enteredId > 0) {
+                    const currentUrl = new URL(location.href);
+                    currentUrl.searchParams.set('player', enteredId);
+                    location.href = currentUrl.toString();
+                } else {
+                    this.showNotification('请输入一个有效的座位号。', 'error');
+                }
+            });
+            return; // Stop further execution
+        }
+
         document.body.addEventListener('click', this.handleGlobalClick.bind(this));
         if (this.gameId) {
             this.startApp();
@@ -244,7 +289,14 @@ const App={
     handleGlobalClick(e) {
         const target = e.target.closest('button[data-action]');
         if (!target || target.disabled) return;
-        const { action, id, value, gameid } = target.dataset;
+        const { action, id, value, gameid, inputid } = target.dataset;
+
+        // NEW: Handle copy action
+        if (action === 'copy-link') {
+            this.copyLink(inputid);
+            return;
+        }
+
         if (id !== undefined && !/^\d+$/.test(id)) {
             this.showNotification('检测到无效操作ID，已阻止。', 'error');
             console.error(`Invalid non-numeric ID "${id}" for action "${action}" was blocked.`);
@@ -325,7 +377,10 @@ const App={
                 const prefix = log.round > 0 ? `<strong>[第 ${log.round} 轮]</strong> ` : '';
                 p.innerHTML = prefix;
                 p.appendChild(document.createTextNode(log.message));
-                logContent.insertBefore(p, logContent.firstChild);
+                
+                // MODIFIED: Append to bottom and auto-scroll
+                logContent.appendChild(p);
+                logArea.scrollTop = logArea.scrollHeight;
                 
                 if (!this.isHost) this.showNotification(log.message, 'info');
             }
@@ -447,14 +502,14 @@ const App={
         infoEl.classList.remove('hidden');
         const baseUrl = `${location.origin}${location.pathname}`;
         const playerUrl = `${baseUrl}?game=${gId}&player=PLAYER_ID`;
-        const godUrl = `${baseUrl}?game=${gId}&player=0`;
         
+        // MODIFIED: Simplified creation info with copy button
         infoEl.innerHTML = `<h3>✅ 游戏创建成功</h3>
-            <p>请将以下链接分发给玩家 (替换PLAYER_ID为他们的座位号):</p>
-            <p>玩家链接模板:</p>
-            <input type="text" readonly value="${playerUrl}" onclick="this.select()">
-            <p>上帝视角链接:</p>
-            <input type="text" readonly value="${godUrl}" onclick="this.select()">
+            <p>请将以下链接模板分发给玩家，让他们将 "PLAYER_ID" 替换为自己的座位号:</p>
+            <div class="link-container">
+                <input type="text" readonly id="player-link-template" value="${playerUrl}">
+                <button data-action="copy-link" data-inputid="player-link-template" class="control-btn">复制</button>
+            </div>
             <button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)身份进入</button>`;
     },
 
@@ -744,8 +799,37 @@ const App={
     async witchUseCure(targetId) { const identityIndex = this.playerData.deaths; const actionRef = db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`); actionRef.transaction(states => { if (!states) states = {}; const key = `${identityIndex}_hasUsedCure`; if (states[key]) return; states[key] = true; return states; }).then(async (result) => { if (result.committed) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ cure: targetId }); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); this.showNotification(`你使用解药救了 ${targetId}号`, 'success'); } }); },
     async witchUsePoison(targetId) { const identityIndex = this.playerData.deaths; const actionRef = db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`); actionRef.transaction(states => { if (!states) states = {}; const key = `${identityIndex}_hasUsedPoison`; if (states[key]) return; states[key] = true; return states; }).then(async (result) => { if (result.committed) { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ poison: targetId }); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); this.showNotification(`你使用毒药毒杀了 ${targetId}号`, 'error'); } }); },
     async witchSkip() { await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ actorId: this.playerId, skipped: true }); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); },
-    async knight(targetId) { await this.setSkillState('hasUsedDuel', true); const target = this.allPlayers[targetId]; const targetRole = this.getActiveRole(target); const isEvil = ['狼人', '隐狼'].includes(targetRole); const loserId = isEvil ? targetId : this.playerId; const loserRole = isEvil ? targetRole : this.getActiveRole(this.playerData); await this.addGameLog(`⚔️ 骑士 ${this.playerId}号 对 ${targetId}号 发动决斗！`); await this.addGameLog(`决斗结果：${loserId}号 (${loserRole}) 阵亡！`); const killResult = await this.kill(loserId, 'DUEL'); await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'DAY' }); },
-    async hunter(targetId) { await this.addGameLog(`🔫 猎人 ${this.playerId}号 开枪带走了 ${targetId}号！`); const hunterId = Object.keys(this.gameState.hunterQueue)[0]; await db.ref(`games/${this.gameId}/state/hunterQueue/${hunterId}`).set(null); const killResult = await this.kill(targetId, 'HUNTER'); if (killResult.sheriffDied) return; const remainingHunters = (await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val() || {}; const nextPhase = Object.keys(remainingHunters).length > 0 ? 'HUNTER_ACTION' : (this.gameState.phase === 'DAY' ? 'NIGHT' : 'DAY'); await this.handlePostDeath({ hunterTriggered: false, sheriffDied: false, nextPhaseIfNoAction: nextPhase }); },
+    
+    async knight(targetId) {
+        await this.setSkillState('hasUsedDuel', true);
+        const target = this.allPlayers[targetId];
+        const targetRole = this.getActiveRole(target);
+        const isEvil = ['狼人', '隐狼'].includes(targetRole);
+        const loserId = isEvil ? targetId : this.playerId;
+        const loserRole = isEvil ? targetRole : this.getActiveRole(this.playerData);
+        
+        await this.addGameLog(`⚔️ 骑士 ${this.playerId}号 对 ${targetId}号 发动决斗！`);
+        const killResult = await this.kill(loserId, 'DUEL');
+        
+        if (isEvil) { // MODIFIED: Knight wins
+            await this.addGameLog(`决斗成功！${loserId}号 (${loserRole}) 阵亡！游戏直接进入夜晚。`);
+            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'NIGHT' });
+        } else { // MODIFIED: Knight fails
+            await this.addGameLog(`决斗失败！骑士 ${loserId}号 阵亡！`);
+            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction: 'DAY' }); // Continue the day
+        }
+    },
+
+    async hunter(targetId) {
+        await this.addGameLog(`🔫 猎人 ${this.playerId}号 开枪带走了 ${targetId}号！`);
+        const hunterId = Object.keys(this.gameState.hunterQueue)[0];
+        await db.ref(`games/${this.gameId}/state/hunterQueue/${hunterId}`).set(null);
+        const killResult = await this.kill(targetId, 'HUNTER');
+        if (killResult.sheriffDied) return;
+        const remainingHunters = (await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val() || {};
+        const nextPhase = Object.keys(remainingHunters).length > 0 ? 'HUNTER_ACTION' : (this.gameState.phase === 'DAY' ? 'NIGHT' : 'DAY');
+        await this.handlePostDeath({ hunterTriggered: false, sheriffDied: false, nextPhaseIfNoAction: nextPhase });
+    },
 
     async tallySheriffVotes() {
         const votes = this.fullGameData.sheriff?.votes || {};

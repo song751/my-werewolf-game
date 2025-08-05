@@ -478,7 +478,7 @@ const App={
         
         const pairs=this.deal(pool);
         if(!pairs){
-            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>提示：请确保“金水宝宝”总数（包括盗贼生成的）在1-2个之间，且身份组合不违反禁配规则。</small><br><small>${configStr}</small>`);
+            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>提示：请确保“金宝宝”总数（包括盗贼生成的）在1-2个之间，且身份组合不违反禁配规则。</small><br><small>${configStr}</small>`);
             return;
         }
         
@@ -1110,3 +1110,4 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 </script>
 </body>
 </html>
+

@@ -1,5 +1,5 @@
 /* ========================================
-   双身份狼人杀 V10.0 - 美化版
+   双身份狼人杀 V10.1 - 美化版
    ======================================== */
 
 :root {
@@ -695,16 +695,16 @@ button:focus-visible {
   font-weight: 600;
 }
 
+/* 修改：移除 .tag-you 样式，改为 display: none */
 .tag-you {
-  background: rgba(99, 102, 241, 0.2);
-  color: #a78bfa;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  display: none !important;
 }
 
-.tag-wolf {
-  background: rgba(239, 68, 68, 0.2);
+/* 修改：.tag-wolf 替换为 .tag-team */
+.tag-team {
+  background: rgba(239, 68, 68, 0.25);
   color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .tag-idiot {
@@ -754,26 +754,10 @@ button:focus-visible {
   display: block;
 }
 
-/* 狼队目标标记（仅狼人视角可见，由 JS 注入） */
-.wolf-marker {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 700;
-  color: #fecaca;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(220, 38, 38, 0.22));
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
-  pointer-events: none;
-}
-.wolf-marker.final {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.35), rgba(220, 38, 38, 0.35));
-  border-color: rgba(239, 68, 68, 0.7);
-  color: #ffe4e6;
-}
+/* 移除：旧的狼队目标标记 */
+/* .wolf-marker ... */
+
+/* 修改：狼队最终目标高亮 */
 .player-card.wolf-final-target {
   border-color: rgba(239, 68, 68, 0.55);
   box-shadow: 0 0 18px rgba(239, 68, 68, 0.28);
@@ -961,12 +945,9 @@ button:focus-visible {
   max-height: calc(80vh - 80px);
 }
 
-/* 狼窝模态框（仅聊天保留） */
-.modal-wolf .modal-header {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
-  border-bottom-color: rgba(239, 68, 68, 0.2);
-}
+/* 移除：狼窝模态框特定样式 .modal-wolf .modal-header */
 
+/* 狼窝聊天/投票区（现在位于主界面） */
 .wolf-chat-section {
   margin-bottom: var(--spacing-md);
 }
@@ -1280,12 +1261,7 @@ button:focus-visible {
     font-size: 12px;
   }
 
-  .wolf-marker {
-    top: 4px;
-    right: 4px;
-    padding: 1px 6px;
-    font-size: 11px;
-  }
+  /* 移除：旧的 .wolf-marker 响应式 */
   
   .setup-header h2,
   .god-header h2 {
@@ -1316,4 +1292,159 @@ button:focus-visible {
   .modal {
     display: none !important;
   }
+}
+
+/* ========================================
+   新增/修改的样式 (来自 styleAdditions)
+   ======================================== */
+
+/* 新增：狼人投票角标 */
+.wolf-corner {
+  position: absolute;
+  right: 4px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.8));
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+}
+
+/* 新增：加入游戏页面的输入框 */
+.fancy-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 16px;
+  text-align: center;
+  transition: all var(--transition-base);
+}
+
+.fancy-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+/* 新增：输入错误时的抖动动画 */
+.shake {
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+/* 新增：按钮点击动画 */
+.clicked {
+  animation: clickPulse 0.3s;
+}
+
+@keyframes clickPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+/* 新增：页面加载/视图切换动画 */
+.loading {
+  opacity: 0;
+  animation: fadeIn 0.5s forwards;
+}
+
+.view-active {
+  animation: slideUp 0.5s ease-out;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* 新增：身份配置计数器样式 */
+.role-counter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.counter-btn {
+  width: 32px; /* 修改：尺寸加大 */
+  height: 32px; /* 修改：尺寸加大 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-size: 20px; /* 修改：尺寸加大 */
+  line-height: 1;
+  padding: 0;
+}
+
+.counter-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.counter-btn:active {
+  transform: scale(0.9);
+}
+
+/* 新增：增强的进度条样式 */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
-<title>双身份狼人杀 - 电子法官 (V9.4)</title>
+<title>双身份狼人杀 - 电子法官 (V9.5)</title>
 <style>
 :root{
   --bg:#0a0e1a;
@@ -123,7 +123,7 @@ button.confirm-btn{background:linear-gradient(135deg,#10b981 0%,#059669 100%)}
 .player-card:hover{transform:translateY(-1.2px);box-shadow:0 6px 14px rgba(0,0,0,.28)}
 .player-card.me{background:linear-gradient(135deg,rgba(59,130,246,.20),rgba(139,92,246,.20));border:2px solid rgba(139,92,246,.45);box-shadow:0 0 14px rgba(139,92,246,.28)}
 .player-card.disabled{opacity:.45;filter:grayscale(.45);pointer-events:none}
-.player-card.selected{border-color:var(--success);box-shadow:0 0 14px rgba(16,185,129,.3)}
+.player-card.selected{border-color:var(--success);box-shadow:0 0 16px 2px rgba(16,185,129,.45), 0 0 4px rgba(16,185,129,.3); transform: translateY(-1.2px) scale(1.02);}
 .player-number{font-size:17px;font-weight:900;text-align:center;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1px}
 .tagline{display:flex;align-items:center;justify-content:center;gap:2px;flex-wrap:wrap;min-height:16px}
 .tag{font-size:9px;padding:1px 5px;border-radius:999px;font-weight:800}
@@ -336,11 +336,10 @@ button.confirm-btn{background:linear-gradient(135deg,#10b981 0%,#059669 100%)}
 
 <script>
 /* =========================================
-   双身份狼人杀 - V9.4
-   - 侧栏再缩窄到 ~60px（移动端 56px），玩家卡片极简化
-   - 修复：拍板狼确认后仍停留在选择状态 -> 清理选择并刷新；确保夜晚状态切换
-   - 上警：主持端新增“强制结束上警”（从上警意向直接进入发言/退水）
-   - 上警投票：仍保留强制计票和时间戳更新，避免不同步
+   双身份狼人杀 - V9.5
+   - 优化UI：增强选中玩家卡片的视觉效果。
+   - 修复狼人刀人逻辑：普通狼人点击即投票，无需确认；仅拍板狼在狼窝确认最终目标。
+   - 优化主持人上警视图：清晰展示上警、不上警和等待中的玩家列表。
 ========================================= */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -672,7 +671,14 @@ const App={
       return false;
     };
 
-    const isSelected=(p)=> this.selection && this.selection.targetId && +this.selection.targetId===+p.id;
+    const isSelected=(p)=>{
+      if (!this.selection) return false;
+      if (this.selection.type === 'wolf-vote') {
+          const myVote = this.fullGameData.wolfVotes?.[this.playerId];
+          return myVote && +myVote === +p.id;
+      }
+      return this.selection.targetId && +this.selection.targetId === +p.id;
+    };
 
     const makeCard=(p)=>{
       const live=2-p.deaths;
@@ -704,7 +710,23 @@ const App={
 
       if(this.selection && selectable(p)){
         card.style.cursor='pointer';
-        card.addEventListener('click',()=>{ this.selection.targetId=p.id.toString(); this.renderPlayerGrid(); this.renderActionPanel(); });
+        card.addEventListener('click',()=>{
+          const type = this.selection.type;
+          const targetId = p.id.toString();
+
+          if (type === 'wolf-vote') {
+              if (!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf !== 'pending') {
+                  this.showNotification('当前不可投票', 'error');
+                  return;
+              }
+              db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(targetId);
+              this.showNotification(`已投票：${targetId}号`, 'success');
+          } else {
+              this.selection.targetId = targetId;
+              this.renderPlayerGrid();
+              this.renderActionPanel();
+          }
+        });
       }
       return card;
     };
@@ -807,10 +829,24 @@ const App={
         if(ns.wolf==='pending'){
           const can=this.canWolfAct(this.playerData);
           this.setSelection('wolf-vote');
-          let html=`<div class="info-box">狼队行动：${can?'请选择刀口或空刀，并由拍板狼确认':'等待普通狼人行动'}</div>`;
-          html+=`<div class="inline" style="margin-top:6px;justify-content:center;"><button class="control-btn" data-action="open-wolf">打开狼窝</button></div>`;
-          html+=bar('今晚袭击目标',{allowSkip:true,skipText:'空刀'});
-          panel.innerHTML=html; return;
+          let html = `<div class="info-box">狼队行动：${can ? '请从上方列表选择袭击目标' : '等待普通狼人行动'}</div>`;
+          html += `<div class="inline" style="margin-top:8px;justify-content:center;">`;
+          if (can) {
+              html += `<button class="control-btn" data-action="skip-selection">🔪 空刀</button>`;
+          }
+          html += `<button class="control-btn" data-action="open-wolf">🐺 打开狼窝</button>`;
+          html += `</div>`;
+          
+          const alphaId = this.getAlphaWolfId();
+          if (alphaId) {
+              if (this.playerId === alphaId) {
+                  html += `<div class="action-feedback" style="margin-top:8px; border-color: var(--warning);">你是拍板狼，请在狼窝中确认最终目标。</div>`;
+              } else if (can) {
+                  html += `<div class="action-feedback" style="margin-top:8px;">你的投票将同步至狼窝，由拍板狼（${alphaId}号）确认。</div>`;
+              }
+          }
+          panel.innerHTML = html;
+          return;
         }else{
           panel.innerHTML=info('狼队已确定刀口，等待其他角色行动…'); return;
         }
@@ -828,10 +864,7 @@ const App={
       case 'seer': await this.seerCheck(t); break;
       case 'guard': await this.guardProtect(t); break;
       case 'witch-poison': await this.witchUsePoison(t); break;
-      case 'wolf-vote':
-        if(!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){ this.showNotification('当前不可投票','error'); break; }
-        await db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(t);
-        this.showNotification(`已投票：${t}号`,'success'); break;
+      // 狼人投票被单独处理，不再通过此函数
       case 'day-vote': await db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set(t); break;
       case 'knight': await this.knight(t); break;
       case 'hunter': await this.hunter(t); break;
@@ -889,10 +922,27 @@ const App={
     }
     if(ph==='SHERIFF_CAND'){
       const alive=Object.values(this.allPlayers).filter(p=>p.isAlive);
-      const decided=alive.filter(p=>candVal(this.fullGameData,p.id)!=null);
-      h+=renderStatus('上警意向',alive,decided);
+      const candidates = [], notRunning = [], pending = [];
+      alive.forEach(p => {
+          const decision = candVal(this.fullGameData, p.id);
+          if (decision === 1) {
+              candidates.push(p.id);
+          } else if (decision === 0) {
+              notRunning.push(p.id);
+          } else {
+              pending.push(p.id);
+          }
+      });
+
+      h += `<div class="info-box" style="text-align:left; padding: 10px 14px;">
+              <strong style="display:block; text-align:center; margin-bottom:8px;">上警意向 (${alive.length - pending.length}/${alive.length})</strong>
+              <div><span style="font-size:1.1em">✅</span> <b>上警:</b> ${candidates.length > 0 ? candidates.map(id=>id+'号').join(', ') : '无'}</div>
+              <div style="margin-top:4px;"><span style="font-size:1.1em">❌</span> <b>不上警:</b> ${notRunning.length > 0 ? notRunning.map(id=>id+'号').join(', ') : '无'}</div>
+              <div style="margin-top:4px;"><span style="font-size:1.1em">⏳</span> <b>等待中:</b> ${pending.length > 0 ? pending.map(id=>id+'号').join(', ') : '无'}</div>
+            </div>`;
+
       h+=`<div class="inline" style="justify-content:center;margin-top:6px;">
-            <button class="control-btn" data-action="host-sheriff-speech" ${decided.length<alive.length?'disabled':''}>进入发言/退水</button>
+            <button class="control-btn" data-action="host-sheriff-speech" ${pending.length > 0 ? 'disabled':''}>进入发言/退水</button>
             <button class="action-btn" data-action="host-force-end-cand">强制结束上警</button>
           </div>`;
     }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
-  <title>双身份狼人杀 - 电子法官 (V9.5)</title>
+  <title>双身份狼人杀 - 电子法官 (V10.0)</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
@@ -11,60 +11,108 @@
 
   <!-- 顶部栏 -->
   <div class="top-bar">
-    <h1>🌙 双身份狼人杀</h1>
-    <div class="top-right">
-      <span id="host-badge" class="badge hidden">👑 主持</span>
-      <span id="sheriff-badge-top" class="badge hidden">⭐ 警长</span>
-      <button class="control-btn" data-action="open-logs">📜 日志</button>
-      <button id="btn-wolf" class="action-btn hidden" data-action="open-wolf">🐺 狼窝</button>
+    <div class="top-bar-content">
+      <div class="logo-section">
+        <span class="logo-icon">🌙</span>
+        <h1>双身份狼人杀</h1>
+      </div>
+      <div class="top-actions">
+        <span id="host-badge" class="badge badge-host hidden">
+          <span class="badge-icon">👑</span>
+          <span>主持</span>
+        </span>
+        <span id="sheriff-badge-top" class="badge badge-sheriff hidden">
+          <span class="badge-icon">⭐</span>
+          <span>警长</span>
+        </span>
+        <button class="btn-icon" data-action="open-logs" title="游戏日志">
+          <span class="btn-icon-emoji">📜</span>
+        </button>
+        <button id="btn-wolf" class="btn-icon btn-wolf hidden" data-action="open-wolf" title="狼窝">
+          <span class="btn-icon-emoji">🐺</span>
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- 设置/创建 -->
-  <div id="setup-view" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;">
-    <h3 style="margin:0 0 8px;font-size:16px;color:var(--text-dim);text-align:center">📋 身份配置</h3>
-    <div id="game-creation-info" class="hidden"></div>
-    <div id="role-setup"></div>
+  <div id="setup-view" class="view-container">
+    <div class="setup-container">
+      <div class="setup-header">
+        <h2>游戏设置</h2>
+        <p class="setup-subtitle">配置身份和规则，创建精彩对局</p>
+      </div>
 
-    <h3 style="margin:12px 0 8px;font-size:16px;color:var(--text-dim);text-align:center">⚙️ 规则选项</h3>
-    <div class="role-setup-item">
-      <div>女巫自救规则</div>
-      <div>
-        <select id="opt-witch-selfsave">
-          <option value="noFirstNightSelfSave">首夜不能自救</option>
-          <option value="onlyFirstNightSelfSave">仅首夜可以自救</option>
-        </select>
-      </div>
-    </div>
-    <div class="role-setup-item">
-      <div>预言家查验模式</div>
-      <div>
-        <select id="opt-seer-mode">
-          <option value="faction">查阵营（第二张为狼也判狼；隐狼判好人）</option>
-          <option value="identity">查身份（只看当前生效身份）</option>
-        </select>
-      </div>
-    </div>
-    <div class="role-setup-item">
-      <div>狼人胜利条件</div>
-      <div>
-        <select id="opt-wolf-win">
-          <option value="edge">屠边（全金宝宝或全神职出局）</option>
-          <option value="exterminate">屠城（所有好人出局）</option>
-        </select>
-      </div>
-    </div>
+      <div id="game-creation-info" class="hidden"></div>
 
-    <p style="text-align:center;font-size:14px;margin:10px 0;">
-      <span style="color:var(--warning)">总身份数: <strong id="total-roles">0</strong></span> |
-      <span style="color:var(--success)">预计玩家数: <strong id="player-cnt">0</strong></span>
-      <small id="player-count-warning" style="color:var(--warning);display:block;margin-top:6px;"></small>
-    </p>
-    <div id="setup-error" class="hidden" style="margin:10px 0;padding:10px;border-radius:12px;border:1px solid var(--danger);background:rgba(239,68,68,.1);"></div>
-    <div style="text-align:center;margin-top:10px;">
-      <button id="btn-create" class="control-btn" data-action="create-game">
+      <!-- 身份配置区 -->
+      <div class="setup-section">
+        <h3 class="section-title">
+          <span class="section-icon">👥</span>
+          身份配置
+        </h3>
+        <div id="role-setup" class="role-grid"></div>
+      </div>
+
+      <!-- 规则选项区 -->
+      <div class="setup-section">
+        <h3 class="section-title">
+          <span class="section-icon">⚙️</span>
+          游戏规则
+        </h3>
+        <div class="rule-options">
+          <div class="rule-item">
+            <label for="opt-witch-selfsave">
+              <span class="rule-label">女巫自救</span>
+              <span class="rule-hint">决定女巫能否自救的时机</span>
+            </label>
+            <select id="opt-witch-selfsave" class="rule-select">
+              <option value="noFirstNightSelfSave">首夜不能自救</option>
+              <option value="onlyFirstNightSelfSave">仅首夜可以自救</option>
+            </select>
+          </div>
+          <div class="rule-item">
+            <label for="opt-seer-mode">
+              <span class="rule-label">预言家模式</span>
+              <span class="rule-hint">查验结果的显示方式</span>
+            </label>
+            <select id="opt-seer-mode" class="rule-select">
+              <option value="faction">查阵营</option>
+              <option value="identity">查身份</option>
+            </select>
+          </div>
+          <div class="rule-item">
+            <label for="opt-wolf-win">
+              <span class="rule-label">狼人获胜</span>
+              <span class="rule-hint">狼人阵营的胜利条件</span>
+            </label>
+            <select id="opt-wolf-win" class="rule-select">
+              <option value="edge">屠边</option>
+              <option value="exterminate">屠城</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 统计信息 -->
+      <div class="setup-stats">
+        <div class="stat-item">
+          <span class="stat-label">总身份数</span>
+          <span class="stat-value" id="total-roles">0</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-label">玩家数</span>
+          <span class="stat-value" id="player-cnt">0</span>
+        </div>
+      </div>
+      <div id="player-count-warning" class="warning-text"></div>
+
+      <div id="setup-error" class="error-message hidden"></div>
+
+      <button id="btn-create" class="btn-primary btn-large" data-action="create-game">
         <span id="create-text">创建游戏</span>
-        <span id="create-spinner" class="hidden" style="margin-left:8px;">⏳</span>
+        <span id="create-spinner" class="spinner hidden"></span>
       </button>
     </div>
   </div>
@@ -77,11 +125,17 @@
 
       <!-- 中央面板 -->
       <div class="center-panel">
-        <div id="status-bar">等待游戏开始...</div>
-        <div id="identity-card"></div>
-        <div id="persist" class="hidden"></div>
-        <div id="action-panel"></div>
-        <div id="host-controls" class="hidden"></div>
+        <div id="status-bar" class="status-bar">
+          <span class="status-text">等待游戏开始...</span>
+        </div>
+        
+        <div id="identity-card" class="identity-card"></div>
+        
+        <div id="persist" class="persist-info hidden"></div>
+        
+        <div id="action-panel" class="action-panel"></div>
+        
+        <div id="host-controls" class="host-controls hidden"></div>
       </div>
 
       <!-- 右侧玩家列 -->
@@ -90,12 +144,28 @@
   </div>
 
   <!-- 上帝后台 -->
-  <div id="god-view" class="hidden" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;">
-    <h3 style="margin:0 0 8px;font-size:16px;color:var(--text-dim);text-align:center">👁️ 上帝视角后台</h3>
-    <div id="god-player-list"></div>
-    <div id="god-log-area" style="margin-top:12px;">
-      <h3 style="margin:0 0 8px;font-size:16px;color:var(--text-dim);text-align:center">🤫 上帝专属日志</h3>
-      <div id="god-log-content" style="background:var(--panel-light);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:400px;overflow:auto;"></div>
+  <div id="god-view" class="hidden">
+    <div class="god-container">
+      <div class="god-header">
+        <h2>上帝视角</h2>
+        <p class="god-subtitle">掌控全局，洞察一切</p>
+      </div>
+      
+      <div class="god-section">
+        <h3 class="section-title">
+          <span class="section-icon">👁️</span>
+          玩家状态
+        </h3>
+        <div id="god-player-list" class="god-player-list"></div>
+      </div>
+
+      <div class="god-section">
+        <h3 class="section-title">
+          <span class="section-icon">🤫</span>
+          秘密日志
+        </h3>
+        <div id="god-log-content" class="god-log-content"></div>
+      </div>
     </div>
   </div>
 
@@ -106,34 +176,50 @@
 
 <!-- 日志模态 -->
 <div id="logs-modal" class="modal">
+  <div class="modal-overlay"></div>
   <div class="modal-content">
     <div class="modal-header">
-      <strong>📜 游戏日志</strong>
-      <button class="control-btn" data-action="close-modal" data-target="logs-modal">关闭</button>
+      <h3 class="modal-title">
+        <span class="modal-icon">📜</span>
+        游戏日志
+      </h3>
+      <button class="modal-close" data-action="close-modal" data-target="logs-modal">
+        <span>×</span>
+      </button>
     </div>
     <div class="modal-body">
-      <div id="game-log-content"></div>
+      <div id="game-log-content" class="log-content"></div>
     </div>
   </div>
 </div>
 
 <!-- 狼窝模态 -->
 <div id="wolf-modal" class="modal">
-  <div class="modal-content">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-wolf">
     <div class="modal-header">
-      <strong>🐺 狼窝</strong>
-      <button class="control-btn" data-action="close-modal" data-target="wolf-modal">关闭</button>
+      <h3 class="modal-title">
+        <span class="modal-icon">🐺</span>
+        狼窝密谋
+      </h3>
+      <button class="modal-close" data-action="close-modal" data-target="wolf-modal">
+        <span>×</span>
+      </button>
     </div>
     <div class="modal-body">
-      <div id="wolf-votes-display" class="info-box" style="margin-top:0;"></div>
-      <div id="wolf-chat-area">
-        <div id="wolf-chat-messages" style="background:var(--panel-light);border:1px solid var(--border);border-radius:12px;padding:8px;max-height:200px;overflow:auto;margin-bottom:10px;"></div>
-        <div class="inline" style="justify-content:center">
-          <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)" />
-          <button class="action-btn" data-action="wolf-send">发送</button>
+      <div id="wolf-votes-display" class="wolf-votes-section"></div>
+      
+      <div id="wolf-chat-area" class="wolf-chat-section">
+        <div id="wolf-chat-messages" class="chat-messages"></div>
+        <div class="chat-input-wrapper">
+          <input id="wolf-chat-input" class="chat-input" placeholder="输入消息..." maxlength="120" />
+          <button class="btn-send" data-action="wolf-send">
+            <span>发送</span>
+          </button>
         </div>
       </div>
-      <div class="info-box" id="wolf-modal-tips" style="margin-top:8px;"></div>
+      
+      <div id="wolf-modal-tips" class="wolf-tips"></div>
     </div>
   </div>
 </div>

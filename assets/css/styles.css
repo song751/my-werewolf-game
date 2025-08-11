@@ -57,9 +57,9 @@
   --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   
-  /* 响应式布局 */
-  --side-width: 80px;
-  --center-min: 340px;
+  /* 响应式布局（缩窄左右列） */
+  --side-width: 68px;  /* 原 80px -> 68px */
+  --center-min: 320px; /* 原 340px -> 320px */
 }
 
 /* 全局样式重置 */
@@ -167,16 +167,16 @@ h1 {
   font-size: 14px;
 }
 
-/* 图标按钮 */
+/* 图标按钮（微调交互和可见性） */
 .btn-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: none;
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -186,6 +186,13 @@ h1 {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+  border-color: var(--border-secondary);
+}
+
+.btn-icon:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.35);
 }
 
 .btn-icon-emoji {
@@ -199,8 +206,8 @@ h1 {
 }
 
 .btn-wolf {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.15));
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.12));
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 /* 视图容器 */
@@ -421,7 +428,7 @@ h1 {
   margin: var(--spacing-md) 0;
 }
 
-/* 按钮系统 */
+/* 按钮系统（美化：颜色、悬浮、聚焦态） */
 button {
   border: none;
   cursor: pointer;
@@ -455,18 +462,25 @@ button:active::before {
   height: 300px;
 }
 
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.35), inset 0 0 0 1px rgba(255,255,255,0.08);
+  border-radius: inherit;
+}
+
 .btn-primary {
-  background: var(--accent-gradient);
+  background: linear-gradient(135deg, #6d72f3 0%, #8e5ef8 100%);
   color: white;
   padding: 10px 20px;
   border-radius: var(--radius-md);
   font-size: 14px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  box-shadow: var(--shadow-lg), 0 0 0 4px rgba(99, 102, 241, 0.15);
 }
 
 .btn-large {
@@ -478,48 +492,51 @@ button:active::before {
 }
 
 .control-btn {
-  background: rgba(99, 102, 241, 0.15);
-  color: var(--accent-primary);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.12));
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  padding: 9px 16px;
   border-radius: var(--radius-md);
   font-size: 13px;
 }
 
 .control-btn:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.25);
-  border-color: rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  border-color: rgba(99, 102, 241, 0.55);
   transform: translateY(-1px);
+  color: white;
 }
 
 .action-btn {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.12));
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 9px 16px;
   border-radius: var(--radius-md);
   font-size: 13px;
 }
 
 .action-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.5);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(220, 38, 38, 0.22));
+  border-color: rgba(239, 68, 68, 0.55);
   transform: translateY(-1px);
+  color: #fecaca;
 }
 
 .confirm-btn {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--color-success);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.15));
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 9px 16px;
   border-radius: var(--radius-md);
   font-size: 13px;
 }
 
 .confirm-btn:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.25);
-  border-color: rgba(16, 185, 129, 0.5);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.25));
+  border-color: rgba(16, 185, 129, 0.55);
   transform: translateY(-1px);
+  color: #a7f3d0;
 }
 
 /* 游戏布局 */
@@ -737,6 +754,32 @@ button:active::before {
   display: block;
 }
 
+/* 狼队目标标记（仅狼人视角可见，由 JS 注入） */
+.wolf-marker {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fecaca;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(220, 38, 38, 0.22));
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+  pointer-events: none;
+}
+.wolf-marker.final {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.35), rgba(220, 38, 38, 0.35));
+  border-color: rgba(239, 68, 68, 0.7);
+  color: #ffe4e6;
+}
+.player-card.wolf-final-target {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.28);
+  transform: translateX(2px) scale(1.02);
+}
+
 /* 上帝视角 */
 .god-container {
   background: rgba(26, 31, 46, 0.6);
@@ -918,18 +961,10 @@ button:active::before {
   max-height: calc(80vh - 80px);
 }
 
-/* 狼窝模态框 */
+/* 狼窝模态框（仅聊天保留） */
 .modal-wolf .modal-header {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
   border-bottom-color: rgba(239, 68, 68, 0.2);
-}
-
-.wolf-votes-section {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
 }
 
 .wolf-chat-section {
@@ -1158,10 +1193,16 @@ button:active::before {
   }
 }
 
-/* 响应式设计 */
+/* 响应式设计（缩窄左右列与区块间距） */
+@media (max-width: 1024px) {
+  #game-layout {
+    gap: var(--spacing-sm);
+  }
+}
+
 @media (max-width: 820px) {
   :root {
-    --side-width: 70px;
+    --side-width: 56px;  /* 原 70px -> 56px */
     --center-min: 280px;
   }
   
@@ -1185,6 +1226,10 @@ button:active::before {
     width: 32px;
     height: 32px;
   }
+
+  #game-layout {
+    gap: var(--spacing-sm); /* 16 -> 8 */
+  }
   
   .setup-container,
   .god-container {
@@ -1203,7 +1248,7 @@ button:active::before {
 
 @media (max-width: 480px) {
   :root {
-    --side-width: 60px;
+    --side-width: 48px;  /* 原 60px -> 48px */
     --center-min: 240px;
   }
   
@@ -1219,6 +1264,10 @@ button:active::before {
     display: none;
   }
   
+  #game-layout {
+    gap: 6px; /* 移动端进一步缩小左右与中间间隔 */
+  }
+
   .player-card {
     min-height: 64px;
   }
@@ -1229,6 +1278,13 @@ button:active::before {
   
   .heart {
     font-size: 12px;
+  }
+
+  .wolf-marker {
+    top: 4px;
+    right: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
   }
   
   .setup-header h2,

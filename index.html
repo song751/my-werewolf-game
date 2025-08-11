@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>双身份狼人杀 - 电子法官 (V9.3)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
+<title>双身份狼人杀 - 电子法官 (V9.4)</title>
 <style>
 :root{
   --bg:#0a0e1a;
@@ -23,11 +23,15 @@
   --radius:16px;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
 
+  /* 两侧列宽可调（桌面更窄，移动端更窄） */
+  --side-w:72px;         /* 默认桌面 */
+  --center-min:320px;
+
   /* 统一动画变量 */
-  --ani-fast: .2s;
-  --ani: .3s;
-  --ani-slow: .5s;
-  --easing: cubic-bezier(0.22, 1, 0.36, 1); /* easeOutBack */
+  --ani-fast:.18s;
+  --ani:.28s;
+  --ani-slow:.5s;
+  --easing:cubic-bezier(0.22,1,0.36,1);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
@@ -37,163 +41,107 @@ body{
     radial-gradient(circle at 80% 80%, rgba(236,72,153,.10) 0%, transparent 50%);
 }
 .hidden{display:none!important}
-.app{max-width:1400px;margin:0 auto;padding:18px}
+.app{max-width:1400px;margin:0 auto;padding:16px}
 
-/* 标题居中与美化 */
+/* 标题与顶栏（标题居中） */
 h1{
-  margin:0;
-  font-size:26px;
-  font-weight:800;
-  letter-spacing:1px;
+  margin:0;font-size:24px;font-weight:800;letter-spacing:.8px;
   background:linear-gradient(135deg,#60a5fa 0%,#a78bfa 50%,#f472b6 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));
 }
-
-/* 顶部栏：标题居中，两侧按钮固定 */
 .top-bar{
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  margin-bottom:14px;
-  padding:14px 18px;
-  background:var(--panel);
-  border-radius:var(--radius);
-  border:1px solid var(--border);
-  box-shadow:var(--shadow-sm);
+  position:relative;display:flex;align-items:center;justify-content:center;
+  margin-bottom:12px;padding:12px 16px;background:var(--panel);
+  border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)
 }
-.top-left{display:flex;align-items:center;gap:12px}
-.top-right{position:absolute;right:18px;display:flex;align-items:center;gap:10px}
-
-/* 徽章 */
+.top-right{position:absolute;right:12px;display:flex;align-items:center;gap:8px}
 .badge{
-  display:inline-block;
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:600;
+  display:inline-block;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700;
   background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(147,51,234,.2));
-  border:1px solid rgba(139,92,246,.4);
-  color:var(--text);
-  backdrop-filter:blur(8px);
-  box-shadow:0 2px 8px rgba(139,92,246,.2);
+  border:1px solid rgba(139,92,246,.4);backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(139,92,246,.2)
 }
 
 /* 按钮（统一动效） */
 button{
-  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-  color:#fff;
-  border:none;
-  padding:9px 16px;
-  border-radius:12px;
-  cursor:pointer;
-  font-size:13px;
-  font-weight:700;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;
+  padding:8px 14px;border-radius:12px;cursor:pointer;font-size:12px;font-weight:800;
   transition:transform var(--ani) var(--easing), box-shadow var(--ani) var(--easing), opacity var(--ani);
-  box-shadow:0 4px 12px rgba(0,0,0,.2);
-  position:relative;
-  overflow:hidden;
+  box-shadow:0 4px 12px rgba(0,0,0,.2);position:relative;overflow:hidden
 }
 button::before{
-  content:'';
-  position:absolute;
-  top:0;left:-100%;
-  width:100%;height:100%;
+  content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
-  transition:left var(--ani-slow) var(--easing);
+  transition:left var(--ani-slow) var(--easing)
 }
 button:hover::before{left:100%}
-button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.3)}
+button:hover:not(:disabled){transform:translateY(-1.5px);box-shadow:0 8px 18px rgba(0,0,0,.28)}
 button:active:not(:disabled){transform:translateY(-1px)}
-button:disabled{opacity:.55;cursor:not-allowed;background:#475569;box-shadow:none}
+button:disabled{opacity:.5;cursor:not-allowed;background:#475569;box-shadow:none}
 button.control-btn{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}
 button.action-btn{background:linear-gradient(135deg,#f43f5e 0%,#dc2626 100%)}
 button.confirm-btn{background:linear-gradient(135deg,#10b981 0%,#059669 100%)}
-.inline{display:flex;gap:10px;align-items:center}
+.inline{display:flex;gap:8px;align-items:center}
 
-/* 主布局：左右列进一步变窄 */
+/* 主布局：左右列极窄，居中主内容 */
 #game-layout{
   display:grid;
-  grid-template-columns:140px minmax(420px, 1fr) 140px;
-  gap:16px;
-  align-items:start;
+  grid-template-columns:var(--side-w) minmax(var(--center-min), 1fr) var(--side-w);
+  gap:12px;align-items:start
 }
 
 /* 中央融合面板 */
 .center-panel{
   background:linear-gradient(135deg,rgba(15,22,38,.95),rgba(26,35,50,.95));
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  padding:18px;
-  backdrop-filter:blur(10px);
-  animation:fade-up var(--ani) var(--easing);
+  border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:14px;backdrop-filter:blur(10px);animation:fade-up var(--ani) var(--easing)
 }
 #status-bar{
-  font-weight:800;font-size:17px;margin-bottom:12px;padding:10px 12px;
+  font-weight:900;font-size:16px;margin-bottom:10px;padding:8px 10px;
   background:var(--panel-light);border-radius:12px;border:1px solid var(--border);text-align:center
 }
-#identity-card{margin-bottom:12px;padding:12px;background:var(--panel-light);border-radius:12px;border:1px solid var(--border);text-align:center}
-#persist{margin-bottom:12px}
-#action-panel{min-height:112px;margin-bottom:12px}
+#identity-card{margin-bottom:10px;padding:10px;background:var(--panel-light);border-radius:12px;border:1px solid var(--border);text-align:center}
+#persist{margin-bottom:10px}
+#action-panel{min-height:96px;margin-bottom:10px}
 
-/* 强调信息框（统一） */
+/* 强调信息框（投票/确认） */
 .info-box{
   background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.15));
-  border:1px solid rgba(139,92,246,.3);
-  padding:12px;border-radius:12px;margin:12px 0;backdrop-filter:blur(8px);text-align:center
+  border:1px solid rgba(139,92,246,.3);padding:10px;border-radius:12px;margin:10px 0;text-align:center
 }
-.action-feedback{
-  margin-top:10px;padding:12px;background:rgba(255,255,255,.03);border-radius:12px;border:1px solid var(--border);text-align:center;font-weight:600
-}
+.action-feedback{margin-top:8px;padding:10px;background:rgba(255,255,255,.03);border-radius:12px;border:1px solid var(--border);text-align:center;font-weight:700}
 
-/* 创建/设置 */
-.role-setup-item{
-  display:flex;justify-content:space-between;align-items:center;padding:12px;margin:10px 0;
-  background:var(--panel-light);border:1px solid var(--border);border-radius:12px;transition:transform var(--ani) var(--easing), border-color var(--ani)
-}
-.role-setup-item:hover{border-color:rgba(139,92,246,.35);transform:translateX(3px)}
-select, input[type=number], input[type=text]{padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);transition:border-color var(--ani)}
-select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
-
-/* 玩家卡片（更窄、更小字号与心形） */
+/* 玩家方格（极窄版） */
 .player-grid{display:grid;grid-template-columns:1fr;gap:8px}
 .player-card{
   background:linear-gradient(135deg,rgba(15,22,38,.82),rgba(26,35,50,.82));
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:8px;
-  display:flex;flex-direction:column;gap:6px;
-  transition:transform var(--ani) var(--easing), box-shadow var(--ani) var(--easing), border-color var(--ani);
-  position:relative;min-height:84px;width:100%;max-width:130px;margin:0 auto;backdrop-filter:blur(6px);
-  box-shadow:0 4px 12px rgba(0,0,0,.2);
-  animation:fade-in var(--ani) var(--easing);
+  border:1px solid var(--border);border-radius:12px;padding:6px;
+  display:flex;flex-direction:column;gap:4px;position:relative;
+  width:100%;max-width:calc(var(--side-w) - 8px);min-height:68px;margin:0 auto;
+  box-shadow:0 3px 10px rgba(0,0,0,.2);transition:transform var(--ani) var(--easing), box-shadow var(--ani) var(--easing), border-color var(--ani)
 }
-.player-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.3)}
-.player-card.me{background:linear-gradient(135deg,rgba(59,130,246,.20),rgba(139,92,246,.20));border:2px solid rgba(139,92,246,.45);box-shadow:0 0 16px rgba(139,92,246,.30)}
+.player-card:hover{transform:translateY(-1.2px);box-shadow:0 6px 14px rgba(0,0,0,.28)}
+.player-card.me{background:linear-gradient(135deg,rgba(59,130,246,.20),rgba(139,92,246,.20));border:2px solid rgba(139,92,246,.45);box-shadow:0 0 14px rgba(139,92,246,.28)}
 .player-card.disabled{opacity:.45;filter:grayscale(.45);pointer-events:none}
-.player-card.selected{border-color:var(--success);box-shadow:0 0 16px rgba(16,185,129,.35)}
-.player-number{font-size:20px;font-weight:900;text-align:center;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:2px}
-.tagline{display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;min-height:20px}
-.tag{font-size:10px;padding:2px 6px;border-radius:999px;font-weight:700;backdrop-filter:blur(6px)}
+.player-card.selected{border-color:var(--success);box-shadow:0 0 14px rgba(16,185,129,.3)}
+.player-number{font-size:17px;font-weight:900;text-align:center;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1px}
+.tagline{display:flex;align-items:center;justify-content:center;gap:2px;flex-wrap:wrap;min-height:16px}
+.tag{font-size:9px;padding:1px 5px;border-radius:999px;font-weight:800}
 .tag-you{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(139,92,246,.2));border:1px solid rgba(139,92,246,.4);color:#a78bfa}
-.tag-wolf{background:linear-gradient(135deg,rgba(239,68,68,.2),rgba(220,38,38,.2));border:1px solid rgba(239,68,68,.4);color:#f87171}
-.tag-idiot{background:linear-gradient(135deg,rgba(245,158,11,.2),rgba(217,119,6,.2));border:1px solid rgba(245,158,11,.4);color:#fbbf24}
-.hearts{display:flex;gap:3px;justify-content:center;margin-top:2px}
-.heart{color:#ef4444;font-size:16px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));transition:transform var(--ani), color var(--ani)}
-.heart.off{color:#374151;transform:scale(.85)}
-.sheriff-icon{font-size:14px;animation:float 3s ease-in-out infinite}
-.kill-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 12px var(--success);display:none;animation:pulse 1.6s infinite}
+.tag-wolf{background:linear-gradient(135deg,rgba(239,68,68,.18),rgba(220,38,38,.18));border:1px solid rgba(239,68,68,.38);color:#f87171}
+.tag-idiot{background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(217,119,6,.18));border:1px solid rgba(245,158,11,.38);color:#fbbf24}
+.hearts{display:flex;gap:2px;justify-content:center;margin-top:1px}
+.heart{color:#ef4444;font-size:13px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+.heart.off{color:#374151;transform:scale(.9)}
+.sheriff-icon{font-size:12px;animation:float 3s ease-in-out infinite}
+.kill-dot{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 10px var(--success);display:none;animation:pulse 1.6s infinite}
 .player-card.selected .kill-dot{display:block}
 
 /* 通知 */
-#notification-container{position:fixed;top:18px;right:18px;z-index:9999;width:320px}
+#notification-container{position:fixed;top:16px;right:12px;z-index:9999;width:300px}
 .notification{
   background:linear-gradient(135deg,rgba(15,22,38,.96),rgba(26,35,50,.96));
-  color:var(--text);
-  padding:14px 16px;border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow);
+  color:var(--text);padding:12px 14px;border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow);
   border-left:4px solid var(--accent);backdrop-filter:blur(8px);
   animation:slide-in var(--ani) var(--easing), fade-out var(--ani-slow) ease 4.4s forwards
 }
@@ -201,33 +149,23 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
 .notification.error{border-left-color:var(--danger)}
 .notification.info{border-left-color:var(--info)}
 
-/* 模态统一动效 */
-.modal{
-  position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);
-  display:flex;align-items:flex-start;justify-content:flex-end;z-index:9998;opacity:0;pointer-events:none;
-  transition:opacity var(--ani) var(--easing)
-}
+/* 模态 */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:flex-end;z-index:9998;opacity:0;pointer-events:none;transition:opacity var(--ani) var(--easing)}
 .modal.open{opacity:1;pointer-events:auto}
-.modal-content{
-  width:min(680px,90vw);max-height:85vh;overflow:auto;margin:60px 18px 18px;
-  background:linear-gradient(135deg,rgba(15,22,38,.98),rgba(26,35,50,.98));
-  border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
-  transform-origin:top right;transform:scale(.92) translateY(-16px);opacity:.8;
-  transition:transform var(--ani) var(--easing), opacity var(--ani) var(--easing)
-}
+.modal-content{width:min(680px,92vw);max-height:85vh;overflow:auto;margin:60px 12px 12px;background:linear-gradient(135deg,rgba(15,22,38,.98),rgba(26,35,50,.98));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);transform-origin:top right;transform:scale(.92) translateY(-14px);opacity:.85;transition:transform var(--ani) var(--easing), opacity var(--ani) var(--easing)}
 .modal.open .modal-content{transform:scale(1) translateY(0);opacity:1}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--panel-light);position:sticky;top:0}
-.modal-body{padding:14px}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel-light);position:sticky;top:0}
+.modal-body{padding:12px}
 .log-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
 .log-item:last-child{border-bottom:none}
 .log-secret{color:var(--warning);font-style:italic}
 
 /* 上帝后台 */
-#god-player-list{display:grid;grid-template-columns:1fr;gap:10px}
-.god-row{display:flex;align-items:center;gap:10px;background:var(--panel-light);padding:12px;border-radius:12px;border-left:4px solid var(--info);transition:transform var(--ani)}
+#god-player-list{display:grid;grid-template-columns:1fr;gap:8px}
+.god-row{display:flex;align-items:center;gap:8px;background:var(--panel-light);padding:10px;border-radius:12px;border-left:4px solid var(--info);transition:transform var(--ani)}
 .god-row:hover{transform:translateX(3px);box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .god-row.dead-all{opacity:.5;border-left-color:#374151}
-.life-heart{color:#ef4444;font-size:18px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
+.life-heart{color:#ef4444;font-size:16px}
 .life-heart.lost{color:#374151}
 .dead-identity{text-decoration:line-through;opacity:.6}
 .thief-copy{color:#94a3b8;font-style:italic;font-size:.9em}
@@ -238,19 +176,25 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
 ::-webkit-scrollbar-thumb{background:rgba(139,92,246,.5);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(139,92,246,.7)}
 
-/* 动画Keyframes（统一调度） */
+/* 动画 */
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(1.18)}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@keyframes fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fade-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slide-in{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes fade-out{from{opacity:1}to{opacity:0;transform:translateY(-10px)}}
 
-/* 响应式：再收窄侧栏 */
+/* 移动端进一步收窄两侧栏为 ~60px，并降低中心最小宽度 */
 @media (max-width: 820px){
-  #game-layout{grid-template-columns:120px 1fr 120px;gap:12px}
-  .player-card{max-width:120px}
+  :root{ --side-w:60px; --center-min:260px; }
   .app{padding:12px}
+  #notification-container{right:8px;width:280px}
+  button{padding:8px 12px;font-size:12px}
+}
+@media (max-width: 380px){
+  :root{ --side-w:56px; --center-min:220px; }
+  .player-card{max-width:calc(var(--side-w) - 6px)}
+  .player-number{font-size:16px}
+  .heart{font-size:12px}
 }
 </style>
 </head>
@@ -259,24 +203,22 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
 
   <!-- 顶部栏 -->
   <div class="top-bar">
-    <div class="top-left">
-      <h1>🌙 双身份狼人杀</h1>
+    <h1>🌙 双身份狼人杀</h1>
+    <div class="top-right">
       <span id="host-badge" class="badge hidden">👑 主持</span>
       <span id="sheriff-badge-top" class="badge hidden">⭐ 警长</span>
-    </div>
-    <div class="top-right">
       <button class="control-btn" data-action="open-logs">📜 日志</button>
       <button id="btn-wolf" class="action-btn hidden" data-action="open-wolf">🐺 狼窝</button>
     </div>
   </div>
 
   <!-- 设置/创建 -->
-  <div id="setup-view" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;">
-    <h3 style="margin:0 0 10px;font-size:18px;color:var(--text-dim);text-align:center">📋 身份配置</h3>
+  <div id="setup-view" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;">
+    <h3 style="margin:0 0 8px;font-size:16px;color:var(--text-dim);text-align:center">📋 身份配置</h3>
     <div id="game-creation-info" class="hidden"></div>
     <div id="role-setup"></div>
 
-    <h3 style="margin:14px 0 10px;font-size:18px;color:var(--text-dim);text-align:center">⚙️ 规则选项</h3>
+    <h3 style="margin:12px 0 8px;font-size:16px;color:var(--text-dim);text-align:center">⚙️ 规则选项</h3>
     <div class="role-setup-item">
       <div>女巫自救规则</div>
       <div>
@@ -305,13 +247,13 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
       </div>
     </div>
 
-    <p style="text-align:center;font-size:15px;margin:14px 0;">
+    <p style="text-align:center;font-size:14px;margin:10px 0;">
       <span style="color:var(--warning)">总身份数: <strong id="total-roles">0</strong></span> |
       <span style="color:var(--success)">预计玩家数: <strong id="player-cnt">0</strong></span>
       <small id="player-count-warning" style="color:var(--warning);display:block;margin-top:6px;"></small>
     </p>
-    <div id="setup-error" class="hidden" style="margin:10px 0;padding:12px;border-radius:12px;border:1px solid var(--danger);background:rgba(239,68,68,.1);"></div>
-    <div style="text-align:center;margin-top:12px;">
+    <div id="setup-error" class="hidden" style="margin:10px 0;padding:10px;border-radius:12px;border:1px solid var(--danger);background:rgba(239,68,68,.1);"></div>
+    <div style="text-align:center;margin-top:10px;">
       <button id="btn-create" class="control-btn" data-action="create-game">
         <span id="create-text">创建游戏</span>
         <span id="create-spinner" class="hidden" style="margin-left:8px;">⏳</span>
@@ -340,18 +282,18 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
   </div>
 
   <!-- 上帝后台 -->
-  <div id="god-view" class="hidden" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;">
-    <h3 style="margin:0 0 10px;font-size:18px;color:var(--text-dim);text-align:center">👁️ 上帝视角后台</h3>
+  <div id="god-view" class="hidden" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;">
+    <h3 style="margin:0 0 8px;font-size:16px;color:var(--text-dim);text-align:center">👁️ 上帝视角后台</h3>
     <div id="god-player-list"></div>
-    <div id="god-log-area" style="margin-top:14px;">
-      <h3 style="margin:0 0 10px;font-size:18px;color:var(--text-dim);text-align:center">🤫 上帝专属日志</h3>
-      <div id="god-log-content" style="background:var(--panel-light);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:400px;overflow:auto;"></div>
+    <div id="god-log-area" style="margin-top:12px;">
+      <h3 style="margin:0 0 8px;font-size:16px;color:var(--text-dim);text-align:center">🤫 上帝专属日志</h3>
+      <div id="god-log-content" style="background:var(--panel-light);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:400px;overflow:auto;"></div>
     </div>
   </div>
 
 </div>
 
-<!-- 通知容器 -->
+<!-- 浮动通知 -->
 <div id="notification-container"></div>
 
 <!-- 日志模态 -->
@@ -377,13 +319,13 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
     <div class="modal-body">
       <div id="wolf-votes-display" class="info-box" style="margin-top:0;"></div>
       <div id="wolf-chat-area">
-        <div id="wolf-chat-messages" style="background:var(--panel-light);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:200px;overflow:auto;margin-bottom:10px;"></div>
+        <div id="wolf-chat-messages" style="background:var(--panel-light);border:1px solid var(--border);border-radius:12px;padding:8px;max-height:200px;overflow:auto;margin-bottom:10px;"></div>
         <div class="inline" style="justify-content:center">
-          <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)" />
+          <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)" />
           <button class="action-btn" data-action="wolf-send">发送</button>
         </div>
       </div>
-      <div class="info-box" id="wolf-modal-tips" style="margin-top:10px;"></div>
+      <div class="info-box" id="wolf-modal-tips" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -394,11 +336,11 @@ select:focus, input:focus{outline:none;border-color:rgba(139,92,246,.5)}
 
 <script>
 /* =========================================
-   双身份狼人杀 - V9.3
-   - 统一动画与样式；左右列更窄，字号与心形缩小，标题与核心信息居中
-   - 上警投票同步修复：投票写入附带时间戳；主持端始终有“强制计票”
-   - 第1夜强制天亮 => 上警
-   - 交互：点击玩家卡片选目标，高亮显示
+   双身份狼人杀 - V9.4
+   - 侧栏再缩窄到 ~60px（移动端 56px），玩家卡片极简化
+   - 修复：拍板狼确认后仍停留在选择状态 -> 清理选择并刷新；确保夜晚状态切换
+   - 上警：主持端新增“强制结束上警”（从上警意向直接进入发言/退水）
+   - 上警投票：仍保留强制计票和时间戳更新，避免不同步
 ========================================= */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
@@ -428,10 +370,10 @@ const App={
 
     if(this.gameId && this.playerId==='PLAYER_ID'){
       const app=document.querySelector('.app');
-      app.innerHTML=`<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:18px;animation:fade-up .3s;">
-        <h3 style="margin:0 0 10px;text-align:center">输入你的座位号</h3>
+      app.innerHTML=`<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:14px;animation:fade-up .3s;">
+        <h3 style="margin:0 0 8px;text-align:center">输入你的座位号</h3>
         <div class="info-box">请输入法官分配给你的座位号（数字），然后点击加入游戏。</div>
-        <div class="inline" style="justify-content:center"><input type="number" id="player-id-input" placeholder="座位号" style="width:160px"><button class="confirm-btn" id="join-game-btn">加入游戏</button></div>
+        <div class="inline" style="justify-content:center"><input type="number" id="player-id-input" placeholder="座位号" style="width:140px"><button class="confirm-btn" id="join-game-btn">加入游戏</button></div>
       </div>`;
       document.getElementById('join-game-btn').addEventListener('click',()=>{
         const id=document.getElementById('player-id-input').value;
@@ -451,7 +393,7 @@ const App={
 
   async startApp(){
     const snap=await db.ref(`games/${this.gameId}`).once('value');
-    if(!snap.exists()){ document.body.innerHTML='<h2 style="padding:20px;">游戏不存在或已损坏</h2>'; return; }
+    if(!snap.exists()){ document.body.innerHTML='<h2 style="padding:16px;">游戏不存在或已损坏</h2>'; return; }
     if(this.playerId==='0'){ this.showView('god'); this.listenToGameChanges(this.renderGodView.bind(this)); }
     else { this.showView('game'); this.listenToGameChanges(this.renderAll.bind(this)); this.listenToLogs(); }
   },
@@ -491,6 +433,7 @@ const App={
       case 'host-sheriff-elect-single': this.hostSheriffElectSingle(); return;
       case 'host-tally-sheriff': this.tallySheriffVotes(); return;
       case 'host-force-tally-sheriff': this.tallySheriffVotes(); return;
+      case 'host-force-end-cand': this.updatePhase('SHERIFF_SPEECH'); return; /* 新增：强制结束上警意向 */
       case 'host-day': this.processNight(); return;
       case 'host-force-day': {
         const round=this.gameState.round||1;
@@ -532,8 +475,8 @@ const App={
     const chat=this.$('wolf-chat-area');
     const tips=this.$('wolf-modal-tips');
     if(type==='regular'){ chat.classList.remove('hidden'); tips.textContent='提示：普通狼人可投票，拍板狼负责确认刀口。'; }
-    else if(type==='hidden'){ chat.classList.add('hidden'); tips.textContent='你是隐狼：可查看普通狼投票，但不能私聊与投票（若场上无普通狼，则由隐狼执行）。'; }
-    else { chat.classList.add('hidden'); tips.textContent='你不是狼人，无法使用狼窝。'; }
+    else if(type==='hidden'){ chat.classList.add('hidden'); tips.textContent='隐狼：可查看普通狼投票，但不能私聊与投票（无普通狼时由隐狼执行）。'; }
+    else { chat.classList.add('hidden'); tips.textContent='你不是狼人。'; }
     this.openModal('wolf-modal');
     this.initWolfListeners();
   },
@@ -559,28 +502,29 @@ const App={
   listenToGameChanges(render){
     if(this.gameListener) db.ref(`games/${this.gameId}`).off('value',this.gameListener);
     this.gameListener=db.ref(`games/${this.gameId}`).on('value',s=>{
-      if(!s.exists()){ document.body.innerHTML='<h2 style="padding:20px;">游戏已结束或不存在</h2>'; return; }
+      if(!s.exists()){ document.body.innerHTML='<h2 style="padding:16px;">游戏已结束或不存在</h2>'; return; }
       const g=s.val();
       this.fullGameData=g; this.gameState=g.state; this.allPlayers=g.players;
       if(this.playerId!=='0'){
-        if(!g.players || !g.players[this.playerId]){ document.body.innerHTML='<h2 style="padding:20px;">错误：你不是该游戏的玩家</h2>'; return; }
+        if(!g.players || !g.players[this.playerId]){ document.body.innerHTML='<h2 style="padding:16px;">错误：你不是该游戏的玩家</h2>'; return; }
         this.playerData=g.players[this.playerId];
         this.isHost=this.playerData.id==this.gameState.creatorId;
       }
       if(this.gameState.phase!=='NIGHT'){ this.stopWolfListeners(); this.closeModal('wolf-modal'); }
+      // 阶段变化时清空选择
       this.selection=null;
       render();
     });
   },
 
-  /* ===== 创建/设置 ===== */
+  /* 创建/设置 */
   renderRoleSetup(){
     const c=this.$('role-setup'); c.innerHTML='';
     Object.keys(DEFAULT_SETUP).forEach(name=>{
       const icon={'平民':'👤','守卫':'🛡️','白痴':'🤪','预言家':'🔮','骑士':'⚔️','女巫':'🧪','猎人':'🔫','狼人':'🐺','隐狼':'🌑','盗贼':'🎭'}[name]||'';
       const v=DEFAULT_SETUP[name];
       const div=document.createElement('div'); div.className='role-setup-item';
-      div.innerHTML=`<span><span style="margin-right:8px;font-size:18px">${icon}</span>${name}</span><input type="number" id="role-${name}" min="0" value="${v}">`;
+      div.innerHTML=`<span><span style="margin-right:6px;font-size:16px">${icon}</span>${name}</span><input type="number" id="role-${name}" min="0" value="${v}">`;
       c.appendChild(div);
     });
     const u=()=>{ let t=0; c.querySelectorAll('input').forEach(i=>t+=+i.value||0); this.$('total-roles').textContent=t; const pc=t>0 && t%2===0? t/2 : '身份总数必须为偶数'; this.$('player-cnt').textContent=pc; this.$('player-count-warning').textContent= typeof pc==='number' && pc>9 ? '(推荐≤9人)' : ''; };
@@ -603,7 +547,8 @@ const App={
     for(let i=1;i<=pc;i++){
       players[i]={id:i,identities:pairs[i-1],originalIdentities:JSON.parse(JSON.stringify(pairs[i-1])),deaths:0,isAlive:true,isReady:false,isExposedIdiot:false,skillStates:{},badge:0};
     }
-    const config={ pc,
+    const config={
+      pc,
       witchSelfSaveRule: this.$('opt-witch-selfsave').value,
       seerMode: this.$('opt-seer-mode').value,
       wolfWin: this.$('opt-wolf-win').value
@@ -619,7 +564,7 @@ const App={
     const base=`${location.origin}${location.pathname}`, url=`${base}?game=${gId}&player=PLAYER_ID`;
     info.innerHTML=`<div class="info-box" style="margin-top:0">将以下链接模板分发给玩家，将 PLAYER_ID 替换为座位号。</div>
       <div class="inline" style="justify-content:center"><input id="player-link-template" style="flex:1" value="${url}" readonly><button data-action="copy-link" data-inputid="player-link-template" class="control-btn">复制</button></div>
-      <div style="margin-top:10px;text-align:center;"><button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)进入</button></div>`;
+      <div style="margin-top:8px;text-align:center;"><button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)进入</button></div>`;
   },
   setupFail(msg){ const e=this.$('setup-error'); e.innerHTML=msg; e.classList.remove('hidden'); const btn=this.$('btn-create'); btn.disabled=false; this.$('create-text').classList.remove('hidden'); this.$('create-spinner').classList.add('hidden'); },
 
@@ -648,7 +593,7 @@ const App={
     return null;
   },
 
-  /* ===== 渲染 ===== */
+  /* 渲染 */
   renderAll(){
     this.$('host-badge').classList.toggle('hidden', !this.isHost);
     this.$('sheriff-badge-top').classList.toggle('hidden', !this.playerData?.badge);
@@ -656,8 +601,8 @@ const App={
     this.renderStatus();
     this.renderIdentityCard();
     this.renderPersistentInfo();
-    this.renderActionPanel(); // 先设选择模式
-    this.renderPlayerGrid();  // 再启用点击
+    this.renderActionPanel(); // 设选择模式
+    this.renderPlayerGrid();  // 启用点击
     if(this.isHost) this.renderHostControls();
 
     const myType=this.getViewerWolfType();
@@ -674,13 +619,13 @@ const App={
     const i=pd.identities, d=pd.deaths;
     const fmt=(id)=>`${ROLES[id.role].icon} ${id.isThiefCopy?`<span style="opacity:.8">${id.role}</span>`:id.role}`;
     this.$('identity-card').innerHTML=`
-      <div><strong style="font-size:16px;">你的身份</strong></div>
-      <div style="margin-top:8px;font-size:16px;">
+      <div><strong style="font-size:15px;">你的身份</strong></div>
+      <div style="margin-top:6px;font-size:15px;">
         ${d>=1?'<span style="opacity:.5;text-decoration:line-through">':''}${fmt(i[0])}${d>=1?'</span>':''}
-        <span style="margin:0 10px;">+</span>
+        <span style="margin:0 8px;">+</span>
         ${d>=2?'<span style="opacity:.5;text-decoration:line-through">':''}${fmt(i[1])}${d>=2?'</span>':''}
       </div>
-      ${this.gameState.phase==='SETUP'&&!pd.isReady?'<div class="inline" style="justify-content:center;margin-top:8px;"><button class="action-btn" data-action="swap-identities">交换</button><button class="confirm-btn" data-action="confirm-identities">确定</button></div>':''}
+      ${this.gameState.phase==='SETUP'&&!pd.isReady?'<div class="inline" style="justify-content:center;margin-top:6px;"><button class="action-btn" data-action="swap-identities">交换</button><button class="confirm-btn" data-action="confirm-identities">确定</button></div>':''}
     `;
   },
 
@@ -690,7 +635,7 @@ const App={
       const mode=this.fullGameData.config?.seerMode||'faction';
       const r=this.getGlobalSkillState('seerResults')||{};
       const l=Object.entries(r).map(([id,res])=>`${id}号(${this.escapeHTML(res)})`).join('、 ');
-      if(l) h+=`<div style="padding:10px;background:var(--panel-light);border-radius:12px;border:1px solid var(--border);text-align:center"><strong>🔮 查验历史(${mode==='faction'?'阵营':'身份'}):</strong> ${l}</div>`;
+      if(l) h+=`<div style="padding:8px;background:var(--panel-light);border-radius:12px;border:1px solid var(--border);text-align:center"><strong>🔮 查验历史(${mode==='faction'?'阵营':'身份'}):</strong> ${l}</div>`;
     }
     const el=this.$('persist'); el.innerHTML=h; el.classList.toggle('hidden', !h);
   },
@@ -707,7 +652,7 @@ const App={
       if(!viewerType) return false;
       const has=(pp,role)=> (pp.originalIdentities||pp.identities).some(x=>x.role===role);
       if(viewerType==='regular') return has(p,'狼人');
-      return has(p,'狼人'); // 隐狼也仅标记普通狼
+      return has(p,'狼人');
     };
 
     const selectable=(p)=>{
@@ -858,13 +803,17 @@ const App={
         else html+=`<div class="action-feedback">本条命毒药已用尽</div>`;
         panel.innerHTML=html; return;
       }
-      if(['狼人','隐狼'].includes(role) && ns.wolf==='pending'){
-        const can=this.canWolfAct(this.playerData);
-        this.setSelection('wolf-vote');
-        let html=`<div class="info-box">狼队行动：${can?'请选择刀口或空刀，并由拍板狼确认':'等待普通狼人行动'}</div>`;
-        html+=`<div class="inline" style="margin-top:6px;justify-content:center;"><button class="control-btn" data-action="open-wolf">打开狼窝</button></div>`;
-        html+=bar('今晚袭击目标',{allowSkip:true,skipText:'空刀'});
-        panel.innerHTML=html; return;
+      if(['狼人','隐狼'].includes(role)){
+        if(ns.wolf==='pending'){
+          const can=this.canWolfAct(this.playerData);
+          this.setSelection('wolf-vote');
+          let html=`<div class="info-box">狼队行动：${can?'请选择刀口或空刀，并由拍板狼确认':'等待普通狼人行动'}</div>`;
+          html+=`<div class="inline" style="margin-top:6px;justify-content:center;"><button class="control-btn" data-action="open-wolf">打开狼窝</button></div>`;
+          html+=bar('今晚袭击目标',{allowSkip:true,skipText:'空刀'});
+          panel.innerHTML=html; return;
+        }else{
+          panel.innerHTML=info('狼队已确定刀口，等待其他角色行动…'); return;
+        }
       }
       panel.innerHTML=info('等待其他角色行动...'); return;
     }
@@ -881,16 +830,15 @@ const App={
       case 'witch-poison': await this.witchUsePoison(t); break;
       case 'wolf-vote':
         if(!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){ this.showNotification('当前不可投票','error'); break; }
-        await db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(t); this.showNotification(`已投票：${t}号`,'success'); break;
+        await db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(t);
+        this.showNotification(`已投票：${t}号`,'success'); break;
       case 'day-vote': await db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set(t); break;
       case 'knight': await this.knight(t); break;
       case 'hunter': await this.hunter(t); break;
       case 'sheriff-vote':
-        // 修复：附带时间戳，确保主持端收到更新
         await db.ref(`games/${this.gameId}/sheriff/votes/${this.playerId}`).set(t);
         await db.ref(`games/${this.gameId}/sheriff/_lastUpdate`).set(firebase.database.ServerValue.TIMESTAMP);
-        this.showNotification(`已投警长：${t==='0'?'弃票':t+'号'}`,'success');
-        break;
+        this.showNotification(`已投警长：${t==='0'?'弃票':t+'号'}`,'success'); break;
       case 'sheriff-pass': await this.playerPassBadge(t); break;
     }
     this.clearSelection(); this.renderActionPanel(); this.renderPlayerGrid();
@@ -914,12 +862,12 @@ const App={
     this.clearSelection(); this.renderActionPanel(); this.renderPlayerGrid();
   },
 
-  /* ===== 主持人面板 ===== */
+  /* 主持人面板 */
   renderHostControls(){
     const el=this.$('host-controls'); el.classList.remove('hidden');
     const ph=this.gameState.phase;
     let h=``;
-    const renderStatus=(title,total,done)=>{ const p=total.filter(x=>done.includes(x.id)); const pending=total.filter(x=>!done.includes(x.id)); let s=`<div class="info-box">${title}：${p.length}/${total.length}</div>`; if(pending.length){ s+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:6px;">'; pending.forEach(pp=>s+=`<div style="background:var(--panel-light);border:1px solid var(--border);border-radius:10px;padding:6px 8px;font-size:12px;text-align:center;">${pp.id}号 待完成</div>`); s+='</div>'; } return s; };
+    const renderStatus=(title,total,done)=>{ const p=total.filter(x=>done.includes(x.id)); const pending=total.filter(x=>!done.includes(x.id)); let s=`<div class="info-box">${title}：${p.length}/${total.length}</div>`; if(pending.length){ s+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px;margin-top:6px;">'; pending.forEach(pp=>s+=`<div style="background:var(--panel-light);border:1px solid var(--border);border-radius:10px;padding:6px;font-size:12px;text-align:center;">${pp.id}号 待完成</div>`); s+='</div>'; } return s; };
 
     if(ph==='SETUP'){
       const tot=Object.values(this.allPlayers); const rdy=tot.filter(p=>p.isReady);
@@ -943,7 +891,10 @@ const App={
       const alive=Object.values(this.allPlayers).filter(p=>p.isAlive);
       const decided=alive.filter(p=>candVal(this.fullGameData,p.id)!=null);
       h+=renderStatus('上警意向',alive,decided);
-      h+=`<button class="control-btn" data-action="host-sheriff-speech" ${decided.length<alive.length?'disabled':''}>进入发言/退水</button>`;
+      h+=`<div class="inline" style="justify-content:center;margin-top:6px;">
+            <button class="control-btn" data-action="host-sheriff-speech" ${decided.length<alive.length?'disabled':''}>进入发言/退水</button>
+            <button class="action-btn" data-action="host-force-end-cand">强制结束上警</button>
+          </div>`;
     }
     if(ph==='SHERIFF_SPEECH'){
       const cand=this.fullGameData.sheriff?.candidates||{}; const drops=this.fullGameData.sheriff?.drops||{};
@@ -956,7 +907,6 @@ const App={
       const votedKeys=Object.keys(this.fullGameData.sheriff?.votes||{});
       const voted=votedKeys.map(id=>this.allPlayers[id]).filter(Boolean);
       h+=`<div class="info-box">投票进度：${voted.length}/${voters.length}</div>`;
-      // “统计”按钮按进度启用，“强制计票”始终提供，避免卡住
       h+=`<div class="inline" style="justify-content:center;margin-top:6px;">
             <button class="control-btn" data-action="host-tally-sheriff" ${voted.length<voters.length?'disabled':''}>📊 统计</button>
             <button class="action-btn" data-action="host-force-tally-sheriff">强制计票</button>
@@ -969,7 +919,7 @@ const App={
       if(open){
         const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
         const voted=Object.keys(this.fullGameData.dayVotes?.[this.gameState.round]||{}).map(id=>this.allPlayers[id]).filter(Boolean);
-        h+=`<div class="info-box" style="margin-top:8px;">投票进度：${voted.length}/${voters.length}</div>`;
+        h+=`<div class="info-box" style="margin-top:6px;">投票进度：${voted.length}/${voters.length}</div>`;
         h+=`<div class="inline" style="justify-content:center"><button class="control-btn" data-action="host-tally-day" ${voted.length<voters.length?'disabled':''}>📊 统计放逐票</button><button class="action-btn" data-action="host-force-tally-day">强制计票</button></div>`;
       }
     }
@@ -980,7 +930,7 @@ const App={
     el.innerHTML=h;
   },
 
-  /* ===== 上帝视角 ===== */
+  /* 上帝视角 */
   renderGodView(){
     const list=this.$('god-player-list'); list.innerHTML='';
     const f=(id)=>`${ROLES[id.role].icon} ${id.isThiefCopy?`<span class="thief-copy">${id.role}</span>`:id.role}`;
@@ -989,8 +939,8 @@ const App={
       const row=document.createElement('div');
       row.className=`god-row ${!p.isAlive?'dead-all':''}`;
       row.innerHTML=`
-        <div style="min-width:64px;font-weight:700;font-size:15px;">${p.id}号 ${p.badge?'👑':''}</div>
-        <div style="flex:1;display:flex;gap:8px;align-items:center;">
+        <div style="min-width:54px;font-weight:700;font-size:14px;">${p.id}号 ${p.badge?'👑':''}</div>
+        <div style="flex:1;display:flex;gap:6px;align-items:center;">
           <span class="${d>=1?'dead-identity':''}">${f(ids[0])}</span><span>+</span>
           <span class="${d>=2?'dead-identity':''}">${f(ids[1])}</span>
         </div>
@@ -1012,7 +962,7 @@ const App={
     godLog.scrollTop=godLog.scrollHeight;
   },
 
-  /* ===== 规则与技能 ===== */
+  /* 规则与技能 */
   async updatePhase(phase,round=null){
     const up={'state/phase':phase};
     if(round!==null) up['state/round']=round;
@@ -1113,6 +1063,7 @@ const App={
     }
   },
 
+  /* 狼队 */
   getViewerWolfType(){
     if(!this.playerData) return null;
     const has=(role)=> (this.playerData.originalIdentities||this.playerData.identities).some(x=>x.role===role);
@@ -1155,7 +1106,7 @@ const App={
         html+=`<div class="log-item">${w.id}号 ${isAlpha?'(拍板狼)':''} → ${vt}</div>`;
       });
       if(this.playerId===alpha && votes[alpha]!=null && this.gameState?.nightStatus?.wolf==='pending'){
-        const tgt=votes[alpha]; html+=`<div class="inline" style="margin-top:8px;justify-content:center;"><button class="confirm-btn" data-action="wolf-confirm" data-value="${tgt}">确认袭击 ${tgt==='0'?'空刀':tgt+'号'}</button></div>`;
+        const tgt=votes[alpha]; html+=`<div class="inline" style="margin-top:6px;justify-content:center;"><button class="confirm-btn" data-action="wolf-confirm" data-value="${tgt}">确认袭击 ${tgt==='0'?'空刀':tgt+'号'}</button></div>`;
       }
       display.innerHTML=html;
     };
@@ -1191,6 +1142,10 @@ const App={
           await this.addGameLog(`🐺 狼队决定袭击 ${targetId==='0'?'空刀':targetId+'号'} (由${this.playerId}号确认)`,true);
           await db.ref(`games/${this.gameId}/state/nightStatus`).transaction(st=>{ if(!st) return st; st.wolf='complete'; if(st.witch==='locked') st.witch='pending'; return st; });
           this.showNotification(`已确认袭击 ${targetId==='0'?'空刀':targetId+'号'}`,'success');
+          // 清理本地选择状态，刷新面板（防止仍显示“选择刀口”）
+          this.clearSelection(); this.renderActionPanel(); this.renderPlayerGrid();
+        }else{
+          this.showNotification('确认失败：已存在刀口或网络问题','error');
         }
       });
   },
@@ -1200,6 +1155,7 @@ const App={
     db.ref(`games/${this.gameId}/wolfChat`).push({pid:this.playerId,msg,ts:firebase.database.ServerValue.TIMESTAMP}); inp.value='';
   },
 
+  /* 上警 */
   async hostEnterSheriffVote(){
     const cand=this.fullGameData.sheriff?.candidates||{}, drops=this.fullGameData.sheriff?.drops||{};
     const valid=Object.keys(cand).filter(id=>cand[id] && !drops[id]);

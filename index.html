@@ -2,127 +2,760 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>双身份狼人杀 - 电子法官 (V9.2)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+<title>双身份狼人杀 - 电子法官 (V9.3)</title>
 <style>
 :root{
-  --bg:#0f1626;
-  --panel:#111827;
-  --border:#243b55;
+  --bg:linear-gradient(135deg, #0f1626 0%, #1a2332 100%);
+  --panel:#1a2332;
+  --panel-light:rgba(26,35,50,0.95);
+  --border:#2a3f5f;
+  --border-light:rgba(42,63,95,0.5);
   --accent:#e94560;
-  --text:#eaeaea;
-  --muted:#a2b1c3;
+  --accent-gradient:linear-gradient(135deg,#e94560 0%,#ff6b8a 100%);
+  --text:#f0f0f0;
+  --text-secondary:#b8c5d6;
+  --muted:#8394a7;
   --success:#00d9ff;
+  --success-light:rgba(0,217,255,0.15);
   --danger:#ff3366;
   --warning:#ffb700;
-  --shadow:0 10px 25px rgba(0,0,0,.35);
-  --radius:14px;
+  --shadow:0 12px 32px rgba(0,0,0,.4);
+  --shadow-sm:0 4px 12px rgba(0,0,0,.25);
+  --radius:16px;
   --gradient:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --gradient-gold:linear-gradient(135deg,#ffd700 0%,#ffed4e 100%);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif;
+  --transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
-.hidden{display:none!important}
-.app{max-width:1200px;margin:0 auto;padding:14px}
-h1{margin:0 0 8px;font-size:22px;letter-spacing:.5px;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.top-bar{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:10px}
-.top-left{display:flex;align-items:center;gap:10px}
-.top-right{display:flex;align-items:center;gap:8px}
-.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:rgba(0,217,255,.15);border:1px solid rgba(0,217,255,.35);color:var(--success)}
-button{background:var(--accent);color:#fff;border:none;padding:9px 14px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:600;transition:.2s}
-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(233,69,96,.35)}
-button:disabled{opacity:.6;cursor:not-allowed;background:#485063}
-button.control-btn{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}
-button.action-btn{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%)}
-button.confirm-btn{background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)}
-.inline{display:flex;gap:8px;align-items:center}
 
-/* 主布局：固定三列（左玩家列/中央区/右玩家列） */
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  padding:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+.hidden{display:none!important}
+
+.app{
+  max-width:1400px;
+  margin:0 auto;
+  padding:12px;
+}
+
+/* 顶部栏 */
+h1{
+  margin:0;
+  font-size:20px;
+  letter-spacing:1px;
+  background:var(--gradient);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 2px 8px rgba(102,126,234,0.3);
+}
+
+.top-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:12px;
+  padding:12px 16px;
+  background:var(--panel-light);
+  border-radius:var(--radius);
+  border:1px solid var(--border-light);
+  backdrop-filter:blur(10px);
+}
+
+.top-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.top-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.badge{
+  display:inline-block;
+  padding:5px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+  background:var(--success-light);
+  border:1px solid var(--success);
+  color:var(--success);
+  animation:glow 2s ease-in-out infinite;
+}
+
+@keyframes glow{
+  0%,100%{box-shadow:0 0 0 0 rgba(0,217,255,0)}
+  50%{box-shadow:0 0 12px 2px rgba(0,217,255,0.4)}
+}
+
+/* 按钮样式 */
+button{
+  background:var(--accent-gradient);
+  color:#fff;
+  border:none;
+  padding:10px 18px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:600;
+  transition:var(--transition);
+  position:relative;
+  overflow:hidden;
+}
+
+button::before{
+  content:'';
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:0;
+  height:0;
+  border-radius:50%;
+  background:rgba(255,255,255,0.3);
+  transform:translate(-50%,-50%);
+  transition:width 0.5s, height 0.5s;
+}
+
+button:active::before{
+  width:300px;
+  height:300px;
+}
+
+button:hover:not(:disabled){
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(233,69,96,.4);
+}
+
+button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  background:#485063;
+}
+
+button.control-btn{
+  background:var(--gradient);
+}
+
+button.action-btn{
+  background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);
+}
+
+button.confirm-btn{
+  background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);
+}
+
+.inline{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+/* 游戏布局 - 移动端优化 */
 #game-layout{
   display:grid;
-  grid-template-columns:minmax(128px,1fr) minmax(300px, 460px) minmax(128px,1fr);
   gap:12px;
   align-items:start;
 }
 
-/* 中央区：去边框的融合样式，仅整体面板一层背景 */
+/* 桌面端：三列布局 */
+@media (min-width:768px){
+  #game-layout{
+    grid-template-columns:minmax(180px,1fr) minmax(360px,520px) minmax(180px,1fr);
+  }
+}
+
+/* 移动端：单列布局 */
+@media (max-width:767px){
+  #game-layout{
+    grid-template-columns:1fr;
+  }
+  
+  .player-grid{
+    order:2;
+  }
+  
+  .center-panel{
+    order:1;
+  }
+  
+  #player-grid-right{
+    order:3;
+  }
+}
+
+/* 中央面板 */
 .center-panel{
-  background:var(--panel);
+  background:linear-gradient(135deg, var(--panel) 0%, rgba(26,35,50,0.98) 100%);
   border:1px solid var(--border);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
-  padding:12px;
+  padding:16px;
+  backdrop-filter:blur(12px);
 }
-#status-bar{font-weight:700;margin-bottom:8px}
-#identity-card{margin-bottom:8px}
-#persist{margin-bottom:8px}
-#action-panel{min-height:100px;margin-bottom:8px}
 
-/* 强调提示框（仅在需要显著区分的环节使用，如投票） */
-.info-box{background:rgba(0,217,255,.10);border:1px solid rgba(0,217,255,.35);padding:10px;border-radius:10px;margin:8px 0}
-.action-feedback{margin-top:8px;padding:10px;background:rgba(255,255,255,.03);border-radius:10px}
+#status-bar{
+  font-weight:700;
+  font-size:16px;
+  margin-bottom:12px;
+  padding:10px;
+  background:linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+  border-radius:12px;
+  border-left:4px solid var(--gradient);
+  background-image:var(--gradient);
+  background-size:4px 100%;
+  background-repeat:no-repeat;
+  background-position:left;
+}
 
-/* 创建/设置 */
-.role-setup-item{display:flex;justify-content:space-between;align-items:center;padding:10px;margin:8px 0;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px}
-select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)}
+#identity-card{
+  margin-bottom:12px;
+  padding:12px;
+  background:rgba(255,255,255,0.03);
+  border-radius:12px;
+  border:1px solid var(--border-light);
+}
 
-/* 玩家方格（紧凑方框，单列；左右各一列，节省横向空间） */
-.player-grid{display:grid;grid-template-columns:1fr;gap:8px}
-.player-card{
-  background:rgba(0,0,0,.22);
+#persist{
+  margin-bottom:12px;
+  padding:10px;
+  background:rgba(0,217,255,0.05);
+  border-radius:12px;
+  border:1px solid rgba(0,217,255,0.2);
+}
+
+#action-panel{
+  min-height:100px;
+  margin-bottom:12px;
+}
+
+/* 信息框美化 */
+.info-box{
+  background:linear-gradient(135deg, rgba(0,217,255,.08) 0%, rgba(0,217,255,.12) 100%);
+  border:1px solid rgba(0,217,255,.3);
+  padding:12px;
+  border-radius:12px;
+  margin:10px 0;
+  position:relative;
+  overflow:hidden;
+}
+
+.info-box::before{
+  content:'';
+  position:absolute;
+  top:-2px;
+  left:-2px;
+  right:-2px;
+  bottom:-2px;
+  background:linear-gradient(45deg, transparent, var(--success), transparent);
+  border-radius:12px;
+  opacity:0;
+  z-index:-1;
+  transition:opacity 0.3s;
+}
+
+.info-box:hover::before{
+  opacity:0.3;
+}
+
+.action-feedback{
+  margin-top:10px;
+  padding:12px;
+  background:rgba(255,255,255,.04);
+  border-radius:12px;
+  border-left:3px solid var(--accent);
+  font-size:14px;
+}
+
+/* 设置界面 */
+.role-setup-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  margin:10px 0;
+  background:linear-gradient(135deg, rgba(255,255,255,.03) 0%, rgba(255,255,255,.05) 100%);
   border:1px solid var(--border);
   border-radius:12px;
-  padding:8px;
-  display:flex;flex-direction:column;gap:6px;
-  transition:.15s;position:relative;min-height:64px
+  transition:var(--transition);
 }
-.player-card.me{outline:2px solid #6fd3ff;box-shadow:0 0 0 3px rgba(111,211,255,.25) inset}
-.player-card.disabled{opacity:.45;filter:grayscale(.3);pointer-events:none}
-.player-card.selected{border-color:#00d9ff;box-shadow:0 0 0 2px rgba(0,217,255,.35) inset}
-.row-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.tagline{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.num{font-size:18px;font-weight:800;min-width:22px;text-align:left}
-.tiny{font-size:12px;opacity:.9}
-.tag{font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid;opacity:.95}
-.tag-you{border-color:#6fd3ff;color:#6fd3ff;background:rgba(111,211,255,.12)}
-.tag-wolf{border-color:#ff4d4d;color:#ff8f8f;background:rgba(255,77,77,.12)}
-.tag-idiot{border-color:#ffb700;color:#ffb700;background:rgba(255,183,0,.12)}
-.hearts{display:flex;gap:3px}
-.heart{color:#ff4d6d;font-size:16px}
-.heart.off{color:#555}
-.kill-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:#00d9ff;box-shadow:0 0 8px rgba(0,217,255,.8);display:none}
-.player-card.selected .kill-dot{display:block}
 
-/* 浮动通知 */
-#notification-container{position:fixed;top:20px;right:20px;z-index:9999;width:300px}
-.notification{background:rgba(0,0,0,.6);color:var(--text);padding:12px 16px;border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow);border-left:5px solid var(--accent);animation:slideIn .35s ease,fadeOut .45s ease 4.55s forwards}
-.notification.success{border-left-color:var(--success)}
-.notification.error{border-left-color:var(--danger)}
-.notification.info{border-left-color:var(--warning)}
-@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-@keyframes fadeOut{from{opacity:1}to{opacity:0;transform:translateY(-20px)}}
+.role-setup-item:hover{
+  transform:translateX(4px);
+  border-color:var(--accent);
+  box-shadow:var(--shadow-sm);
+}
 
-/* 模态弹窗（日志/狼窝） */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:flex-end;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s ease}
-.modal.open{opacity:1;pointer-events:auto}
-.modal-content{width:min(640px,90vw);max-height:80vh;overflow:auto;margin:70px 16px 16px;background:rgba(0,0,0,.7);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);transform-origin:top right;transform:scale(.92) translateY(-8px);opacity:.7;transition:transform .2s ease, opacity .2s ease}
-.modal.open .modal-content{transform:scale(1) translateY(0);opacity:1}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.06);position:sticky;top:0}
-.modal-body{padding:12px}
-.log-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
-.log-item:last-child{border-bottom:none}
-.log-secret{color:var(--warning);font-style:italic}
+select, input[type=number], input[type=text]{
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  font-size:14px;
+  transition:var(--transition);
+}
 
-/* 上帝后台 */
-#god-player-list{display:grid;grid-template-columns:1fr;gap:10px}
-.god-row{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.2);padding:10px;border-radius:10px;border-left:4px solid var(--border)}
-.god-row.dead-all{opacity:.5;border-left-color:#555}
-.life-heart{color:#ff4d6d;font-size:18px}
-.life-heart.lost{color:#555}
-.dead-identity{text-decoration:line-through;opacity:.6}
-.thief-copy{color:#8ca0b3;font-style:italic;font-size:.9em}
+select:focus, input:focus{
+  outline:none;
+  border-color:var(--success);
+  box-shadow:0 0 0 3px rgba(0,217,255,0.1);
+}
 
-/* 不做三列折叠，始终保留左右两列和中间区域 */
+/* 玩家卡片 - 大幅美化 */
+.player-grid{
+  display:grid;
+  gap:10px;
+}
+
+/* 桌面端：单列 */
+@media (min-width:768px){
+  .player-grid{
+    grid-template-columns:1fr;
+  }
+}
+
+/* 移动端：双列以充分利用空间 */
+@media (max-width:767px){
+  .player-grid{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+
+.player-card{
+  background:linear-gradient(135deg, rgba(26,35,50,0.8) 0%, rgba(15,22,38,0.9) 100%);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  transition:var(--transition);
+  position:relative;
+  min-height:80px;
+  cursor:pointer;
+  overflow:hidden;
+}
+
+.player-card::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:2px;
+  background:var(--gradient);
+  transform:scaleX(0);
+  transition:transform 0.3s;
+}
+
+.player-card:hover::before{
+  transform:scaleX(1);
+}
+
+.player-card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 8px 24px rgba(0,0,0,0.3);
+  border-color:var(--accent);
+}
+
+.player-card.me{
+  background:linear-gradient(135deg, rgba(111,211,255,0.15) 0%, rgba(0,217,255,0.1) 100%);
+  border:2px solid #6fd3ff;
+  box-shadow:0 0 20px rgba(111,211,255,.3);
+}
+
+.player-card.disabled{
+  opacity:.4;
+  filter:grayscale(0.5);
+  pointer-events:none;
+  background:linear-gradient(135deg, rgba(72,80,99,0.3) 0%, rgba(52,58,72,0.3) 100%);
+}
+
+.player-card.selected{
+  border-color:#00d9ff;
+  background:linear-gradient(135deg, rgba(0,217,255,0.15) 0%, rgba(79,172,254,0.1) 100%);
+  box-shadow:0 0 0 3px rgba(0,217,255,.2), 0 8px 24px rgba(0,217,255,0.3);
+  transform:scale(1.05);
+}
+
+.row-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.tagline{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.num{
+  font-size:20px;
+  font-weight:800;
+  min-width:28px;
+  background:var(--gradient);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.tiny{
+  font-size:14px;
+  filter:drop-shadow(0 0 8px rgba(255,215,0,0.6));
+}
+
+.tag{
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:999px;
+  border:1px solid;
+  font-weight:600;
+  letter-spacing:0.5px;
+}
+
+.tag-you{
+  border-color:#6fd3ff;
+  color:#6fd3ff;
+  background:rgba(111,211,255,.15);
+  animation:pulse 2s infinite;
+}
+
+@keyframes pulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.05)}
+}
+
+.tag-wolf{
+  border-color:#ff4d4d;
+  color:#ff8f8f;
+  background:rgba(255,77,77,.15);
+}
+
+.tag-idiot{
+  border-color:#ffb700;
+  color:#ffb700;
+  background:rgba(255,183,0,.15);
+}
+
+.hearts{
+  display:flex;
+  gap:4px;
+  margin-top:4px;
+}
+
+.heart{
+  color:#ff4d6d;
+  font-size:18px;
+  filter:drop-shadow(0 0 4px rgba(255,77,109,0.5));
+  transition:var(--transition);
+}
+
+.heart.off{
+  color:#444;
+  filter:none;
+}
+
+.kill-dot{
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#00d9ff;
+  box-shadow:0 0 12px rgba(0,217,255,.9);
+  display:none;
+  animation:blink 1s infinite;
+}
+
+@keyframes blink{
+  0%,100%{opacity:1}
+  50%{opacity:0.3}
+}
+
+.player-card.selected .kill-dot{
+  display:block;
+}
+
+/* 通知优化 */
+#notification-container{
+  position:fixed;
+  top:20px;
+  right:20px;
+  z-index:9999;
+  width:320px;
+  max-width:90vw;
+}
+
+.notification{
+  background:linear-gradient(135deg, rgba(26,35,50,0.95) 0%, rgba(15,22,38,0.98) 100%);
+  color:var(--text);
+  padding:14px 18px;
+  border-radius:14px;
+  margin-bottom:12px;
+  box-shadow:var(--shadow);
+  border-left:4px solid var(--accent);
+  backdrop-filter:blur(12px);
+  animation:slideIn .4s cubic-bezier(0.68,-0.55,0.265,1.55), fadeOut .5s ease 4.5s forwards;
+}
+
+.notification.success{
+  border-left-color:var(--success);
+  background:linear-gradient(135deg, rgba(0,217,255,0.15) 0%, rgba(26,35,50,0.95) 100%);
+}
+
+.notification.error{
+  border-left-color:var(--danger);
+  background:linear-gradient(135deg, rgba(255,51,102,0.15) 0%, rgba(26,35,50,0.95) 100%);
+}
+
+.notification.info{
+  border-left-color:var(--warning);
+  background:linear-gradient(135deg, rgba(255,183,0,0.15) 0%, rgba(26,35,50,0.95) 100%);
+}
+
+@keyframes slideIn{
+  from{
+    transform:translateX(120%);
+    opacity:0;
+  }
+  to{
+    transform:translateX(0);
+    opacity:1;
+  }
+}
+
+@keyframes fadeOut{
+  from{opacity:1}
+  to{
+    opacity:0;
+    transform:translateY(-20px);
+  }
+}
+
+/* 模态弹窗美化 */
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.6);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9998;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s ease;
+  backdrop-filter:blur(8px);
+}
+
+.modal.open{
+  opacity:1;
+  pointer-events:auto;
+}
+
+.modal-content{
+  width:min(720px,90vw);
+  max-height:85vh;
+  overflow:auto;
+  margin:20px;
+  background:linear-gradient(135deg, rgba(26,35,50,0.98) 0%, rgba(15,22,38,0.99) 100%);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:0 24px 48px rgba(0,0,0,0.5);
+  transform:scale(0.9) translateY(20px);
+  opacity:0;
+  transition:all 0.3s cubic-bezier(0.68,-0.55,0.265,1.55);
+}
+
+.modal.open .modal-content{
+  transform:scale(1) translateY(0);
+  opacity:1;
+}
+
+.modal-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,.04);
+  position:sticky;
+  top:0;
+  z-index:10;
+  backdrop-filter:blur(10px);
+}
+
+.modal-body{
+  padding:16px;
+}
+
+.log-item{
+  padding:10px;
+  margin:6px 0;
+  border-radius:10px;
+  background:rgba(255,255,255,0.02);
+  border-left:3px solid var(--border);
+  font-size:14px;
+  transition:var(--transition);
+}
+
+.log-item:hover{
+  background:rgba(255,255,255,0.05);
+  transform:translateX(4px);
+}
+
+.log-secret{
+  color:var(--warning);
+  font-style:italic;
+  border-left-color:var(--warning);
+}
+
+/* 上帝后台美化 */
+#god-player-list{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+}
+
+.god-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  background:linear-gradient(135deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.35) 100%);
+  padding:12px;
+  border-radius:12px;
+  border-left:4px solid var(--border);
+  transition:var(--transition);
+}
+
+.god-row:hover{
+  transform:translateX(4px);
+  box-shadow:var(--shadow-sm);
+  background:linear-gradient(135deg, rgba(0,0,0,.3) 0%, rgba(0,0,0,.4) 100%);
+}
+
+.god-row.dead-all{
+  opacity:.45;
+  border-left-color:#555;
+  background:linear-gradient(135deg, rgba(72,80,99,0.2) 0%, rgba(52,58,72,0.2) 100%);
+}
+
+.life-heart{
+  color:#ff4d6d;
+  font-size:20px;
+  filter:drop-shadow(0 0 6px rgba(255,77,109,0.6));
+}
+
+.life-heart.lost{
+  color:#444;
+  filter:none;
+}
+
+.dead-identity{
+  text-decoration:line-through;
+  opacity:.5;
+}
+
+.thief-copy{
+  color:#8ca0b3;
+  font-style:italic;
+  font-size:.9em;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+}
+
+::-webkit-scrollbar-track{
+  background:rgba(255,255,255,0.02);
+  border-radius:4px;
+}
+
+::-webkit-scrollbar-thumb{
+  background:var(--border);
+  border-radius:4px;
+  transition:background 0.3s;
+}
+
+::-webkit-scrollbar-thumb:hover{
+  background:var(--accent);
+}
+
+/* 移动端额外优化 */
+@media (max-width:480px){
+  .app{
+    padding:8px;
+  }
+  
+  .top-bar{
+    flex-direction:column;
+    gap:8px;
+    align-items:stretch;
+    padding:10px;
+  }
+  
+  .top-left, .top-right{
+    justify-content:center;
+  }
+  
+  h1{
+    font-size:18px;
+    text-align:center;
+  }
+  
+  .player-grid{
+    grid-template-columns:1fr;
+  }
+  
+  .player-card{
+    padding:10px;
+    min-height:70px;
+  }
+  
+  button{
+    padding:10px 14px;
+    font-size:13px;
+  }
+  
+  .center-panel{
+    padding:12px;
+  }
+  
+  #notification-container{
+    top:10px;
+    right:10px;
+    left:10px;
+    width:auto;
+  }
+}
+
+/* 加载动画 */
+@keyframes spin{
+  from{transform:rotate(0deg)}
+  to{transform:rotate(360deg)}
+}
+
+#create-spinner{
+  animation:spin 1s linear infinite;
+  display:inline-block;
+}
 </style>
 </head>
 <body>
@@ -142,12 +775,12 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
   </div>
 
   <!-- 设置/创建 -->
-  <div id="setup-view" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;">
-    <h3 style="margin:0 0 8px;font-size:16px;color:var(--muted)">📋 身份配置</h3>
+  <div id="setup-view" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;">
+    <h3 style="margin:0 0 12px;font-size:18px;color:var(--text-secondary)">📋 身份配置</h3>
     <div id="game-creation-info" class="hidden"></div>
     <div id="role-setup"></div>
 
-    <h3 style="margin:12px 0 8px;font-size:16px;color:var(--muted)">⚙️ 规则选项</h3>
+    <h3 style="margin:16px 0 12px;font-size:18px;color:var(--text-secondary)">⚙️ 规则选项</h3>
     <div class="role-setup-item">
       <div>女巫自救规则</div>
       <div>
@@ -176,13 +809,13 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
       </div>
     </div>
 
-    <p style="text-align:center;font-size:15px;margin:10px 0;">
+    <p style="text-align:center;font-size:15px;margin:14px 0;">
       <span style="color:var(--warning)">总身份数: <strong id="total-roles">0</strong></span> |
       <span style="color:var(--success)">预计玩家数: <strong id="player-cnt">0</strong></span>
-      <small id="player-count-warning" style="color:var(--warning);display:block;"></small>
+      <small id="player-count-warning" style="color:var(--warning);display:block;margin-top:6px;"></small>
     </p>
-    <div id="setup-error" class="hidden" style="margin:10px 0;padding:12px;border-radius:12px;border:1px solid var(--danger);background:rgba(255,0,110,.1);"></div>
-    <div style="text-align:center;margin-top:10px;">
+    <div id="setup-error" class="hidden" style="margin:12px 0;padding:14px;border-radius:12px;border:1px solid var(--danger);background:rgba(255,0,110,.1);"></div>
+    <div style="text-align:center;margin-top:14px;">
       <button id="btn-create" class="control-btn" data-action="create-game">
         <span id="create-text">创建游戏</span>
         <span id="create-spinner" class="hidden" style="margin-left:8px;">⏳</span>
@@ -193,10 +826,10 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
   <!-- 游戏主界面 -->
   <div id="game-view" class="hidden">
     <div id="game-layout">
-      <!-- 左侧玩家方格（单列） -->
+      <!-- 左侧玩家方格 -->
       <div id="player-grid-left" class="player-grid"></div>
 
-      <!-- 中央融合面板（去掉子区域的边框与底色，仅保留必要强调提示） -->
+      <!-- 中央面板 -->
       <div class="center-panel">
         <div id="status-bar">等待游戏开始...</div>
         <div id="identity-card"></div>
@@ -205,18 +838,18 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
         <div id="host-controls" class="hidden"></div>
       </div>
 
-      <!-- 右侧玩家方格（单列） -->
+      <!-- 右侧玩家方格 -->
       <div id="player-grid-right" class="player-grid"></div>
     </div>
   </div>
 
   <!-- 上帝后台 -->
-  <div id="god-view" class="hidden" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;">
-    <h3 style="margin:0 0 8px;font-size:16px;color:var(--muted)">👑 上帝视角后台</h3>
+  <div id="god-view" class="hidden" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;">
+    <h3 style="margin:0 0 12px;font-size:18px;color:var(--text-secondary)">👑 上帝视角后台</h3>
     <div id="god-player-list"></div>
-    <div id="god-log-area" style="margin-top:12px;">
-      <h3 style="margin:0 0 8px;font-size:16px;color:var(--muted)">🤫 上帝专属日志</h3>
-      <div id="god-log-content" style="background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:360px;overflow:auto;"></div>
+    <div id="god-log-area" style="margin-top:16px;">
+      <h3 style="margin:0 0 12px;font-size:18px;color:var(--text-secondary)">🤫 上帝专属日志</h3>
+      <div id="god-log-content" style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:400px;overflow:auto;"></div>
     </div>
   </div>
 
@@ -229,7 +862,7 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
 <div id="logs-modal" class="modal">
   <div class="modal-content">
     <div class="modal-header">
-      <strong>📜 游戏日志</strong>
+      <strong style="font-size:16px;">📜 游戏日志</strong>
       <button class="control-btn" data-action="close-modal" data-target="logs-modal">关闭</button>
     </div>
     <div class="modal-body">
@@ -242,19 +875,19 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
 <div id="wolf-modal" class="modal">
   <div class="modal-content">
     <div class="modal-header">
-      <strong>🐺 狼窝</strong>
+      <strong style="font-size:16px;">🐺 狼窝</strong>
       <button class="control-btn" data-action="close-modal" data-target="wolf-modal">关闭</button>
     </div>
     <div class="modal-body">
       <div id="wolf-votes-display" class="info-box" style="margin-top:0;"></div>
       <div id="wolf-chat-area">
-        <div id="wolf-chat-messages" style="background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:10px;padding:10px;max-height:180px;overflow:auto;margin-bottom:8px;"></div>
+        <div id="wolf-chat-messages" style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:200px;overflow:auto;margin-bottom:10px;"></div>
         <div class="inline">
-          <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)" />
+          <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text)" />
           <button class="action-btn" data-action="wolf-send">发送</button>
         </div>
       </div>
-      <div class="info-box" id="wolf-modal-tips" style="margin-top:8px;"></div>
+      <div class="info-box" id="wolf-modal-tips" style="margin-top:10px;"></div>
     </div>
   </div>
 </div>
@@ -265,11 +898,12 @@ select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V9.2
-   - 修复 join-as-creator 传参 => 不再出现“游戏不存在或已损坏”。
-   - 第1夜“强制天亮”直达上警（SHERIFF_CAND），非第1夜仍结算夜晚。
-   - 玩家卡片为紧凑“方框”，左右各一列；点击可选择并高亮。
-   - 中央去边框融合风格，仅保留关键 info-box 强调。
+   双身份狼人杀 - V9.3
+   - UI大幅美化，移动端优化
+   - 修复 join-as-creator 传参 => 不再出现"游戏不存在或已损坏"。
+   - 第1夜"强制天亮"直达上警（SHERIFF_CAND），非第1夜仍结算夜晚。
+   - 玩家卡片为紧凑"方框"，移动端自适应；点击可选择并高亮。
+   - 中央融合风格，关键 info-box 强调。
    - 其余规则与前版一致（女巫自救/预言家模式/屠边或屠城/狼窝与拍板）。
 ========================================================== */
 
@@ -300,8 +934,8 @@ const App={
 
     if(this.gameId && this.playerId==='PLAYER_ID'){
       const app=document.querySelector('.app');
-      app.innerHTML=`<div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px;">
-        <h3 style="margin:0 0 8px;">输入你的座位号</h3>
+      app.innerHTML=`<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:20px;">
+        <h3 style="margin:0 0 12px;">输入你的座位号</h3>
         <div class="info-box">请输入法官分配给你的座位号（数字），然后点击加入游戏。</div>
         <div class="inline"><input type="number" id="player-id-input" placeholder="座位号" style="width:140px"><button class="confirm-btn" id="join-game-btn">加入游戏</button></div>
       </div>`;
@@ -323,7 +957,7 @@ const App={
 
   async startApp(){
     const snap=await db.ref(`games/${this.gameId}`).once('value');
-    if(!snap.exists()){ document.body.innerHTML='<h2 style="padding:18px;">游戏不存在或已损坏</h2>'; return; }
+    if(!snap.exists()){ document.body.innerHTML='<h2 style="padding:20px;">游戏不存在或已损坏</h2>'; return; }
     if(this.playerId==='0'){ this.showView('god'); this.listenToGameChanges(this.renderGodView.bind(this)); }
     else { this.showView('game'); this.listenToGameChanges(this.renderAll.bind(this)); this.listenToLogs(); }
   },
@@ -432,11 +1066,11 @@ const App={
   listenToGameChanges(render){
     if(this.gameListener) db.ref(`games/${this.gameId}`).off('value',this.gameListener);
     this.gameListener=db.ref(`games/${this.gameId}`).on('value',s=>{
-      if(!s.exists()){ document.body.innerHTML='<h2 style="padding:18px;">游戏已结束或不存在</h2>'; return; }
+      if(!s.exists()){ document.body.innerHTML='<h2 style="padding:20px;">游戏已结束或不存在</h2>'; return; }
       const g=s.val();
       this.fullGameData=g; this.gameState=g.state; this.allPlayers=g.players;
       if(this.playerId!=='0'){
-        if(!g.players || !g.players[this.playerId]){ document.body.innerHTML='<h2 style="padding:18px;">错误：你不是该游戏的玩家</h2>'; return; }
+        if(!g.players || !g.players[this.playerId]){ document.body.innerHTML='<h2 style="padding:20px;">错误：你不是该游戏的玩家</h2>'; return; }
         this.playerData=g.players[this.playerId];
         this.isHost=this.playerData.id==this.gameState.creatorId;
       }
@@ -453,7 +1087,7 @@ const App={
       const icon={'平民':'👤','守卫':'🛡️','白痴':'🤪','预言家':'🔮','骑士':'⚔️','女巫':'🧪','猎人':'🔫','狼人':'🐺','隐狼':'🌑','盗贼':'🎭'}[name]||'';
       const v=DEFAULT_SETUP[name];
       const div=document.createElement('div'); div.className='role-setup-item';
-      div.innerHTML=`<span><span style="margin-right:8px">${icon}</span>${name}</span><input type="number" id="role-${name}" min="0" value="${v}">`;
+      div.innerHTML=`<span><span style="margin-right:10px;font-size:18px;">${icon}</span>${name}</span><input type="number" id="role-${name}" min="0" value="${v}">`;
       c.appendChild(div);
     });
     const u=()=>{ let t=0; c.querySelectorAll('input').forEach(i=>t+=+i.value||0); this.$('total-roles').textContent=t; const pc=t>0 && t%2===0? t/2 : '身份总数必须为偶数'; this.$('player-cnt').textContent=pc; this.$('player-count-warning').textContent= typeof pc==='number' && pc>9 ? '(推荐≤9人)' : ''; };
@@ -493,7 +1127,7 @@ const App={
     const base=`${location.origin}${location.pathname}`, url=`${base}?game=${gId}&player=PLAYER_ID`;
     info.innerHTML=`<div class="info-box" style="margin-top:0">将以下链接模板分发给玩家，将 PLAYER_ID 替换为座位号。</div>
       <div class="inline"><input id="player-link-template" style="flex:1" value="${url}" readonly><button data-action="copy-link" data-inputid="player-link-template" class="control-btn">复制</button></div>
-      <div style="margin-top:8px;text-align:center;"><button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)进入</button></div>`;
+      <div style="margin-top:10px;text-align:center;"><button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)进入</button></div>`;
   },
   setupFail(msg){ const e=this.$('setup-error'); e.innerHTML=msg; e.classList.remove('hidden'); const btn=this.$('btn-create'); btn.disabled=false; this.$('create-text').classList.remove('hidden'); this.$('create-spinner').classList.add('hidden'); },
 
@@ -548,13 +1182,13 @@ const App={
     const i=pd.identities, d=pd.deaths;
     const fmt=(id)=>`${ROLES[id.role].icon} ${id.isThiefCopy?`<span style="opacity:.8">${id.role}</span>`:id.role}`;
     this.$('identity-card').innerHTML=`
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div><strong>你的身份</strong></div>
         ${this.gameState.phase==='SETUP'&&!pd.isReady?'<div class="inline"><button class="action-btn" data-action="swap-identities">交换</button><button class="confirm-btn" data-action="confirm-identities">确定</button></div>':''}
       </div>
-      <div style="margin-top:6px;font-size:16px;">
+      <div style="margin-top:8px;font-size:16px;">
         ${d>=1?'<span style="opacity:.5;text-decoration:line-through">':''}${fmt(i[0])}${d>=1?'</span>':''}
-        <span style="margin:0 10px;">+</span>
+        <span style="margin:0 12px;">+</span>
         ${d>=2?'<span style="opacity:.5;text-decoration:line-through">':''}${fmt(i[1])}${d>=2?'</span>':''}
       </div>`;
   },
@@ -574,8 +1208,21 @@ const App={
     const L=this.$('player-grid-left'), R=this.$('player-grid-right');
     L.innerHTML=''; R.innerHTML='';
     const list=Object.values(this.allPlayers).sort((a,b)=>a.id-b.id);
-    const half=Math.ceil(list.length/2);
-    const leftList=list.slice(0,half), rightList=list.slice(half);
+    
+    // 根据屏幕宽度调整分布
+    const isMobile = window.innerWidth <= 767;
+    let leftList, rightList;
+    
+    if(isMobile){
+      // 移动端：全部放在左侧（会自动变成双列或单列）
+      leftList = list;
+      rightList = [];
+    } else {
+      // 桌面端：平均分配
+      const half=Math.ceil(list.length/2);
+      leftList=list.slice(0,half);
+      rightList=list.slice(half);
+    }
 
     const viewerType=this.getViewerWolfType();
     const canSeeTeammate=(p)=>{
@@ -660,8 +1307,8 @@ const App={
     const info=(msg)=>`<div class="action-feedback">${this.escapeHTML(msg)}</div>`;
     const bar=(title,{confirmText='确认',skipText='跳过',allowSkip=true,allowCancel=true}={})=>{
       const tgt=this.selection?.targetId? `${this.selection.targetId}号` : '未选择';
-      return `<div class="info-box"><strong>${this.escapeHTML(title)}</strong><div style="margin-top:6px;">当前目标：<b>${tgt}</b></div></div>
-        <div class="inline" style="margin-top:8px;">
+      return `<div class="info-box"><strong>${this.escapeHTML(title)}</strong><div style="margin-top:8px;">当前目标：<b style="color:var(--success);font-size:16px;">${tgt}</b></div></div>
+        <div class="inline" style="margin-top:10px;">
           <button class="confirm-btn" data-action="confirm-selection" ${!this.selection?.targetId?'disabled':''}>${confirmText}</button>
           ${allowSkip?`<button class="control-btn" data-action="skip-selection">${skipText}</button>`:''}
           ${allowCancel?`<button class="action-btn" data-action="cancel-selection">取消</button>`:''}
@@ -729,8 +1376,8 @@ const App={
         const nightTarget=this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
         let html=`<div class="info-box">解药:${hasCure?'✅':'❌'} | 毒药:${hasPoison?'✅':'❌'}`;
         const selfRule=this.fullGameData.config?.witchSelfSaveRule||'noFirstNightSelfSave';
-        html+=`<div style="margin-top:6px;color:${selfRule==='noFirstNightSelfSave'?'#ffb700':'#6fd3ff'};font-size:13px;">规则：${selfRule==='noFirstNightSelfSave'?'首夜不能自救':'仅首夜可以自救'}</div></div>`;
-        if(hasCure && nightTarget && nightTarget!=='0') html+=`<div class="inline" style="margin:6px 0;"><button class="action-btn" onclick="App.witchTryCure('${nightTarget}')">💊 救 ${nightTarget}号</button></div>`;
+        html+=`<div style="margin-top:8px;color:${selfRule==='noFirstNightSelfSave'?'#ffb700':'#6fd3ff'};font-size:13px;">规则：${selfRule==='noFirstNightSelfSave'?'首夜不能自救':'仅首夜可以自救'}</div></div>`;
+        if(hasCure && nightTarget && nightTarget!=='0') html+=`<div class="inline" style="margin:8px 0;"><button class="action-btn" onclick="App.witchTryCure('${nightTarget}')">💊 救 ${nightTarget}号</button></div>`;
         if(hasPoison){ this.setSelection('witch-poison'); html+=bar('毒药：请选择目标',{allowSkip:true,skipText:'不使用毒药'}); }
         else html+=`<div class="action-feedback">本条命毒药已用尽</div>`;
         panel.innerHTML=html; return;
@@ -739,7 +1386,7 @@ const App={
         const can=this.canWolfAct(this.playerData);
         this.setSelection('wolf-vote');
         let html=`<div class="info-box">狼队行动：${can?'请选择刀口或空刀，并由拍板狼确认':'等待普通狼人行动'}</div>`;
-        html+=`<div class="inline" style="margin-top:6px;"><button class="control-btn" data-action="open-wolf">打开狼窝</button></div>`;
+        html+=`<div class="inline" style="margin-top:8px;"><button class="control-btn" data-action="open-wolf">打开狼窝</button></div>`;
         html+=bar('今晚袭击目标',{allowSkip:true,skipText:'空刀'});
         panel.innerHTML=html; return;
       }
@@ -787,12 +1434,12 @@ const App={
     const el=this.$('host-controls'); el.classList.remove('hidden');
     const ph=this.gameState.phase;
     let h=``;
-    const renderStatus=(title,total,done)=>{ const p=total.filter(x=>done.includes(x.id)); const pending=total.filter(x=>!done.includes(x.id)); let s=`<div class="info-box">${title}：${p.length}/${total.length}</div>`; if(pending.length){ s+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;">'; pending.forEach(pp=>s+=`<div style="background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:10px;padding:6px;font-size:12px;">${pp.id}号 未完成</div>`); s+='</div>'; } return s; };
+    const renderStatus=(title,total,done)=>{ const p=total.filter(x=>done.includes(x.id)); const pending=total.filter(x=>!done.includes(x.id)); let s=`<div class="info-box">${title}：${p.length}/${total.length}</div>`; if(pending.length){ s+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:8px;">'; pending.forEach(pp=>s+=`<div style="background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:10px;padding:8px;font-size:12px;text-align:center;">${pp.id}号 未完成</div>`); s+='</div>'; } return s; };
 
     if(ph==='SETUP'){
       const tot=Object.values(this.allPlayers); const rdy=tot.filter(p=>p.isReady);
       h+=renderStatus('玩家准备',tot,rdy);
-      if(rdy.length<tot.length) h+=`<button class="action-btn" data-action="host-force-start">强制开始</button>`;
+      if(rdy.length<tot.length) h+=`<button class="action-btn" data-action="host-force-start">强制开始</button> `;
       h+=`<button class="control-btn" data-action="host-start" ${rdy.length<tot.length?'disabled':''}>🚀 开始游戏</button>`;
     }
     if(ph==='NIGHT'){
@@ -800,10 +1447,10 @@ const App={
       const hasSheriff=Object.values(this.allPlayers).some(p=>p.badge);
       h+=`<div class="info-box">夜晚进度：${Object.values(ns).filter(s=>s==='complete').length} / ${Object.values(ns).length}</div>`;
       if(this.gameState.round===1 && !hasSheriff){
-        h+=`<button class="control-btn" data-action="host-sheriff-cand-init" ${!done?'disabled':''}>👑 开始上警</button>`;
+        h+=`<button class="control-btn" data-action="host-sheriff-cand-init" ${!done?'disabled':''}>👑 开始上警</button> `;
         h+=`<button class="action-btn" data-action="host-force-day">强制上警</button>`;
       }else{
-        if(!done) h+=`<button class="action-btn" data-action="host-force-day">强制天亮</button>`;
+        if(!done) h+=`<button class="action-btn" data-action="host-force-day">强制天亮</button> `;
         h+=`<button class="control-btn" data-action="host-day" ${!done?'disabled':''}>☀️ 天亮了(结算夜晚)</button>`;
       }
     }
@@ -816,14 +1463,14 @@ const App={
     if(ph==='SHERIFF_SPEECH'){
       const cand=this.fullGameData.sheriff?.candidates||{}; const drops=this.fullGameData.sheriff?.drops||{};
       const valid=Object.keys(cand).filter(id=>cand[id] && !drops[id]);
-      if(valid.length===1) h+=`<div class="info-box">独警：${valid[0]}号</div><button class="confirm-btn" data-action="host-sheriff-elect-single">直接当选</button>`;
+      if(valid.length===1) h+=`<div class="info-box">独警：${valid[0]}号</div><button class="confirm-btn" data-action="host-sheriff-elect-single">直接当选</button> `;
       h+=`<button class="control-btn" data-action="host-sheriff-vote">进入投票</button>`;
     }
     if(ph==='SHERIFF_VOTE'){
       const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
       const voted=Object.keys(this.fullGameData.sheriff?.votes||{}).map(id=>this.allPlayers[id]).filter(Boolean);
       h+=`<div class="info-box">投票进度：${voted.length}/${voters.length}</div>`;
-      h+=`<button class="control-btn" data-action="host-tally-sheriff" ${voted.length<voters.length?'disabled':''}>📊 统计</button>`;
+      h+=`<button class="control-btn" data-action="host-tally-sheriff" ${voted.length<voters.length?'disabled':''}>📊 统计</button> `;
       h+=`<button class="action-btn" data-action="host-force-tally-sheriff">强制计票</button>`;
     }
     if(ph==='DAY'){
@@ -833,8 +1480,8 @@ const App={
       if(open){
         const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
         const voted=Object.keys(this.fullGameData.dayVotes?.[this.gameState.round]||{}).map(id=>this.allPlayers[id]).filter(Boolean);
-        h+=`<div class="info-box" style="margin-top:8px;">投票进度：${voted.length}/${voters.length}</div>`;
-        h+=`<button class="control-btn" data-action="host-tally-day" ${voted.length<voters.length?'disabled':''}>📊 统计放逐票</button>`;
+        h+=`<div class="info-box" style="margin-top:10px;">投票进度：${voted.length}/${voters.length}</div>`;
+        h+=`<button class="control-btn" data-action="host-tally-day" ${voted.length<voters.length?'disabled':''}>📊 统计放逐票</button> `;
         h+=`<button class="action-btn" data-action="host-force-tally-day">强制计票</button>`;
       }
     }
@@ -842,7 +1489,7 @@ const App={
       h+=`<div class="info-box">警长已阵亡，等待移交或撕毁</div><button class="action-btn" data-action="host-force-badge-destroy">强制撕毁</button>`;
     }
     if(ph==='GAME_OVER'){ h+=`<div class="info-box">游戏结束</div>`; }
-    el.innerHTML=h;
+    el.innerHTML=`<div style="margin-top:10px;">${h}</div>`;
   },
 
   // 上帝视角
@@ -855,7 +1502,7 @@ const App={
       row.className=`god-row ${!p.isAlive?'dead-all':''}`;
       row.innerHTML=`
         <div style="min-width:60px;font-weight:700;">${p.id}号 ${p.badge?'👑':''}</div>
-        <div style="flex:1;display:flex;gap:8px;align-items:center;">
+        <div style="flex:1;display:flex;gap:10px;align-items:center;">
           <span class="${d>=1?'dead-identity':''}">${f(ids[0])}</span><span>+</span>
           <span class="${d>=2?'dead-identity':''}">${f(ids[1])}</span>
         </div>
@@ -1020,7 +1667,7 @@ const App={
         html+=`<div class="log-item">${w.id}号 ${isAlpha?'(拍板狼)':''} → ${vt}</div>`;
       });
       if(this.playerId===alpha && votes[alpha]!=null && this.gameState?.nightStatus?.wolf==='pending'){
-        const tgt=votes[alpha]; html+=`<div class="inline" style="margin-top:8px;"><button class="confirm-btn" data-action="wolf-confirm" data-value="${tgt}">确认袭击 ${tgt==='0'?'空刀':tgt+'号'}</button></div>`;
+        const tgt=votes[alpha]; html+=`<div class="inline" style="margin-top:10px;"><button class="confirm-btn" data-action="wolf-confirm" data-value="${tgt}">确认袭击 ${tgt==='0'?'空刀':tgt+'号'}</button></div>`;
       }
       display.innerHTML=html;
     };

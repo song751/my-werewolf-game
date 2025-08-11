@@ -1,9 +1,9 @@
-/* =========================================
+/* ========================================
    双身份狼人杀 - V10.0
    - 全新UI美化：统一视觉风格，增强交互体验
    - 优化动画效果：添加平滑过渡和微交互
    - 改进响应式设计：更好的移动端适配
-========================================= */
+======================================== */
 
 const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomain:"werewolf-game-master-1f37f.firebaseapp.com",databaseURL:"https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"werewolf-game-master-1f37f",storageBucket:"werewolf-game-master-1f37f.appspot.com",messagingSenderId:"626014452910",appId:"1:626014452910:web:35b6eba412f95f1878013f"};
 firebase.initializeApp(firebaseConfig);

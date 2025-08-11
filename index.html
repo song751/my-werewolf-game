@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
-  <title>双身份狼人杀 - 电子法官 (V10.0)</title>
+  <title>双身份狼人杀 - 电子法官 (V10.1)</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
@@ -28,9 +28,7 @@
         <button class="btn-icon" data-action="open-logs" title="游戏日志">
           <span class="btn-icon-emoji">📜</span>
         </button>
-        <button id="btn-wolf" class="btn-icon btn-wolf hidden" data-action="open-wolf" title="狼窝">
-          <span class="btn-icon-emoji">🐺</span>
-        </button>
+        <!-- 狼窝按钮已被移除 -->
       </div>
     </div>
   </div>
@@ -193,36 +191,7 @@
   </div>
 </div>
 
-<!-- 狼窝模态 -->
-<div id="wolf-modal" class="modal">
-  <div class="modal-overlay"></div>
-  <div class="modal-content modal-wolf">
-    <div class="modal-header">
-      <h3 class="modal-title">
-        <span class="modal-icon">🐺</span>
-        狼窝密谋
-      </h3>
-      <button class="modal-close" data-action="close-modal" data-target="wolf-modal">
-        <span>×</span>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div id="wolf-votes-display" class="wolf-votes-section"></div>
-      
-      <div id="wolf-chat-area" class="wolf-chat-section">
-        <div id="wolf-chat-messages" class="chat-messages"></div>
-        <div class="chat-input-wrapper">
-          <input id="wolf-chat-input" class="chat-input" placeholder="输入消息..." maxlength="120" />
-          <button class="btn-send" data-action="wolf-send">
-            <span>发送</span>
-          </button>
-        </div>
-      </div>
-      
-      <div id="wolf-modal-tips" class="wolf-tips"></div>
-    </div>
-  </div>
-</div>
+<!-- 狼窝模态框已被移除 -->
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>

@@ -1,183 +1,285 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>双身份狼人杀 - 电子法官 (V8.0)</title>
-
-<!-- ========= 视觉样式 (CSS) ========= -->
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>双身份狼人杀 - 电子法官 (V9.0)</title>
 <style>
 :root{
-    --bg:#1a1a2e;
-    --card:#16213e;
-    --border:#0f3460;
-    --accent:#e94560;
-    --text:#eaeaea;
-    --success:#00d9ff;
-    --danger:#ff006e;
-    --warning:#ffb700;
-    --gradient:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-    --shadow:0 10px 30px rgba(0,0,0,.3);
-    --font-main:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --bg:#0f1626;
+  --card:#171f2e;
+  --panel:#111827;
+  --border:#243b55;
+  --accent:#e94560;
+  --text:#eaeaea;
+  --muted:#a2b1c3;
+  --success:#00d9ff;
+  --danger:#ff3366;
+  --warning:#ffb700;
+  --shadow:0 10px 25px rgba(0,0,0,.35);
+  --radius:16px;
+  --radius-sm:12px;
+  --radius-lg:22px;
+  --gradient:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-main);line-height:1.6;min-height:100vh}
-body{display:flex;justify-content:center;align-items:flex-start;padding:20px;
- background-image:
- radial-gradient(circle at 20% 50%,rgba(233,69,96,.1)0%,transparent 50%),
- radial-gradient(circle at 80% 80%,rgba(0,217,255,.1)0%,transparent 50%)}
-#app{width:100%;max-width:900px;background:var(--card);border-radius:20px;padding:30px;box-shadow:var(--shadow);border:1px solid var(--border);animation:fadeIn .5s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform: translateY(0)}}
-h1,h2,h3{color:var(--text);margin-bottom:20px;text-align:center;letter-spacing:1px}
-h1{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:2em;margin-bottom:30px}
-h2{color:var(--success);font-size:1.5em;border-bottom:2px solid var(--border);padding-bottom:10px}
-h3{color:var(--warning);font-size:1.2em}
-hr{border:none;border-top:2px solid var(--border);margin:30px 0}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+a{color:inherit}
 .hidden{display:none!important}
-button{background:var(--accent);color:#fff;border:none;padding:12px 24px;border-radius:12px;cursor:pointer;font-size:16px;font-weight:600;margin:5px;transition:.3s all;position:relative;overflow:hidden}
-button::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;background:rgba(255,255,255,.2);border-radius:50%;transform:translate(-50%,-50%);transition:width .6s,height .6s}
-button:hover::before{width:300px;height:300px}
-button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 5px 20px rgba(233,69,96,.4)}
-button:disabled{background:#4a4a4a;cursor:not-allowed;opacity:.6}
-button.selected{background:var(--success)!important;box-shadow:0 5px 20px rgba(0,217,255,.4)}
+.app{max-width:1200px;margin:0 auto;padding:18px}
+h1{margin:0 0 12px;font-size:22px;letter-spacing:.5px;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.top-bar{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:10px}
+.top-left{display:flex;align-items:center;gap:12px}
+.top-right{display:flex;align-items:center;gap:8px}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:rgba(0,217,255,.15);border:1px solid rgba(0,217,255,.35);color:var(--success)}
+button{background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:600;transition:.25s;position:relative;overflow:hidden}
+button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(233,69,96,.35)}
+button:disabled{opacity:.6;cursor:not-allowed;background:#485063}
 button.control-btn{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}
 button.action-btn{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%)}
 button.confirm-btn{background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)}
-input[type=number],input[type=text],input[type=password]{width:80px;padding:10px;border-radius:10px;border:2px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);font-size:16px;text-align:center;transition:.3s all}
-input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,.1)}
-.role-setup-item{display:flex;justify-content:space-between;align-items:center;padding:15px;margin:10px 0;background:rgba(255,255,255,.03);border-radius:12px;transition:.3s all;border:1px solid transparent}
-.player-list-item{display:flex;justify-content:space-between;align-items:center;padding:15px 20px;margin:12px 0;background:rgba(255,255,255,.05);border-radius:15px;transition:.3s all;border:2px solid transparent}
-.player-list-item.dead{opacity:.7;background:rgba(255,0,110,.1)}
-.player-list-item.dead-all{opacity:.4;background:rgba(100,100,100,.1);text-decoration:line-through}
-.player-list-item.exposed-idiot { border-left: 4px solid var(--warning); padding-left: 16px; }
-.life-heart{color:var(--danger);font-size:24px;transition:.3s all;text-shadow:0 0 10px rgba(255,0,110,.5)}
-.life-heart.lost{color:#555;text-shadow:none}
-.thief-copy{color:#888;font-style:italic;font-size:.9em}
-.dead-identity{text-decoration:line-through;opacity:.6}
-.action-panel{max-height: 40vh; overflow-y: auto;}
-.action-feedback{margin-top:25px;padding:20px;background:rgba(255,255,255,.03);border-radius:15px;text-align:center;border:1px solid var(--border)}
-.game-over-banner{padding:40px;text-align:center;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:20px;font-size:28px;font-weight:bold;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-.game-over-banner.bad{background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%)}
-.role-icon{display:inline-block;width:30px;height:30px;margin-right:10px;text-align:center;line-height:30px;border-radius:50%;background:rgba(255,255,255,.1)}
-.loading-spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:var(--accent);animation:spin 1s infinite ease-in-out}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-.identity-card{background:rgba(255,255,255,.05);padding:20px;border-radius:15px;margin:10px 0;border:2px solid var(--border);transition:.3s all}
-#host-controls {text-align: center; margin: 20px 0; background: rgba(0,217,255,0.1); padding: 20px; border-radius: 15px; border: 1px solid var(--success);}
-#god-player-list { display: flex; flex-direction: column; gap: 12px; }
-.god-player-row { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border-left: 4px solid var(--border); transition: all .3s ease; flex-wrap: wrap; }
-.god-player-row.dead-all { opacity: 0.5; background: rgba(100,100,100,0.1); border-left-color: #555; }
-.god-player-row .player-id { font-weight: bold; font-size: 1.4em; min-width: 60px; }
-.god-player-row .player-health { min-width: 60px; }
-.god-player-row .player-identities { display: flex; align-items: center; gap: 10px; font-size: 1.1em; flex-grow: 1; }
-.god-player-row .player-status-tags { font-size: 0.9em; color: var(--warning); }
-.status-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;}
-.status-item {background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; transition: all .3s ease;}
-.status-item.pending {background: rgba(255,183,0,0.2); color: var(--warning);}
-.info-box{background:rgba(0,217,255,.1);border:1px solid var(--success);padding:15px;border-radius:10px;margin:15px 0}
-.error-box{background:rgba(255,0,110,.1);border:1px solid var(--danger);padding:15px;border-radius:10px;margin:15px 0;color:var(--danger)}
-.setup-error{background:rgba(255,0,110,.1);border:2px solid var(--danger);padding:20px;border-radius:15px;margin:20px 0;text-align:center}
+
+/* 布局 */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+#game-layout{display:grid;grid-template-columns:1fr minmax(300px, 420px) 1fr;gap:16px;align-items:start}
+.section-title{font-size:14px;color:var(--muted);letter-spacing:.5px;margin:0 0 8px}
+
+/* 玩家网格（左右两列） */
+.player-column{display:grid;grid-template-columns:1fr;gap:10px}
+.player-card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;transition:.2s;position:relative
+}
+.player-card:hover{border-color:#315a86}
+.player-card.me{outline:2px solid #6fd3ff;box-shadow:0 0 0 3px rgba(111,211,255,.25) inset}
+.player-card.disabled{opacity:.45;filter:grayscale(.3);pointer-events:none}
+.player-card.selected{border-color:#00d9ff;box-shadow:0 0 0 2px rgba(0,217,255,.35) inset}
+.player-main{display:flex;align-items:center;gap:10px}
+.player-number{font-size:20px;font-weight:800;min-width:34px;text-align:center}
+.player-badge{font-size:18px}
+.player-tags{display:flex;align-items:center;gap:6px}
+.tag{font-size:11px;padding:2px 6px;border-radius:999px;border:1px solid;opacity:.9}
+.tag-you{border-color:#6fd3ff;color:#6fd3ff;background:rgba(111,211,255,.12)}
+.tag-wolf{border-color:#ff4d4d;color:#ff8f8f;background:rgba(255,77,77,.12)}
+.tag-idiot{border-color:#ffb700;color:#ffb700;background:rgba(255,183,0,.12)}
+.life{display:flex;gap:3px}
+.heart{color:#ff4d6d;font-size:18px}
+.heart.off{color:#555}
+.kill-dot{position:absolute;top:6px;right:8px;width:8px;height:8px;border-radius:50%;background:#00d9ff;box-shadow:0 0 8px rgba(0,217,255,.8);display:none}
+.player-card.selected .kill-dot{display:block}
+
+/* 中央操作区 */
+.center-panel{padding:12px}
+#status-bar{padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-align:center;margin-bottom:10px;font-weight:600}
+#identity-card{padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border);margin-bottom:10px}
+#persist{padding:10px;border-radius:10px;background:rgba(0,217,255,.08);border:1px solid rgba(0,217,255,.35);margin-bottom:10px}
+#host-controls{padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border);margin-top:10px}
+#action-panel{padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border);margin-bottom:10px;min-height:120px}
+
+.info-box{background:rgba(0,217,255,.08);border:1px solid rgba(0,217,255,.35);padding:10px;border-radius:10px;margin:8px 0}
+.action-feedback{margin-top:10px;padding:10px;background:rgba(255,255,255,.03);border-radius:10px;text-align:center;border:1px solid var(--border)}
+
+/* 设置区 */
+.role-setup-item{display:flex;justify-content:space-between;align-items:center;padding:10px;margin:8px 0;background:rgba(255,255,255,.03);border-radius:12px;border:1px solid var(--border)}
+.inline{display:flex;gap:8px;align-items:center}
+select, input[type=number], input[type=text]{padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)}
+
+/* 浮动通知 */
 #notification-container{position:fixed;top:20px;right:20px;z-index:9999;width:300px}
-.notification{background:var(--card);color:var(--text);padding:15px 20px;border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow);border-left:5px solid var(--accent);animation:slideIn .5s ease,fadeOut .5s ease 4.5s forwards}
+.notification{background:var(--card);color:var(--text);padding:12px 16px;border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow);border-left:5px solid var(--accent);animation:slideIn .35s ease,fadeOut .45s ease 4.55s forwards}
 .notification.success{border-left-color:var(--success)}
 .notification.error{border-left-color:var(--danger)}
 .notification.info{border-left-color:var(--warning)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes fadeOut{from{opacity:1}to{opacity:0;transform:translateY(-20px)}}
-#game-log-area, #god-log-area {margin-top:20px;max-height: 300px; overflow-y:auto;padding:15px;background:rgba(0,0,0,0.2);border-radius:10px;border:1px solid var(--border)}
-#game-log-area h3, #god-log-area h3 {margin-top:0;font-size:1.1em;color:var(--success)}
-#game-log-content p, #god-log-content p {margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05)}
-#game-log-content p:last-child, #god-log-content p:last-child {border-bottom:none;margin-bottom:0}
-#wolf-chat-messages p { margin: 0 0 5px; padding: 0; border: none; }
-#wolf-chat-messages p:last-child { margin-bottom: 0; }
-#game-creation-info { padding: 20px; background: rgba(0,217,255,0.1); border-radius: 15px; }
-#game-creation-info .link-container { display: flex; align-items: center; margin-bottom: 10px; }
-#game-creation-info input { flex-grow: 1; text-align: left; padding: 15px; margin-bottom: 0; margin-right: 10px; }
 
+/* 模态弹窗（日志/狼窝） */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:flex-end;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.modal.open{opacity:1;pointer-events:auto}
+.modal-content{width:min(640px,90vw);max-height:80vh;overflow:auto;margin:70px 18px 18px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);transform-origin:top right;transform:scale(.92) translateY(-8px);opacity:.7;transition:transform .2s ease, opacity .2s ease}
+.modal.open .modal-content{transform:scale(1) translateY(0);opacity:1}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.03);position:sticky;top:0}
+.modal-body{padding:12px}
+.log-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+.log-item:last-child{border-bottom:none}
+.log-secret{color:var(--warning);font-style:italic}
+
+/* 上帝后台 */
+#god-player-list{display:grid;grid-template-columns:1fr;gap:10px}
+.god-row{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.2);padding:10px;border-radius:10px;border-left:4px solid var(--border)}
+.god-row.dead-all{opacity:.5;border-left-color:#555}
+.life-heart{color:#ff4d6d;font-size:18px}
+.life-heart.lost{color:#555}
+.dead-identity{text-decoration:line-through;opacity:.6}
+.thief-copy{color:#8ca0b3;font-style:italic;font-size:.9em}
+
+/* 响应式 */
+@media(max-width:900px){
+  #game-layout{grid-template-columns:1fr;gap:12px}
+  .player-column{grid-template-columns:1fr 1fr}
+}
 @media(max-width:600px){
-    #app{padding:20px}
-    h1{font-size:1.5em}
-    button{padding:10px 16px;font-size:14px}
-    #notification-container{width:auto;left:20px;right:20px}
+  .player-column{grid-template-columns:1fr}
+  .top-right{gap:6px}
+  button{padding:9px 12px;font-size:13px}
 }
 </style>
 </head>
 <body>
-<div id="app">
-    <h1 id="game-title">🌙 双身份狼人杀</h1>
+<div class="app">
 
-    <div id="setup-view">
-        <h2>📋 身份配置</h2>
-        <div id="game-creation-info" class="hidden"></div>
-        <div id="role-setup"></div>
-        <p style="text-align:center;font-size:18px;">
-            <span style="color:var(--warning)">总身份数: <strong id="total-roles">0</strong></span> |
-            <span style="color:var(--success)">预计玩家数: <strong id="player-cnt">0</strong></span>
-            <small id="player-count-warning" style="color:var(--warning);display:block;"></small>
-        </p>
-        <div id="setup-error" class="setup-error hidden"></div>
-        <div style="text-align:center;margin-top:20px;">
-            <button id="btn-create" class="control-btn" data-action="create-game">
-                <span id="create-text">创建游戏</span>
-                <span id="create-spinner" class="loading-spinner hidden"></span>
-            </button>
-        </div>
+  <!-- 顶部栏 -->
+  <div class="top-bar">
+    <div class="top-left">
+      <h1>🌙 双身份狼人杀</h1>
+      <span id="host-badge" class="badge hidden">主持</span>
+      <span id="sheriff-badge-top" class="badge hidden">👑 警长</span>
+    </div>
+    <div class="top-right">
+      <button id="btn-logs" class="control-btn" data-action="open-logs">📜 日志</button>
+      <button id="btn-wolf" class="action-btn hidden" data-action="open-wolf">🐺 狼窝</button>
+    </div>
+  </div>
+
+  <!-- 视图1：创建/设置 -->
+  <div id="setup-view" class="panel" style="padding:14px;">
+    <h3 class="section-title">📋 身份配置</h3>
+    <div id="game-creation-info" class="hidden"></div>
+    <div id="role-setup"></div>
+
+    <h3 class="section-title" style="margin-top:12px;">⚙️ 规则选项</h3>
+    <div class="role-setup-item">
+      <div>女巫自救规则</div>
+      <div>
+        <select id="opt-witch-selfsave">
+          <option value="noFirstNightSelfSave">首夜不能自救</option>
+          <option value="onlyFirstNightSelfSave">仅首夜可以自救</option>
+        </select>
+      </div>
+    </div>
+    <div class="role-setup-item">
+      <div>预言家查验模式</div>
+      <div>
+        <select id="opt-seer-mode">
+          <option value="faction">查阵营（第二张为狼也判为狼人；隐狼判好人）</option>
+          <option value="identity">查身份（只看当前生效身份）</option>
+        </select>
+      </div>
+    </div>
+    <div class="role-setup-item">
+      <div>狼人胜利条件</div>
+      <div>
+        <select id="opt-wolf-win">
+          <option value="edge">屠边（全金宝宝或全神职出局）</option>
+          <option value="exterminate">屠城（所有好人出局）</option>
+        </select>
+      </div>
     </div>
 
-    <div id="game-view" class="hidden">
-        <div id="player-info">
-            <h2 id="pid-show"></h2>
-            <h3>你的身份是:</h3>
-            <div id="my-ids" class="identity-card"></div>
-            <div id="swap-area" class="hidden">
-                <p style="text-align:center;color:var(--warning)">游戏开始前，你可以交换两个身份的顺序。当前生效的身份是第一个。</p>
-                <div style="text-align:center;">
-                    <button data-action="swap-identities" class="action-btn">🔄 交换顺序</button>
-                    <button data-action="confirm-identities" class="confirm-btn">✅ 确定身份顺序</button>
-                </div>
-            </div>
-        </div>
-        <hr>
-        <div id="game-area">
-            <div id="player-status" style="text-align:center;font-size:20px;font-weight:bold;padding:15px;background:rgba(255,255,255,.05);border-radius:15px;margin-bottom:20px;">等待游戏开始...</div>
-            <div id="host-controls" class="hidden"></div>
-            <div id="persist" class="hidden"></div>
-            <div id="action-panel"></div>
-            <div id="wolf-chat-area" class="hidden"></div>
-            <h3>👥 玩家列表</h3>
-            <div id="player-list"></div>
-            <div id="game-log-area" class="hidden">
-                <h3>📜 游戏日志</h3>
-                <div id="game-log-content"></div>
-            </div>
-        </div>
+    <p style="text-align:center;font-size:15px;margin:10px 0;">
+      <span style="color:var(--warning)">总身份数: <strong id="total-roles">0</strong></span> |
+      <span style="color:var(--success)">预计玩家数: <strong id="player-cnt">0</strong></span>
+      <small id="player-count-warning" style="color:var(--warning);display:block;"></small>
+    </p>
+    <div id="setup-error" class="hidden" style="margin:10px 0;padding:12px;border-radius:12px;border:1px solid var(--danger);background:rgba(255,0,110,.1);"></div>
+    <div style="text-align:center;margin-top:10px;">
+      <button id="btn-create" class="control-btn" data-action="create-game">
+        <span id="create-text">创建游戏</span>
+        <span id="create-spinner" class="hidden" style="margin-left:8px;">⏳</span>
+      </button>
     </div>
+  </div>
 
-    <div id="god-view" class="hidden">
-        <h2>👑 上帝视角后台</h2>
-        <div id="god-player-list"></div>
-        <div id="god-log-area" class="hidden">
-            <h3>🤫 上帝专属日志 (含夜晚信息)</h3>
-            <div id="god-log-content"></div>
-        </div>
+  <!-- 视图2：游戏主界面 -->
+  <div id="game-view" class="hidden">
+    <div id="game-layout">
+
+      <!-- 左侧玩家列 -->
+      <div class="player-column panel" id="player-col-left" style="padding:10px;">
+        <h3 class="section-title">👥 玩家</h3>
+        <div id="player-grid-left"></div>
+      </div>
+
+      <!-- 中央操作区 -->
+      <div class="center-panel panel">
+        <div id="status-bar">等待游戏开始...</div>
+        <div id="identity-card"></div>
+        <div id="persist" class="hidden"></div>
+        <div id="action-panel"></div>
+        <div id="host-controls" class="hidden"></div>
+      </div>
+
+      <!-- 右侧玩家列 -->
+      <div class="player-column panel" id="player-col-right" style="padding:10px;">
+        <h3 class="section-title">👥 玩家</h3>
+        <div id="player-grid-right"></div>
+      </div>
+
     </div>
+  </div>
+
+  <!-- 视图3：上帝后台 -->
+  <div id="god-view" class="hidden panel" style="padding:14px;">
+    <h3 class="section-title">👑 上帝视角后台</h3>
+    <div id="god-player-list"></div>
+    <div id="god-log-area" style="margin-top:12px;">
+      <h3 class="section-title">🤫 上帝专属日志</h3>
+      <div id="god-log-content" class="panel" style="padding:10px;max-height:360px;overflow:auto;"></div>
+    </div>
+  </div>
+
 </div>
+
+<!-- 浮动通知 -->
 <div id="notification-container"></div>
 
+<!-- 日志模态 -->
+<div id="logs-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <strong>📜 游戏日志</strong>
+      <button class="control-btn" data-action="close-modal" data-target="logs-modal">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div id="game-log-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 狼窝模态（投票与聊天） -->
+<div id="wolf-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <strong>🐺 狼窝</strong>
+      <button class="control-btn" data-action="close-modal" data-target="wolf-modal">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div id="wolf-votes-display" class="info-box" style="margin-top:0;"></div>
+      <div id="wolf-chat-area">
+        <div id="wolf-chat-messages" class="panel" style="padding:10px;max-height:180px;overflow:auto;margin-bottom:8px;"></div>
+        <div class="inline">
+          <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)" />
+          <button class="action-btn" data-action="wolf-send">发送</button>
+        </div>
+      </div>
+      <div class="info-box" id="wolf-modal-tips" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
 /* ==========================================================
-   双身份狼人杀 - V8.0
-   变更要点：
-   - 盗贼复制为完全复制：双狼/双预言家/双女巫等均可用技能（禁：双隐狼、隐狼+狼）。
-   - 上帝视角包含夜晚秘密日志；玩家日志去重，保留浮动通知。
-   - 预言家查阵营：只要两张牌里有“狼人”则验出“狼人”；隐狼被验为“好人”。
-   - 白天投票需主持人手动开启；开启后骑士禁用。
-   - 警长若最终独警（退水后只剩1人）直接当选。
-   - 狼队拍板与投票权限收紧；猎人队列与回流阶段稳定。
-   - classList 调用修复。
+   双身份狼人杀 - V9.0
+   - UI双列玩家卡片，点击卡片选人，中间统一确认/跳过。
+   - 日志弹窗，点击外部关闭；狼窝弹窗（聊天+投票）。
+   - 规则选项：女巫自救（两模式）、预言家查验（阵营/身份）、狼人胜利（屠城/屠边）。
+   - 狼队可见性：隐狼看得到普通狼人；普通狼人看不到隐狼；狼在第二张也能被队友识别，但非当前生效时不能聊天/投票/拍板。
+   - 上帝后台仅显示 identities 顺序。
    ========================================================== */
 
 // Firebase
@@ -185,1141 +287,1119 @@ const firebaseConfig={apiKey:"AIzaSyCEAgB6DoY8YA6lZnYblhIDVTYH_q8UimI",authDomai
 firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
-// 角色
-const ROLES={
- '平民':{name:'平民',faction:'good',isGod:false,icon:'👤'},
- '守卫':{name:'守卫',faction:'good',isGod:true,icon:'🛡️'},
- '白痴':{name:'白痴',faction:'good',isGod:true,icon:'🤪'},
- '预言家':{name:'预言家',faction:'good',isGod:true,icon:'🔮'},
- '骑士':{name:'骑士',faction:'good',isGod:true,icon:'⚔️'},
- '隐狼':{name:'隐狼',faction:'bad',isGod:false,isInvisible:true,icon:'🌑'},
- '女巫':{name:'女巫',faction:'good',isGod:true,icon:'🧪'},
- '猎人':{name:'猎人',faction:'good',isGod:true,icon:'🔫'},
- '狼人':{name:'狼人',faction:'bad',isGod:false,icon:'🐺'},
- '盗贼':{name:'盗贼',faction:'neutral',isGod:false,isThief:true,icon:'🎭'}
-};
+// 角色与默认配置
+const ROLES={'平民':{faction:'good',isGod:false,icon:'👤'},'守卫':{faction:'good',isGod:true,icon:'🛡️'},'白痴':{faction:'good',isGod:true,icon:'🤪'},'预言家':{faction:'good',isGod:true,icon:'🔮'},'骑士':{faction:'good',isGod:true,icon:'⚔️'},'隐狼':{faction:'bad',isGod:false,isInvisible:true,icon:'🌑'},'女巫':{faction:'good',isGod:true,icon:'🧪'},'猎人':{faction:'good',isGod:true,icon:'🔫'},'狼人':{faction:'bad',isGod:false,icon:'🐺'},'盗贼':{faction:'neutral',isGod:false,isThief:true,icon:'🎭'}};
 const DEFAULT_SETUP={'平民':6,'守卫':1,'白痴':1,'预言家':1,'骑士':1,'女巫':1,'猎人':1,'狼人':2,'隐狼':1,'盗贼':1};
-
-// 禁配（原始对与最终对都要检查）
-const FORBIDDEN_RAW=[
-  ['预言家','狼人'],
-  ['预言家','隐狼'],
-  ['盗贼','隐狼'],     // 防止复制出双隐狼（最终对也会再次检查）
-  ['隐狼','狼人'],     // 禁 狼人+隐狼
-  ['隐狼','隐狼']      // 禁 双隐狼
-];
+const FORBIDDEN_RAW=[['预言家','狼人'],['预言家','隐狼'],['盗贼','隐狼'],['隐狼','狼人'],['隐狼','隐狼']];
 
 const App={
-    gameId:null,playerId:null,isHost:false,gameState:null,allPlayers:{},playerData:null,fullGameData:null,
-    gameListener:null,logListener:null,wolfChatListener:null,wolfVotesListener:null,wolfVotesCallbackRef:null,
-    logQueryRef:null,seenLogKeys:new Set(),
-
-    $(id){return document.getElementById(id)},
-    escapeHTML(str){ if(typeof str!=='string') return ''; return str.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); },
-    showNotification(message,type='info',duration=5000){ const c=this.$('notification-container'); const d=document.createElement('div'); d.className=`notification ${type}`; d.textContent=this.escapeHTML(message); c.appendChild(d); setTimeout(()=>d.remove(),duration); },
-
-    // 日志写入：允许任何端写（公开/秘密）
-    async addGameLog(message,isSecret=false){
-        const logEntry={message,round:this.gameState?.round||0,timestamp:firebase.database.ServerValue.TIMESTAMP,isSecret:isSecret};
-        await db.ref(`games/${this.gameId}/logs`).push(logEntry);
-    },
-
-    _shuffle(a){let i=a.length,r;while(i){r=Math.floor(Math.random()*i--);[a[i],a[r]]=[a[r],a[i]]}return a;},
-    showView(v){['setup-view','game-view','god-view'].forEach(id=>{const el=this.$(id); if(el) el.classList.add('hidden');}); const t=this.$(v+'-view'); if(t) t.classList.remove('hidden');},
-    copyLink(inputId){ const input=this.$(inputId); if(!input) return; input.select(); input.setSelectionRange(0,99999); navigator.clipboard.writeText(input.value).then(()=>this.showNotification('链接已复制到剪贴板!','success'),err=>{this.showNotification('复制失败，请手动复制。','error');console.error(err);}); },
-
-    async init(){
-        const q=new URLSearchParams(location.search);
-        this.gameId=q.get('game'); this.playerId=q.get('player');
-
-        if(this.gameId && this.playerId==='PLAYER_ID'){
-            const appEl=this.$('app');
-            appEl.innerHTML=`
-                <h1>输入你的座位号</h1>
-                <div class="info-box" style="text-align:center;">
-                    <p>请输入法官分配给你的座位号（数字），然后点击加入游戏。</p>
-                    <input type="number" id="player-id-input" placeholder="座位号" style="width:120px; margin-bottom: 20px; padding: 15px; font-size: 1.2em;">
-                    <br>
-                    <button id="join-game-btn" class="confirm-btn">加入游戏</button>
-                </div>`;
-            this.$('join-game-btn').addEventListener('click',()=>{
-                const enteredId=this.$('player-id-input').value;
-                if(enteredId && !isNaN(enteredId) && enteredId>0){
-                    const u=new URL(location.href); u.searchParams.set('player',enteredId); location.href=u.toString();
-                }else{ this.showNotification('请输入一个有效的座位号。','error'); }
-            });
-            return;
-        }
-
-        document.body.addEventListener('click',this.handleGlobalClick.bind(this));
-        if(this.gameId){ this.startApp(); } else { this.showView('setup'); this.renderRoleSetup(); }
-    },
-
-    async startApp(){
-        const gameRef=db.ref(`games/${this.gameId}`);
-        const snapshot=await gameRef.once('value');
-        if(!snapshot.exists()){ document.body.innerHTML='<h1>游戏不存在或已损坏。请确认链接是否正确，或刷新重试。</h1>'; return; }
-        if(this.playerId==='0'){ this.showView('god'); this.listenToGameChanges(this.renderGodView.bind(this)); }
-        else if(this.playerId){ this.showView('game'); this.listenToGameChanges(this.renderAll.bind(this)); this.listenToLogs(); }
-    },
-
-    handleGlobalClick(e){
-        const target=e.target.closest('button[data-action]'); if(!target || target.disabled) return;
-        const {action,id,value,gameid,inputid}=target.dataset;
-        if(action==='copy-link'){ this.copyLink(inputid); return; }
-        if(id!==undefined && !/^\d+$/.test(id)){ this.showNotification('检测到无效操作ID，已阻止。','error'); console.error(`Invalid ID "${id}" for action "${action}"`); return; }
-
-        if(action==='join-as-creator'){ this.gameId=gameid; this.playerId='1'; history.pushState(null,'',`?game=${this.gameId}&player=${this.playerId}`); this.startApp(); return; }
-
-        // Host actions
-        if(action.startsWith('host-')){
-            if(!this.isHost) return;
-            switch(action){
-                case 'host-force-start':
-                    if(confirm('确定要强制开始游戏吗？未准备的玩家将以默认身份顺序开始。')){
-                        const updates={}; Object.values(this.allPlayers).forEach(p=>{ if(!p.isReady) updates[`players/${p.id}/isReady`]=true; });
-                        db.ref(`games/${this.gameId}`).update(updates).then(()=>this.updatePhase('NIGHT',1));
-                    }
-                    break;
-                case 'host-start': this.updatePhase('NIGHT',1); break;
-                case 'host-force-day': if(confirm('确定要强制进入白天吗？所有未行动的玩家将视为无操作。')) this.processNight(); break;
-                case 'host-day': this.processNight(); break;
-                case 'host-sheriff-cand-init': this.updatePhase('SHERIFF_CAND'); break;
-                case 'host-sheriff-speech': this.updatePhase('SHERIFF_SPEECH'); break;
-                case 'host-sheriff-vote': this.hostEnterSheriffVote(); break;
-                case 'host-tally-sheriff': this.tallySheriffVotes(); break;
-                case 'host-force-tally-sheriff': if(confirm('确定要强制统计警长票吗？未投票的玩家将视为弃票。')) this.tallySheriffVotes(); break;
-                case 'host-sheriff-elect-single': this.hostSheriffElectSingle(); break;
-                case 'host-open-day-vote': db.ref(`games/${this.gameId}/state/dayVotingOpen`).set(true); break;
-                case 'host-close-day-vote': db.ref(`games/${this.gameId}/state/dayVotingOpen`).set(false); break;
-                case 'host-tally-day': this.tallyDayVotes(); break;
-                case 'host-force-badge-destroy': if(confirm('确定要强制撕毁警徽吗？')) this.playerDestroyBadge(true); break;
-                case 'host-reveal': this.renderPlayerList(true); break;
-            }
-            return;
-        }
-
-        const provideImmediateFeedback=(btn)=>{ const panel=btn.closest('.action-panel'); if(panel){ panel.querySelectorAll('button[data-action]').forEach(b=>b.disabled=true); btn.classList.add('selected'); } };
-
-        // Player actions
-        switch(action){
-            case 'create-game': this.createGame(); break;
-            case 'swap-identities': db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).transaction(ids=>ids?[ids[1],ids[0]]:null); break;
-            case 'confirm-identities': db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).transaction(isReady=>isReady||true); break;
-            case 'sheriff-cand': db.ref(`games/${this.gameId}/sheriff/candidates/${this.playerId}`).set(Number(value)); break;
-            case 'sheriff-drop': db.ref(`games/${this.gameId}/sheriff/drops/${this.playerId}`).set(true); break;
-            case 'sheriff-vote': db.ref(`games/${this.gameId}/sheriff/votes/${this.playerId}`).set(id); break;
-            case 'sheriff-pass-badge': this.playerPassBadge(id); break;
-            case 'sheriff-destroy-badge': this.playerDestroyBadge(); break;
-            case 'day-vote':
-                if(!this.fullGameData?.state?.dayVotingOpen){ this.showNotification('主持人尚未开启投票。','error'); return; }
-                db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set(id); break;
-            case 'knight-duel': 
-                if(this.fullGameData?.state?.dayVotingOpen){ this.showNotification('投票已开启，骑士此时不可发动。','error'); return; }
-                this.knight(id); break;
-            case 'guard-protect': provideImmediateFeedback(target); this.guardProtect(id); break;
-            case 'guard-skip': provideImmediateFeedback(target); this.guardSkip(); break;
-            case 'seer-check': provideImmediateFeedback(target); this.seerCheck(id); break;
-            case 'seer-skip': provideImmediateFeedback(target); this.seerSkip(); break;
-            case 'wolf-vote': 
-                if(!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){ this.showNotification('你现在不能进行狼人投票。','error'); return; }
-                db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(id); break;
-            case 'wolf-skip':
-                if(!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){ this.showNotification('你现在不能进行狼人投票。','error'); return; }
-                db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set('0'); break;
-            case 'wolf-confirm': provideImmediateFeedback(target); this.wolfConfirmKill(id); break;
-            case 'wolf-send': this.sendWolfMessage(); break;
-            case 'witch-cure': provideImmediateFeedback(target); this.witchUseCure(id); break;
-            case 'witch-poison': provideImmediateFeedback(target); this.witchUsePoison(id); break;
-            case 'witch-skip': provideImmediateFeedback(target); this.witchSkip(); break;
-            case 'hunter-shoot': this.hunter(id); break;
-        }
-    },
-
-    // 进入警长投票（若独警则直接当选）
-    async hostEnterSheriffVote(){
-        const cand = this.fullGameData.sheriff?.candidates || {};
-        const drops = this.fullGameData.sheriff?.drops || {};
-        const valid = Object.keys(cand).filter(id => cand[id] && !drops[id]);
-        if(valid.length===1){
-            const sheriffId=valid[0];
-            await db.ref(`games/${this.gameId}/players/${sheriffId}/badge`).set(1);
-            await this.addGameLog(`👑 ${sheriffId}号玩家独警，直接当选警长！`);
-            if(this.gameState.round===1){ await this.processNight(); } else { await this.updatePhase('DAY'); }
-        }else{
-            await this.updatePhase('SHERIFF_VOTE');
-        }
-    },
-    async hostSheriffElectSingle(){
-        const cand = this.fullGameData.sheriff?.candidates || {};
-        const drops = this.fullGameData.sheriff?.drops || {};
-        const valid = Object.keys(cand).filter(id => cand[id] && !drops[id]);
-        if(valid.length===1){
-            const sheriffId=valid[0];
-            await db.ref(`games/${this.gameId}/players/${sheriffId}/badge`).set(1);
-            await this.addGameLog(`👑 ${sheriffId}号玩家独警，直接当选警长！`);
-            if(this.gameState.round===1){ await this.processNight(); } else { await this.updatePhase('DAY'); }
-        }else{
-            this.showNotification('当前不是独警，无法直接当选。','error');
-        }
-    },
-
-    listenToLogs(){
-        if(this.logQueryRef && this.logListener){ this.logQueryRef.off('child_added', this.logListener); }
-        this.seenLogKeys.clear();
-        this.logQueryRef = db.ref(`games/${this.gameId}/logs`).limitToLast(200);
-        this.logListener = this.logQueryRef.on('child_added', snap=>{
-            if(!snap.exists()) return;
-            const key=snap.key; if(this.seenLogKeys.has(key)) return;
-            this.seenLogKeys.add(key);
-            const log=snap.val();
-            if(log && !log.isSecret){
-                const logArea=this.$('game-log-area'); const logContent=this.$('game-log-content');
-                if(logArea.classList.contains('hidden')) logArea.classList.remove('hidden');
-                const p=document.createElement('p');
-                const prefix=log.round>0?`<strong>[第 ${log.round} 轮]</strong> `:'';
-                p.innerHTML=prefix; p.appendChild(document.createTextNode(log.message));
-                logContent.appendChild(p);
-                logArea.scrollTop=logArea.scrollHeight;
-                if(!this.isHost) this.showNotification(log.message,'info');
-            }
-        });
-    },
-
-    listenToGameChanges(renderCallback){
-        this.cleanupListeners();
-        this.gameListener=db.ref(`games/${this.gameId}`).on('value',s=>{
-            if(!s.exists()){ document.body.innerHTML='<h1>游戏已结束或不存在</h1>'; this.cleanupListeners(); return; }
-            const g=s.val();
-            this.fullGameData=g; this.gameState=g.state; this.allPlayers=g.players;
-            if(this.playerId!=='0'){
-                if(!g.players || !g.players[this.playerId]){ document.body.innerHTML='<h1>错误：您不是该游戏的玩家。请检查座位号是否正确。</h1>'; this.cleanupListeners(); return; }
-                this.playerData=g.players[this.playerId];
-                this.isHost = this.playerData.id == this.gameState.creatorId;
-            }
-            if(this.gameState.phase!=='NIGHT' && (this.wolfChatListener || this.wolfVotesListener)){ this.stopWolfListeners(); }
-            if(this.gameState.phase==='GAME_OVER'){ this.cleanupListeners(); }
-            renderCallback();
-        });
-    },
-    cleanupListeners(){
-        if(this.gameListener) db.ref(`games/${this.gameId}`).off('value',this.gameListener);
-        if(this.logQueryRef && this.logListener) this.logQueryRef.off('child_added',this.logListener);
-        this.stopWolfListeners();
-        this.gameListener=null; this.logListener=null; this.logQueryRef=null;
-    },
-
-    renderRoleSetup(){
-        const c=this.$('role-setup'); c.innerHTML='';
-        const thiefInput=`<input type="number" id="role-盗贼" min="0" max="1" value="${DEFAULT_SETUP['盗贼']}">`;
-        Object.keys(DEFAULT_SETUP).forEach(roleName=>{
-            const r=ROLES[roleName]; if(!r) return;
-            const div=document.createElement('div'); div.className='role-setup-item';
-            const inputHtml=roleName==='盗贼'?thiefInput:`<input type="number" id="role-${roleName}" min="0" value="${DEFAULT_SETUP[roleName]}">`;
-            div.innerHTML=`<span><span class="role-icon">${r.icon}</span> ${roleName}</span> ${inputHtml}`;
-            c.appendChild(div);
-        });
-        const u=()=>{ let t=0; this.$('role-setup').querySelectorAll('input').forEach(i=>t+=+i.value||0);
-            this.$('total-roles').textContent=t;
-            const pCount=t>0 && t%2===0 ? t/2 : '身份总数必须为偶数';
-            this.$('player-cnt').textContent=pCount;
-            this.$('player-count-warning').textContent=typeof pCount==='number'&&pCount>9?'(推荐≤9人)':'';
-        };
-        this.$('role-setup').oninput=u; u();
-    },
-
-    async createGame(){
-        this.$('btn-create').disabled=true;
-        this.$('create-text').classList.add('hidden');
-        this.$('create-spinner').classList.remove('hidden');
-        const errorEl=this.$('setup-error'); if(errorEl) errorEl.classList.add('hidden');
-
-        const pool=[]; let configStr='当前配置：';
-        this.$('role-setup').querySelectorAll('input').forEach(i=>{
-            const r=i.id.replace('role-',''); const count=+i.value;
-            if(count>0) configStr+=`${r}x${count} `;
-            for(let k=0;k<count;k++) pool.push(r);
-        });
-
-        if(pool.length===0 || pool.length%2!==0){ this.showSetupError('身份总数需为偶数且大于0'); return; }
-        if(pool.length/2>12){ this.showSetupError('玩家过多，建议不超过12人。'); return; }
-
-        const pairs=this.deal(pool);
-        if(!pairs){
-            this.showSetupError(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>提示：确保“金水宝宝”总数（包括盗贼生成的）在1-2个之间，且组合不违反禁配规则。</small><br><small>${configStr}</small>`);
-            return;
-        }
-
-        const gId=db.ref('games').push().key, pc=pool.length/2, players={};
-        for(let i=1;i<=pc;i++){
-            players[i]={ id:i, identities:pairs[i-1], originalIdentities:JSON.parse(JSON.stringify(pairs[i-1])), deaths:0, isAlive:true, isReady:false, isExposedIdiot:false, skillStates:{}, badge:0 };
-        }
-
-        await db.ref(`games/${gId}`).set({
-            state:{phase:'SETUP',round:0,peaceNightStreak:0,winner:null,creatorId:1, nightStatus:{}, hunterQueue:{}, postDeathState:null, dayVotingOpen:false},
-            players, config:{pc}, wolfChat:{}, wolfVotes:{}, nightActions:{}, sheriff:{}, dayVotes:{}, logs:{}
-        });
-
-        this.showNotification('游戏创建成功！','success');
-        this.$('role-setup').classList.add('hidden');
-        this.$('btn-create').classList.add('hidden');
-        const infoEl=this.$('game-creation-info'); infoEl.classList.remove('hidden');
-        const baseUrl=`${location.origin}${location.pathname}`; const playerUrl=`${baseUrl}?game=${gId}&player=PLAYER_ID`;
-        infoEl.innerHTML = `<h3>✅ 游戏创建成功</h3>
-            <p>请将以下链接模板分发给玩家，让他们将 "PLAYER_ID" 替换为自己的座位号:</p>
-            <div class="link-container">
-                <input type="text" readonly id="player-link-template" value="${playerUrl}">
-                <button data-action="copy-link" data-inputid="player-link-template" class="control-btn">复制</button>
-            </div>
-            <button data-action="join-as-creator" data-gameid="${gId}" class="confirm-btn">以1号玩家(主持人)身份进入</button>`;
-    },
-
-    showSetupError(msg){
-        const errorEl=this.$('setup-error');
-        if(errorEl){ errorEl.innerHTML=`<h3>❌ 创建失败</h3><p>${msg.replace(/\n/g,'<br>')}</p>`; errorEl.classList.remove('hidden'); }
-        this.$('btn-create').disabled=false; this.$('create-text').classList.remove('hidden'); this.$('create-spinner').classList.add('hidden');
-    },
-
-    // 发牌，包含盗贼复制；最终检查双隐狼/隐狼+狼禁用
-    deal(pool){
-        for(let t=0;t<5000;t++){
-            const s=this._shuffle([...pool]);
-            let isValid=true;
-            const rawPairs=[];
-            for(let i=0;i<s.length;i+=2){ const p=[s[i],s[i+1]].sort(); rawPairs.push(p); }
-            for(const p of rawPairs){
-                if(FORBIDDEN_RAW.some(([r1,r2])=> (r1===p[0]&&r2===p[1]) || (r1===p[1]&&r2===p[0]))){ isValid=false; break; }
-            }
-            if(!isValid) continue;
-
-            const finalPairs=[]; const finalRoles={};
-            for(const p of rawPairs){
-                let p1,p2;
-                if(p[0]==='盗贼'){ // 盗贼复制另一张身份（完全复制，可行动）
-                    p1={r:p[1],t:true};
-                    p2={r:p[1],t:false};
-                }else{
-                    p1={r:p[0],t:false};
-                    p2={r:p[1],t:false};
-                }
-                finalPairs.push([{role:p1.r,isThiefCopy:p1.t},{role:p2.r,isThiefCopy:p2.t}]);
-                finalRoles[p1.r]=(finalRoles[p1.r]||0)+1;
-                finalRoles[p2.r]=(finalRoles[p2.r]||0)+1;
-            }
-
-            const goldenBabyCount = finalPairs.filter(p=>p[0].role==='平民' && p[1].role==='平民').length;
-            if(goldenBabyCount<1 || goldenBabyCount>2) continue;
-
-            // 最终组合禁配（防双隐狼、隐狼+狼）
-            for(const pair of finalPairs){
-                const roles=[pair[0].role,pair[1].role].sort();
-                if(FORBIDDEN_RAW.some(([r1,r2])=> (r1===roles[0]&&r2===roles[1]) || (r1===roles[1]&&r2===roles[0]))){ isValid=false; break; }
-            }
-            if(!isValid) continue;
-
-            const wolfCount=(finalRoles['狼人']||0)+(finalRoles['隐狼']||0);
-            if(wolfCount===0) continue;
-
-            const godCount=Object.keys(finalRoles).reduce((sum,role)=> sum+(ROLES[role].isGod?finalRoles[role]:0),0);
-            if(godCount===0) continue;
-
-            return finalPairs;
-        }
-        return null;
-    },
-
-    renderAll(){ this.renderPlayerInfo(); this.renderPlayerStatus(); this.renderPlayerList(); this.renderPersistentInfo(); this.renderActionPanel(); if(this.isHost) this.renderHostControls(); },
-
-    renderGodView(){
-        this.$('game-title').textContent=`后台监控 - ${this.gameId}`;
-        const listEl=this.$('god-player-list'); listEl.innerHTML='';
-        const f=(id)=>`${ROLES[id.role].icon} ${id.isThiefCopy?`<span class="thief-copy">${id.role}</span>`:id.role}`;
-        Object.values(this.allPlayers).sort((a,b)=>a.id-b.id).forEach(p=>{
-            const live=2-p.deaths;
-            const heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
-            const ids=p.identities; // 使用当前顺序，标记更准确
-            const d=p.deaths;
-            let statusTags=[]; if(p.isExposedIdiot) statusTags.push('白痴已翻牌'); if(!p.isAlive) statusTags.push('已淘汰');
-            const row=document.createElement('div');
-            row.className=`god-player-row ${!p.isAlive ? 'dead-all' : ''}`;
-            row.innerHTML=`
-                <div class="player-id">${p.id}号 ${p.badge?'👑':''}</div>
-                <div class="player-health">${heart}</div>
-                <div class="player-identities">
-                    <span class="${d>=1?'dead-identity':''}">${f(ids[0])}</span>
-                    <span>+</span>
-                    <span class="${d>=2?'dead-identity':''}">${f(ids[1])}</span>
-                </div>
-                <div class="player-status-tags">${statusTags.join(', ')}</div>`;
-            listEl.appendChild(row);
-        });
-
-        const godLogArea=this.$('god-log-area'); const godLogContent=this.$('god-log-content');
-        godLogArea.classList.remove('hidden'); godLogContent.innerHTML='';
-        const allLogs=Object.entries(this.fullGameData.logs||{}).map(([k,v])=>({...v,_k:k}));
-        if(allLogs.length>0){
-            allLogs.sort((a,b)=>a.timestamp-b.timestamp).forEach(log=>{
-                const p=document.createElement('p');
-                const prefix=log.round>0?`<strong>[第 ${log.round} 轮]</strong> `:'';
-                p.innerHTML=prefix; p.appendChild(document.createTextNode(log.message));
-                if(log.isSecret){ p.style.color='var(--warning)'; p.style.fontStyle='italic'; }
-                godLogContent.appendChild(p);
-            });
-            godLogArea.scrollTop=godLogArea.scrollHeight;
-        }else{
-            godLogContent.innerHTML='<p>暂无日志记录。</p>';
-        }
-    },
-
-    renderPlayerInfo(){
-        this.$('pid-show').textContent=`🎮 你是 ${this.playerId} 号 ${this.playerData.badge?'👑':''} ${this.isHost?' (主持人)':''}`;
-        const i=this.playerData.identities,d=this.playerData.deaths;
-        const f=id=>`${ROLES[id.role].icon} ${id.isThiefCopy?'<span class="thief-copy">'+id.role+'</span>':id.role}`;
-        this.$('my-ids').innerHTML=`<div style="font-size:24px;">${d>=1?'<span class="dead-identity">':''}${f(i[0])}${d>=1?'</span>':''}<span style="margin:0 20px;">+</span>${d>=2?'<span class="dead-identity">':''}${f(i[1])}${d>=2?'</span>':''}</div>`;
-        const showSwap=this.gameState.phase==='SETUP' && !this.playerData.isReady;
-        this.$('swap-area').classList.toggle('hidden', !showSwap);
-    },
-
-    renderPlayerStatus(){
-        const m={SETUP:'⏳ 等待所有玩家准备',NIGHT:`🌙 第 ${this.gameState.round} 夜晚`,SHERIFF_CAND:'👑 警长竞选：上警阶段',SHERIFF_SPEECH:'👑 警长竞选：发言/退水阶段',SHERIFF_VOTE:'👑 警长竞选：投票阶段',DAY:`☀️ 第 ${this.gameState.round} 天`,GAME_OVER:`🏆 ${this.gameState.winner}`,HUNTER_ACTION:'🔫 猎人正在开枪...',SHERIFF_TRANSFER:'💔 警长阵亡，等待移交警徽...'};
-        const statusEl=this.$('player-status'); if(statusEl) statusEl.innerHTML=m[this.gameState.phase]||'进行中';
-        if(this.gameState.phase==='GAME_OVER'){ const t=this.$('game-title'); if(t) t.innerHTML=`<div class="game-over-banner ${this.gameState.winner.includes('狼人')?'bad':''}">${this.gameState.winner}</div>`; }
-    },
-
-    renderPlayerList(reveal=false){
-        const listEl=this.$('player-list'); if(!listEl) return;
-        listEl.innerHTML=Object.values(this.allPlayers).map(p=>{
-            const live=2-p.deaths,heart=`<span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span>`;
-            let ids=''; if(reveal){ const fmt=i=>`${ROLES[i.role].icon} ${i.isThiefCopy?'<span class="thief-copy">'+i.role+'</span>':i.role}`; ids=` [${fmt(p.originalIdentities[0])} + ${fmt(p.originalIdentities[1])}]`; }
-            const classList=['player-list-item']; if(!p.isAlive) classList.push('dead-all'); else if(p.deaths>0) classList.push('dead'); if(p.isExposedIdiot) classList.push('exposed-idiot');
-            return `<div class="${classList.join(' ')}">
-                        <span><strong>${p.id}号</strong> ${p.badge?'👑':''} ${ids} <small style="color:var(--warning)">${p.isExposedIdiot?'(白痴已翻牌)':''}</small></span>
-                        <span>${heart}</span>
-                    </div>`;
-        }).join('');
-    },
-
-    // 预言家查验历史：按玩家整体（不再按每条命分开）
-    renderPersistentInfo(){
-        let h='';
-        if(this.getActiveRole(this.playerData)==='预言家'){
-            const r=this.getGlobalSkillState('seerResults')||{};
-            const l=Object.entries(r).map(([id,res])=>`${id}号(${res==='狼人'?'🐺':'😇'})`).join('、 ');
-            if(l) h+=`<div class="info-box"><strong>🔮 查验历史:</strong> ${l}</div>`;
-        }
-        const el=this.$('persist'); el.innerHTML=h; el.classList.toggle('hidden', !h);
-    },
-
-    renderHostControls(){
-        const el=this.$('host-controls'); if(!el) return;
-        el.classList.remove('hidden');
-        const ph=this.gameState.phase; let h=`<h3>👑 主持人面板</h3>`;
-
-        const renderStatusGrid=(title, totalList, doneList)=>{
-            const doneIds=doneList.map(p=>p.id.toString());
-            const pendingList=totalList.filter(p=>!doneIds.includes(p.id.toString()));
-            let gridHtml=`<div class="info-box">${title}：${doneIds.length} / ${totalList.length}</div>`;
-            if(pendingList.length>0){ gridHtml+='<div class="status-grid">'; pendingList.forEach(p=>gridHtml+=`<div class="status-item pending">${p.id}号 未完成</div>`); gridHtml+='</div>'; }
-            return gridHtml;
-        };
-
-        switch(ph){
-            case 'SETUP': {
-                const rdy=Object.values(this.allPlayers).filter(p=>p.isReady), tot=Object.values(this.allPlayers);
-                h+=renderStatusGrid('玩家准备',tot,rdy);
-                if(rdy.length<tot.length) h+=`<button data-action="host-force-start" class="action-btn">强制开始</button>`;
-                h+=`<button data-action="host-start" class="control-btn" ${rdy.length<tot.length?'disabled':''}>🚀 开始游戏</button>`;
-                break;
-            }
-            case 'NIGHT': {
-                const ns=this.gameState.nightStatus||{}, done=Object.values(ns).every(s=>s==='complete');
-                h+=`<p style="font-size: 1.2em; margin-bottom: 15px;">${done?'✅ 所有行动已完成':'⏳ 等待玩家行动...'}</p>`;
-                const pendingCount=Object.values(ns).filter(s=>s==='pending'||s==='locked').length; const totalTasks=Object.values(ns).length;
-                if(totalTasks>0) h+=`<div class="info-box">行动进度：${totalTasks-pendingCount} / ${totalTasks}</div>`;
-                const hasSheriff=Object.values(this.allPlayers).some(p=>p.badge);
-                if(this.gameState.round===1 && !hasSheriff){
-                    h+=`<button data-action="host-sheriff-cand-init" class="control-btn" ${!done?'disabled':''}>👑 开始上警</button>`;
-                    if(!done) h+=`<button data-action="host-force-day" class="action-btn">强制进入白天</button>`;
-                }else{
-                    if(!done) h+=`<button data-action="host-force-day" class="action-btn">强制天亮</button>`;
-                    h+=`<button data-action="host-day" class="control-btn" ${!done?'disabled':''}>☀️ 天亮了 (结算夜晚)</button>`;
-                }
-                break;
-            }
-            case 'SHERIFF_CAND': {
-                const alive=Object.values(this.allPlayers).filter(p=>p.isAlive);
-                const decided=Object.values(this.allPlayers).filter(p=>this.fullGameData.sheriff?.candidates?.[p.id]!=null);
-                h+=renderStatusGrid('上警意向',alive,decided);
-                h+=`<button data-action="host-sheriff-speech" class="control-btn" ${decided.length<alive.length?'disabled':''}>进入发言阶段</button>`;
-                break;
-            }
-            case 'SHERIFF_SPEECH': {
-                // 若独警，提供直接当选按钮
-                const cand=this.fullGameData.sheriff?.candidates||{}; const drops=this.fullGameData.sheriff?.drops||{};
-                const valid=Object.keys(cand).filter(id=>cand[id] && !drops[id]);
-                if(valid.length===1) h+=`<div class="info-box">当前独警：${valid[0]}号</div><button data-action="host-sheriff-elect-single" class="confirm-btn">直接当选</button>`;
-                h+=`<button data-action="host-sheriff-vote" class="control-btn">进入投票阶段</button>`;
-                break;
-            }
-            case 'SHERIFF_VOTE': {
-                const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
-                const votedData=this.fullGameData.sheriff?.votes||{};
-                const votedPlayers=Object.keys(votedData).map(id=>this.allPlayers[id]).filter(Boolean);
-                h+=renderStatusGrid('警长投票',voters,votedPlayers);
-                h+=`<button data-action="host-tally-sheriff" class="control-btn" ${votedPlayers.length<voters.length?'disabled':''}>📊 统计警长票</button>`;
-                h+=`<button data-action="host-force-tally-sheriff" class="action-btn">强制计票</button>`;
-                break;
-            }
-            case 'DAY': {
-                const dayOpen=!!this.fullGameData?.state?.dayVotingOpen;
-                h+=`<div class="info-box">投票开关：${dayOpen?'已开启 ✅':'未开启 ⏳'}</div>`;
-                if(!dayOpen){
-                    h+=`<button data-action="host-open-day-vote" class="control-btn">🔓 开启白天投票</button>`;
-                }else{
-                    h+=`<button data-action="host-close-day-vote" class="action-btn">🔒 关闭白天投票</button>`;
-                }
-                if(dayOpen){
-                    const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
-                    const dayVotedData=this.fullGameData.dayVotes?.[this.gameState.round]||{};
-                    const dayVotedPlayers=Object.keys(dayVotedData).map(id=>this.allPlayers[id]).filter(Boolean);
-                    h+=renderStatusGrid('放逐投票',voters,dayVotedPlayers);
-                    h+=`<button data-action="host-tally-day" class="control-btn" ${dayVotedPlayers.length<voters.length?'disabled':''}>📊 统计放逐票</button>`;
-                }else{
-                    h+=`<div class="info-box">提示：投票未开启前，骑士仍可发动决斗。</div>`;
-                }
-                break;
-            }
-            case 'SHERIFF_TRANSFER': {
-                h+=`<h4>警长已阵亡</h4><p>等待玩家操作或强制撕毁警徽</p>`;
-                h+=`<button data-action="host-force-badge-destroy" class="action-btn">强制撕毁</button>`;
-                break;
-            }
-            case 'GAME_OVER': {
-                h+=`<button data-action="host-reveal" class="control-btn">👁️ 复盘：显示所有身份</button>`;
-                break;
-            }
-        }
-        el.innerHTML=h;
-    },
-
-    renderActionPanel(){
-        const panelEl=this.$('action-panel'); if(!panelEl) return;
-        panelEl.innerHTML=''; panelEl.classList.remove('hidden');
-
-        const isDead=!this.playerData.isAlive;
-        const isSheriffTransferTarget=this.gameState.phase==='SHERIFF_TRANSFER' && this.gameState.postDeathState && this.playerId===this.gameState.postDeathState.deadSheriffId;
-        if(this.gameState.phase==='GAME_OVER' || (isDead && !isSheriffTransferTarget)){ panelEl.classList.add('hidden'); return; }
-
-        const phase=this.gameState.phase;
-        const activeRole=this.getActiveRole(this.playerData);
-        let content=''; const renderFeedback=(msg)=>`<div class="action-feedback"><p>${this.escapeHTML(msg)}</p></div>`;
-
-        switch(phase){
-            case 'SHERIFF_CAND': {
-                if(isDead) break;
-                const cand=this.fullGameData.sheriff?.candidates?.[this.playerId];
-                if(cand!=null) content=renderFeedback(`你已选择 ${cand?'上警':'不上警'}`); else { this.panelSheriffCand(); return; }
-                break;
-            }
-            case 'SHERIFF_SPEECH': {
-                if(isDead) break;
-                const isCandidate=this.fullGameData.sheriff?.candidates?.[this.playerId];
-                const hasDropped=this.fullGameData.sheriff?.drops?.[this.playerId];
-                if(isCandidate && !hasDropped){ this.panelSheriffDrop(); return; }
-                content=renderFeedback('等待主持人推进流程...');
-                break;
-            }
-            case 'SHERIFF_VOTE': {
-                if(this.playerData.isExposedIdiot || isDead){ content=renderFeedback('你无法投票。'); break; }
-                const sheriffVote=this.fullGameData.sheriff?.votes?.[this.playerId];
-                if(sheriffVote!=null){ content=renderFeedback(`你已投票给 ${sheriffVote==='0'?'弃票':sheriffVote+'号'}`); }
-                else { this.panelSheriffVote(); return; }
-                break;
-            }
-            case 'DAY': {
-                const dayOpen=!!this.fullGameData?.state?.dayVotingOpen;
-                if(!dayOpen){
-                    // 投票未开启：骑士可发动；其他人显示等待
-                    if(activeRole==='骑士' && !this.getSkillState('hasUsedDuel')){
-                        this.panelDayPreVoteKnight(); return;
-                    }else{
-                        content=renderFeedback('等待主持人开启投票…');
-                    }
-                }else{
-                    // 投票已开启：正常投票，骑士禁用
-                    if(this.playerData.isExposedIdiot || isDead){ content=renderFeedback('你无法投票。'); break; }
-                    const dayVote=this.fullGameData.dayVotes?.[this.gameState.round]?.[this.playerId];
-                    if(dayVote!=null){ content=renderFeedback(`你已投票给 ${dayVote==='0'?'弃票':dayVote+'号'}`); }
-                    else { this.panelDayVote(); return; }
-                }
-                break;
-            }
-            case 'NIGHT': {
-                if(isDead) break;
-                const nightStatus=this.gameState.nightStatus||{};
-                if(['狼人','隐狼'].includes(activeRole) && nightStatus.wolf==='pending'){ this.panelWolf(); return; }
-                switch(activeRole){
-                    case '守卫': if(nightStatus.guard==='pending'){ this.panelGuard(); return; } break;
-                    case '预言家': if(nightStatus.seer==='pending'){ this.panelSeer(); return; } break;
-                    case '女巫': if(nightStatus.witch==='pending'){ this.panelWitch(); return; } break;
-                }
-                content=renderFeedback('请耐心等待天亮...');
-                break;
-            }
-            case 'HUNTER_ACTION': {
-                if(this.gameState.hunterQueue && this.gameState.hunterQueue[this.playerId]){ this.panelHunter(); return; }
-                content=renderFeedback('等待猎人开枪...');
-                break;
-            }
-            case 'SHERIFF_TRANSFER': {
-                if(isSheriffTransferTarget){ this.panelSheriffTransfer(); return; }
-                content=renderFeedback('等待警长移交警徽...');
-                break;
-            }
-            default: panelEl.classList.add('hidden');
-        }
-        panelEl.innerHTML=content;
-    },
-
-    // Panels
-    panelWolf(){
-        const myRole=this.getActiveRole(this.playerData);
-        const allLivingWolves=Object.values(this.allPlayers).filter(p=>p.isAlive && ['狼人','隐狼'].includes(this.getActiveRole(p)));
-        const livingRegularWolves=allLivingWolves.filter(p=>this.getActiveRole(p)==='狼人');
-
-        let teammatesToDisplay;
-        if(myRole==='隐狼'){ teammatesToDisplay=allLivingWolves.filter(p=>p.id!=this.playerId); }
-        else { teammatesToDisplay=livingRegularWolves.filter(p=>p.id!=this.playerId); }
-
-        const canAct=this.canWolfAct(this.playerData);
-        const myVote=this.fullGameData.wolfVotes?.[this.playerId];
-        let h=`<h3>🐺 狼人行动</h3>`;
-        if(myRole==='隐狼' && livingRegularWolves.length>0){ h+=`<p style="color:var(--warning)">你是隐狼，当有其他普通狼人存活时，你不能行动。</p>`; }
-        h+=`<div class="info-box">🐺 队友：${teammatesToDisplay.length>0?teammatesToDisplay.map(p=>`${p.id}号(${this.getActiveRole(p)})`).join('、'):'无'}</div>`;
-        const targets=Object.values(this.allPlayers).filter(p=>p.isAlive);
-        h+=`<h4>选择今夜袭击目标：</h4>`;
-        h+=targets.map(p=>`<button class="action-btn ${myVote===p.id.toString()?'selected':''}" data-action="wolf-vote" data-id="${p.id}" ${!canAct?'disabled':''}>${p.id}号</button>`).join('');
-        h+=`<button class="control-btn ${myVote==='0'?'selected':''}" data-action="wolf-skip" ${!canAct?'disabled':''}>🚫 今夜空刀</button>`;
-        this.$('action-panel').innerHTML=h;
-
-        const chatEl=this.$('wolf-chat-area');
-        if(myRole==='狼人'){
-            if(chatEl){
-                chatEl.classList.remove('hidden');
-                chatEl.innerHTML = `
-                    <div id="wolf-votes-display"></div>
-                    <h4>💬 狼人内部讨论</h4>
-                    <div id="wolf-chat-messages" style="max-height:150px;overflow-y:auto;background:rgba(255,255,255,.05);padding:10px;border-radius:8px;margin-bottom:10px;text-align:left;"></div>
-                    <div style="display:flex;gap:6px;">
-                        <input id="wolf-chat-input" placeholder="输入聊天内容…" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.2);color:var(--text); width: auto;" />
-                        <button class="action-btn" data-action="wolf-send" style="padding: 8px 16px;">发送</button>
-                    </div>`;
-                this.$('wolf-chat-input').addEventListener('keyup',(e)=>{ if(e.key==='Enter') this.sendWolfMessage(); });
-            }
-        }else{
-            if(chatEl){ chatEl.classList.remove('hidden'); chatEl.innerHTML=`<div id="wolf-votes-display"></div>`; }
-        }
-        this.initWolfListeners();
-    },
-    panelSheriffCand(){ this.$('action-panel').innerHTML=`<h3>👑 是否上警？</h3><button data-action="sheriff-cand" data-value="1" class="action-btn">我要上警</button><button data-action="sheriff-cand" data-value="0" class="control-btn">不上警</button>`; },
-    panelSheriffDrop(){ this.$('action-panel').innerHTML=`<button data-action="sheriff-drop" class="action-btn">💧 退水</button>`; },
-    panelSheriffVote(){
-        const cands=Object.keys(this.fullGameData.sheriff.candidates||{}).filter(id=>this.fullGameData.sheriff.candidates[id] && !this.fullGameData.sheriff.drops?.[id]);
-        let h=`<h3>👑 为警长投票</h3>`;
-        h+=cands.map(id=>`<button class="action-btn" data-action="sheriff-vote" data-id="${id}">${id}号</button>`).join('');
-        h+=`<button class="control-btn" data-action="sheriff-vote" data-id="0">弃票</button>`;
-        this.$('action-panel').innerHTML=h;
-    },
-    panelDayPreVoteKnight(){
-        const actionTargets=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot && p.id!=this.playerId);
-        let h=`<h3>⚔️ 决斗阶段（投票未开启）</h3><div class="info-box">主持人尚未开启投票，骑士可在此时发动技能。</div>`;
-        h+=actionTargets.map(p=>`<button class="action-btn" data-action="knight-duel" data-id="${p.id}">⚔️ 决斗 ${p.id}号</button>`).join('');
-        this.$('action-panel').innerHTML=h;
-    },
-    panelDayVote(){
-        let h=`<h3>🗳️ 放逐投票</h3>`;
-        const voteTargets=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
-        h+=`<h4>选择投票目标：</h4>`;
-        h+=voteTargets.map(p=>`<button class="action-btn" data-action="day-vote" data-id="${p.id}">${p.id}号</button>`).join('');
-        h+=`<button class="control-btn" data-action="day-vote" data-id="0">弃票</button>`;
-        this.$('action-panel').innerHTML=h;
-    },
-    panelGuard(){
-        const last=this.getSkillState('lastGuardTarget');
-        let h=`<h3>🛡️ 守卫行动</h3>`; if(last) h+=`<p style="color:var(--warning)">上回合守护：${last}号</p>`;
-        const targets=Object.values(this.allPlayers).filter(p=>p.isAlive && p.id!=last);
-        h+=targets.map(p=>`<button class="action-btn" data-action="guard-protect" data-id="${p.id}">${p.id}号</button>`).join('');
-        h+=`<button class="control-btn" data-action="guard-skip">不守护</button>`;
-        this.$('action-panel').innerHTML=h;
-    },
-    panelSeer(){
-        let h=`<h3>🔮 预言家行动</h3>`;
-        const targets=Object.values(this.allPlayers).filter(p=>p.isAlive && p.id!=this.playerId);
-        h+=targets.map(p=>`<button class="action-btn" data-action="seer-check" data-id="${p.id}">${p.id}号</button>`).join('');
-        h+=`<button class="control-btn" data-action="seer-skip">跳过查验</button>`;
-        this.$('action-panel').innerHTML=h;
-    },
-    panelWitch(){
-        const identityIndex=this.playerData.deaths;
-        const hasCure=!this.getSkillState('hasUsedCure',this.playerData,identityIndex);
-        const hasPoison=!this.getSkillState('hasUsedPoison',this.playerData,identityIndex);
-        const nightTarget=this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
-        let h=`<h3>🧪 女巫行动</h3>`;
-        h+=`<p>解药: ${hasCure?'✅':'❌'} | 毒药: ${hasPoison?'✅':'❌'}</p>`;
-        if(nightTarget && nightTarget!=='0' && hasCure){
-            h+=`<div class="info-box">今夜 ${nightTarget}号 被袭击</div><button class="action-btn" data-action="witch-cure" data-id="${nightTarget}">💊 使用解药救人</button>`;
-        }else if(nightTarget==='0' || !nightTarget){ h+=`<div class="info-box">今夜平安无事或袭击目标未知</div>`; }
-        if(hasPoison){
-            h+=`<h4>使用毒药：</h4>`;
-            const targets=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot && p.id!=this.playerId);
-            h+=targets.map(p=>`<button class="action-btn" data-action="witch-poison" data-id="${p.id}">☠️ 毒杀 ${p.id}号</button>`).join('');
-        }
-        h+=`<button class="control-btn" data-action="witch-skip">不使用药水</button>`;
-        this.$('action-panel').innerHTML=h;
-    },
-    panelHunter(){
-        let h=`<h3>🔫 猎人开枪</h3><p>你已死亡，请选择带走目标：</p>`;
-        const targets=Object.values(this.allPlayers).filter(p=>p.isAlive);
-        h+=targets.map(p=>`<button class="action-btn" data-action="hunter-shoot" data-id="${p.id}">${p.id}号</button>`).join('');
-        this.$('action-panel').innerHTML=h;
-    },
-    panelSheriffTransfer(){
-        let h=`<h3>💔 你已阵亡，请移交警徽</h3>`;
-        const targets=Object.values(this.allPlayers).filter(p=>p.isAlive);
-        h+=`<h4>选择移交对象：</h4>`;
-        h+=targets.map(p=>`<button class="action-btn" data-action="sheriff-pass-badge" data-id="${p.id}">移交给 ${p.id}号</button>`).join('');
-        h+=`<hr style="margin: 15px 0;" />`;
-        h+=`<button class="control-btn" data-action="sheriff-destroy-badge">撕毁警徽</button>`;
-        this.$('action-panel').innerHTML=h;
-    },
-
-    // 阶段切换
-    async updatePhase(phase,round=null){
-        const up={'state/phase':phase};
-        if(round!==null){ up['state/round']=round; }
-        else if(phase==='NIGHT'){ up['state/round']=this.gameState.round+1; }
-
-        if(phase==='NIGHT'){
-            up['nightActions']={}; up['wolfVotes']={}; up['wolfChat']={};
-            const alivePlayers=Object.values(this.allPlayers).filter(p=>p.isAlive);
-            const roleExists=(role)=>alivePlayers.some(p=>this.getActiveRole(p)===role);
-            const witchPlayer=alivePlayers.find(p=>this.getActiveRole(p)==='女巫');
-            const witchIdx=witchPlayer?witchPlayer.deaths:-1;
-            const canWitchUseSkill=witchPlayer && (!this.getSkillState('hasUsedCure',witchPlayer,witchIdx) || !this.getSkillState('hasUsedPoison',witchPlayer,witchIdx));
-            const nightStatus={ guard:roleExists('守卫')?'pending':'complete', seer:roleExists('预言家')?'pending':'complete', wolf:this.isAnyWolfInGame()?'pending':'complete', witch:canWitchUseSkill?'locked':'complete' };
-            if(nightStatus.wolf==='complete' && nightStatus.witch==='locked') nightStatus.witch='pending';
-            up['state/nightStatus']=nightStatus;
-        }
-        if(phase==='DAY'){ up['state/dayVotingOpen']=false; } // 白天默认未开票
-        await db.ref(`games/${this.gameId}`).update(up);
-    },
-
-    // 夜行/技能
-    sendWolfMessage(){
-        const myRole=this.getActiveRole(this.playerData);
-        if(myRole==='隐狼'){ this.showNotification('隐狼不能参与狼人讨论。','error'); return; }
-        const input=this.$('wolf-chat-input'); if(!input) return;
-        const msg=(input.value||'').trim(); if(!msg) return;
-        if(msg.length>120){ this.showNotification('消息过长 (≤120 字)。','error'); return; }
-        db.ref(`games/${this.gameId}/wolfChat`).push({pid:this.playerId,msg,ts:firebase.database.ServerValue.TIMESTAMP});
-        input.value='';
-    },
-
-    async wolfConfirmKill(targetId){
-        // 权限校验：必须是当前拍板狼，且可行动，且狼行动为 pending
-        const alpha=this.getAlphaWolfId();
-        if(this.playerId!==alpha || !this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){
-            this.showNotification('你无权确认或当前不可确认。','error'); return;
-        }
-        const actionRef=db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/wolf`);
-        actionRef.transaction(cur=>{ if(cur) return; return {target:targetId,actorId:this.playerId}; })
-        .then(async (res)=>{
-            if(res.committed){
-                await this.addGameLog(`🐺 狼队决定袭击 ${targetId==='0'?'空刀':targetId+'号'} (由${this.playerId}号确认)`,true);
-                await db.ref(`games/${this.gameId}/state/nightStatus`).transaction(st=>{ if(!st) return st; st.wolf='complete'; if(st.witch==='locked') st.witch='pending'; return st; });
-                this.showNotification(`狼队已决定袭击 ${targetId==='0'?'空刀':targetId+'号'}`,'info');
-            }
-        });
-    },
-
-    // 预言家查阵营（隐狼躲验；若任一张是“狼人”，则判为狼人）
-    async seerCheck(targetId){
-        const target=this.allPlayers[targetId];
-        const hasRegularWolf = (target.identities||[]).some(id=>id.role==='狼人');
-        const hasInvisibleWolf = (target.identities||[]).some(id=>id.role==='隐狼');
-        const result = hasRegularWolf ? '狼人' : '好人'; // 隐狼不暴露
-        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target:targetId, result, actorId:this.playerId });
-        await this.addGameLog(`🔮 预言家(${this.playerId}号)查验 ${targetId}号, 结果为 ${result}`, true);
-        await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
-        const results=this.getGlobalSkillState('seerResults')||{}; results[targetId]=result;
-        await this.setGlobalSkillState('seerResults',results);
-        this.showNotification(`查验结果：${targetId}号是${result==='狼人'?'🐺 狼人':'😇 好人'}`,'success');
-    },
-    async seerSkip(){
-        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({ target:null, actorId:this.playerId, skipped:true });
-        await this.addGameLog(`🔮 预言家(${this.playerId}号)跳过查验`, true);
-        await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
-    },
-
-    async guardProtect(targetId){
-        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target:targetId, actorId:this.playerId });
-        await this.addGameLog(`🛡️ 守卫(${this.playerId}号)守护了 ${targetId}号`, true);
-        await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
-        await this.setSkillState('lastGuardTarget',targetId);
-        this.showNotification(`你守护了 ${targetId}号`,'success');
-    },
-    async guardSkip(){
-        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({ target:null, actorId:this.playerId });
-        await this.addGameLog(`🛡️ 守卫(${this.playerId}号)空守`, true);
-        await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete');
-        await this.setSkillState('lastGuardTarget',null);
-    },
-
-    async witchUseCure(targetId){
-        const identityIndex=this.playerData.deaths;
-        const actionRef=db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`);
-        actionRef.transaction(states=>{ if(!states) states={}; const key=`${identityIndex}_hasUsedCure`; if(states[key]) return; states[key]=true; return states; })
-        .then(async (res)=>{
-            if(res.committed){
-                await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({cure:targetId});
-                await this.addGameLog(`🧪 女巫(${this.playerId}号)使用解药救了 ${targetId}号`, true);
-                await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
-                this.showNotification(`你使用解药救了 ${targetId}号`,'success');
-            }
-        });
-    },
-    async witchUsePoison(targetId){
-        const identityIndex=this.playerData.deaths;
-        const actionRef=db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`);
-        actionRef.transaction(states=>{ if(!states) states={}; const key=`${identityIndex}_hasUsedPoison`; if(states[key]) return; states[key]=true; return states; })
-        .then(async (res)=>{
-            if(res.committed){
-                await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({poison:targetId});
-                await this.addGameLog(`🧪 女巫(${this.playerId}号)使用毒药毒杀了 ${targetId}号`, true);
-                await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
-                this.showNotification(`你使用毒药毒杀了 ${targetId}号`,'error');
-            }
-        });
-    },
-    async witchSkip(){
-        await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({ actorId:this.playerId, skipped:true });
-        await this.addGameLog(`🧪 女巫(${this.playerId}号)没有使用药水`, true);
-        await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
-    },
-
-    async knight(targetId){
-        await this.setSkillState('hasUsedDuel',true);
-        const target=this.allPlayers[targetId];
-        const targetRole=this.getActiveRole(target);
-        const isEvil=['狼人','隐狼'].includes(targetRole);
-        const loserId=isEvil?targetId:this.playerId;
-        const loserRole=isEvil?targetRole:this.getActiveRole(this.playerData);
-        await this.addGameLog(`⚔️ 骑士 ${this.playerId}号 对 ${targetId}号 发动决斗！`);
-        const killResult=await this.kill(loserId,'DUEL');
-        if(isEvil){
-            await this.addGameLog(`决斗成功！${loserId}号 (${loserRole}) 阵亡！游戏直接进入夜晚。`);
-            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction:'NIGHT' });
-        }else{
-            await this.addGameLog(`决斗失败！骑士 ${loserId}号 阵亡！`);
-            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction:'DAY' });
-        }
-    },
-
-    async hunter(targetId){
-        await this.addGameLog(`🔫 猎人 ${this.playerId}号 开枪带走了 ${targetId}号！`);
-        // 当前执行者出队
-        await db.ref(`games/${this.gameId}/state/hunterQueue/${this.playerId}`).set(null);
-        const killResult=await this.kill(targetId,'HUNTER');
-        if(killResult.sheriffDied) return; // 警长死亡优先等待移交
-        // 检查是否还有猎人
-        const remaining= (await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val() || {};
-        if(Object.keys(remaining).length>0){
-            await this.updatePhase('HUNTER_ACTION');
-        }else{
-            const nextPhase = this.gameState.postDeathState?.nextPhase || (this.gameState.phase==='DAY'?'NIGHT':'DAY');
-            // 若非警徽移交场景，清理 postDeathState
-            if(!this.gameState.postDeathState || !this.gameState.postDeathState.deadSheriffId){
-                await db.ref(`games/${this.gameId}/state/postDeathState`).set(null);
-            }
-            await this.updatePhase(nextPhase);
-        }
-    },
-
-    // 计票
-    async tallySheriffVotes(){
-        const votes=this.fullGameData.sheriff?.votes||{};
-        const voteCounts={};
-        Object.values(votes).forEach(target=>{ if(target!=='0') voteCounts[target]=(voteCounts[target]||0)+1; });
-        const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
-        let details='警长投票详情：'+voters.map(voter=>{
-            const t=votes[voter.id];
-            if(t===undefined) return `${voter.id}号(未投票)`;
-            if(t==='0') return `${voter.id}号(弃票)`;
-            return `${voter.id}号 → ${t}号`;
-        }).join('，');
-        await this.addGameLog(details);
-
-        const maxVotes=Object.keys(voteCounts).length>0?Math.max(...Object.values(voteCounts)):0;
-        const winners=Object.keys(voteCounts).filter(id=>voteCounts[id]===maxVotes);
-        if(winners.length===1){
-            const sheriffId=winners[0];
-            await db.ref(`games/${this.gameId}/players/${sheriffId}/badge`).set(1);
-            await this.addGameLog(`👑 投票结束，${sheriffId}号玩家当选警长！`);
-            if(this.gameState.round===1){ await this.processNight(); } else { await this.updatePhase('DAY'); }
-        }else{
-            const message=winners.length>1?`平票：${winners.join('、')}号。重新发言并投票。`:'无人当选警长，此后无警长。';
-            await this.addGameLog(`⚖️ ${message}`);
-            const newCandidates={}; if(winners.length>1) winners.forEach(id=>newCandidates[id]=1);
-            await db.ref(`games/${this.gameId}/sheriff`).set({ candidates:newCandidates, votes:{}, drops:{} });
-            if(winners.length>1) await this.updatePhase('SHERIFF_SPEECH');
-            else if(this.gameState.round===1) { await this.processNight(); }
-            else { await this.updatePhase('DAY'); }
-        }
-    },
-
-    async tallyDayVotes(){
-        const votes=this.fullGameData.dayVotes?.[this.gameState.round]||{};
-        const voteCounts={};
-        const sheriffId=Object.keys(this.allPlayers).find(id=>this.allPlayers[id].badge);
-        const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
-        let details='放逐投票详情：'+voters.map(voter=>{
-            const t=votes[voter.id];
-            if(t===undefined) return `${voter.id}号(未投票)`;
-            if(t==='0') return `${voter.id}号(弃票)`;
-            return `${voter.id}号${sheriffId==voter.id?'(警长)':''} → ${t}号`;
-        }).join('，');
-        await this.addGameLog(details);
-
-        Object.entries(votes).forEach(([voterId,targetId])=>{
-            if(targetId!=='0'){
-                const w=voterId==sheriffId?1.5:1; voteCounts[targetId]=(voteCounts[targetId]||0)+w;
-            }
-        });
-        const maxVotes=Object.keys(voteCounts).length>0?Math.max(...Object.values(voteCounts)):0;
-        const votedOut=Object.keys(voteCounts).filter(id=>voteCounts[id]===maxVotes);
-
-        if(votedOut.length===1){
-            const targetId=votedOut[0];
-            await this.addGameLog(`⚖️ 投票结束, ${targetId}号玩家以 ${voteCounts[targetId]} 票被放逐。`);
-            const killResult=await this.kill(targetId,'VOTE');
-            await this.handlePostDeath({ ...killResult, nextPhaseIfNoAction:'NIGHT' });
-        }else{
-            const message=votedOut.length>1?`平票：${votedOut.join('、')}号。无人出局。`:'无人被投出。';
-            await this.addGameLog(`⚖️ ${message}`);
-            await this.updatePhase('NIGHT');
-        }
-    },
-
-    async playerPassBadge(toPlayerId){
-        const transferState=this.gameState.postDeathState||{};
-        if(this.playerId!==transferState.deadSheriffId){ this.showNotification('你无权操作警徽。','error'); return; }
-        const updates={ [`players/${transferState.deadSheriffId}/badge`]:0, [`players/${toPlayerId}/badge`]:1, 'state/postDeathState':null };
-        await db.ref(`games/${this.gameId}`).update(updates);
-        await this.addGameLog(`👑 警徽已由 ${transferState.deadSheriffId}号 移交给 ${toPlayerId} 号。`);
-        await this.handlePostDeath({ hunterTriggered:transferState.hunterTriggered, sheriffDied:false, nextPhaseIfNoAction:transferState.nextPhase });
-    },
-    async playerDestroyBadge(isForced=false){
-        const transferState=this.gameState.postDeathState||{};
-        if(!isForced && this.playerId!==transferState.deadSheriffId){ this.showNotification('你无权操作警徽。','error'); return; }
-        const updates={ [`players/${transferState.deadSheriffId}/badge`]:0, 'state/postDeathState':null };
-        await db.ref(`games/${this.gameId}`).update(updates);
-        await this.addGameLog(`💔 警徽已被 ${transferState.deadSheriffId}号 撕毁。`);
-        await this.handlePostDeath({ hunterTriggered:transferState.hunterTriggered, sheriffDied:false, nextPhaseIfNoAction:transferState.nextPhase });
-    },
-
-    async handlePostDeath({ hunterTriggered, sheriffDied, nextPhaseIfNoAction='DAY' }){
-        if(sheriffDied) return;
-        const isGameOver=await this.checkWin(); if(isGameOver) return;
-        const hunterQueue=(await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val()||{};
-        if(Object.keys(hunterQueue).length>0){
-            // 存储回流阶段
-            await db.ref(`games/${this.gameId}/state/postDeathState`).transaction(v=>{
-                v=v||{}; v.nextPhase=nextPhaseIfNoAction; return v;
-            });
-            await this.updatePhase('HUNTER_ACTION');
-        }else if(nextPhaseIfNoAction){
-            await this.updatePhase(nextPhaseIfNoAction);
-        }
-    },
-
-    async kill(pid,cause){
-        let resultState={ hunterTriggered:false, sheriffDied:false };
-        const playerRef=db.ref(`games/${this.gameId}/players/${pid}`);
-        const pBefore=this.allPlayers[pid];
-        if(!pBefore || !pBefore.isAlive) return resultState;
-
-        const roleBeforeDeath=this.getActiveRole(pBefore);
-        let idiotFlipped=false;
-        const trx=await playerRef.transaction(p=>{
-            if(!p || !p.isAlive) return p;
-            const diedIdentityIndex=p.deaths;
-            const diedIdentity=p.identities[diedIdentityIndex];
-            if(cause==='VOTE' && diedIdentity && diedIdentity.role==='白痴' && !p.isExposedIdiot){
-                p.isExposedIdiot=true; idiotFlipped=true;
-                // 特例：翻牌仍失去一条命（按你当前规则保留）
-            }
-            p.deaths=Math.min(p.deaths+1,2);
-            if(p.deaths>=2) p.isAlive=false;
-            return p;
-        });
-        if(!trx.committed) return resultState;
-        if(idiotFlipped){ await this.addGameLog(`🤪 ${pid}号玩家因被投票出局，翻开其白痴身份！`); }
-
-        const p=trx.snapshot.val(); const wasSheriff=pBefore.badge; const isNowDead=!p.isAlive;
-        const willTriggerHunter = roleBeforeDeath==='猎人' && (['NIGHT','VOTE','POISON','DUEL'].includes(cause));
-        if(willTriggerHunter){
-            await db.ref(`games/${this.gameId}/state/hunterQueue/${pid}`).set(true);
-            resultState.hunterTriggered=true;
-        }
-        if(isNowDead && wasSheriff){
-            const nextPhase=(cause==='DAY'||cause==='VOTE'||cause==='DUEL')?'NIGHT':'DAY';
-            await db.ref(`games/${this.gameId}/state`).update({ phase:'SHERIFF_TRANSFER', postDeathState:{ deadSheriffId:pid, hunterTriggered:resultState.hunterTriggered, nextPhase:nextPhase } });
-            resultState.sheriffDied=true;
-        }
-        await this.checkWin();
-        return resultState;
-    },
-
-    async processNight(){
-        await this.addGameLog(`🌙 天亮了。`);
-        const actions=this.fullGameData.nightActions?.[this.gameState.round]||{};
-        const nightDeaths=[];
-        const wolfTarget=actions.wolf?.target;
-        const guardTarget=actions.guard?.target;
-        const witchCure=actions.witch?.cure;
-        const witchPoison=actions.witch?.poison;
-
-        if(wolfTarget && wolfTarget!=='0'){
-            const isGuarded=guardTarget===wolfTarget;
-            const isCured=witchCure===wolfTarget;
-            if(!isGuarded && !isCured){ nightDeaths.push({pid:wolfTarget,cause:'NIGHT'}); }
-        }
-        if(witchPoison){
-            if(!nightDeaths.some(d=>d.pid===witchPoison)){ nightDeaths.push({pid:witchPoison,cause:'POISON'}); }
-        }
-
-        let anyHunterTriggered=false, anySheriffDied=false;
-        if(nightDeaths.length>0){
-            const deadIds=[...new Set(nightDeaths.map(d=>d.pid))].sort((a,b)=>a-b).join('号、');
-            await this.addGameLog(`死亡的玩家是：${deadIds}号`);
-            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);
-            for(const d of nightDeaths){
-                const res=await this.kill(d.pid,d.cause);
-                if(res.hunterTriggered) anyHunterTriggered=true;
-                if(res.sheriffDied){ anySheriffDied=true; break; }
-            }
-        }else{
-            await this.addGameLog(`昨夜是平安夜。`);
-            const newStreak=(this.gameState.peaceNightStreak||0)+1;
-            await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(newStreak);
-        }
-        const nextPhase='DAY';
-        await this.handlePostDeath({ hunterTriggered:anyHunterTriggered, sheriffDied:anySheriffDied, nextPhaseIfNoAction:nextPhase });
-    },
-
-    async checkWin(){
-        await new Promise(r=>setTimeout(r,100));
-        const snapshot=await db.ref(`games/${this.gameId}`).once('value');
-        if(!snapshot.exists()) return false;
-        const g=snapshot.val();
-        if(g.state.phase==='GAME_OVER') return true;
-
-        let winner=null;
-        const allPlayers=Object.values(g.players);
-        const wolfPlayers=allPlayers.filter(p=>p.originalIdentities.some(id=>ROLES[id.role].faction==='bad'));
-        const godPlayers=allPlayers.filter(p=>p.originalIdentities.some(id=>ROLES[id.role].isGod));
-        const goldenBabyPlayers=allPlayers.filter(p=>p.originalIdentities.every(id=>id.role==='平民'));
-
-        const areAllWolvesDead=wolfPlayers.every(p=>!p.isAlive);
-        if(areAllWolvesDead) winner='游戏结束 - 好人阵营胜利！(狼人已全部出局)';
-        if(g.state.peaceNightStreak>=3) winner='游戏结束 - 好人阵营胜利！(连续三晚平安夜)';
-
-        if(!winner){
-            const areAllGodsDead=godPlayers.every(p=>!p.isAlive);
-            if(areAllGodsDead) winner='游戏结束 - 狼人阵营胜利！(神职已全部出局)';
-            const areAllGoldenBabiesDead=goldenBabyPlayers.length>0 && goldenBabyPlayers.every(p=>!p.isAlive);
-            if(areAllGoldenBabiesDead) winner='游戏结束 - 狼人阵营胜利！(金宝宝已全部出局)';
-        }
-        if(winner){
-            await db.ref(`games/${this.gameId}/state`).update({ phase:'GAME_OVER', winner });
-            await this.addGameLog(`🏆 ${winner}`);
-            return true;
-        }
-        return false;
-    },
-
-    // Helpers
-    getActiveRole(p){ if(!p || !p.isAlive) return null; if(p.deaths>=p.identities.length) return null; const current=p.identities[p.deaths]; return current?current.role:null; },
-    isAnyWolfInGame(){ return Object.values(this.allPlayers).some(p=>p.isAlive && ['狼人','隐狼'].includes(this.getActiveRole(p))); },
-    canWolfAct(p){
-        const role=this.getActiveRole(p);
-        if(!['狼人','隐狼'].includes(role)) return false;
-        if(role==='狼人') return true;
-        if(role==='隐狼'){ const livingRegular=Object.values(this.allPlayers).filter(p2=>p2.isAlive && this.getActiveRole(p2)==='狼人'); return livingRegular.length===0; }
-        return false;
-    },
-    getAlphaWolfId(){
-        const livingRegular=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='狼人');
-        if(livingRegular.length>0) return Math.min(...livingRegular.map(p=>p.id)).toString();
-        const livingInvisible=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='隐狼');
-        if(livingInvisible.length>0) return Math.min(...livingInvisible.map(p=>p.id)).toString();
-        return null;
-    },
-    getSkillState(key,player=null,identityIndex=-1){ const p=player||this.playerData; if(!p) return undefined; const idx=identityIndex!==-1?identityIndex:p.deaths; return (p.skillStates||{})[`${idx}_${key}`]; },
-    async setSkillState(key,value){ const idx=this.playerData.deaths; const stateKey=`${idx}_${key}`; await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${stateKey}`).set(value); },
-    getGlobalSkillState(key,player=null){ const p=player||this.playerData; if(!p) return undefined; return (p.skillStates||{})[`global_${key}`]; },
-    async setGlobalSkillState(key,value){ await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/global_${key}`).set(value); },
-
-    // 狼人频道
-    initWolfListeners(){
-        this.stopWolfListeners(false);
-        const myRole=this.getActiveRole(this.playerData);
-        if(!['狼人','隐狼'].includes(myRole)) return;
-        const alphaWolfId=this.getAlphaWolfId();
-
-        this.wolfVotesCallbackRef=(s)=>{
-            const votes=s.val()||{};
-            const displayEl=this.$('wolf-votes-display'); if(!displayEl) return;
-            let wolvesToDisplayInVotePanel;
-            if(myRole==='隐狼'){ wolvesToDisplayInVotePanel=Object.values(this.allPlayers).filter(p=>p.isAlive && ['狼人','隐狼'].includes(this.getActiveRole(p))); }
-            else { wolvesToDisplayInVotePanel=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='狼人'); }
-            let display='<h4>投票情况</h4><div class="info-box">';
-            wolvesToDisplayInVotePanel.forEach(wolf=>{
-                const voteTarget=votes[wolf.id];
-                const voteText=voteTarget!=null?(voteTarget==='0'?'空刀':`${voteTarget}号`):'尚未投票';
-                const isAlpha=wolf.id.toString()===alphaWolfId;
-                display+=`<p>${wolf.id}号 ${isAlpha?'<strong>(拍板狼)</strong>':''} → ${voteText}</p>`;
-            });
-            display+='</div>';
-            if(this.playerId===alphaWolfId && votes[alphaWolfId]!=null){
-                const alphaVote=votes[alphaWolfId];
-                display+=`<div style="text-align:center;margin-top:15px;"><p style="color:var(--success);font-size:1.2em;">你是拍板狼，请确认行动</p><button class="confirm-btn" data-action="wolf-confirm" data-id="${alphaVote}">确认袭击 ${alphaVote==='0'?'空刀':alphaVote+'号'}</button></div>`;
-            }else if(!alphaWolfId){
-                display+='<p style="text-align:center;">没有狼人可以行动。</p>';
-            }else if(votes[alphaWolfId]==null){
-                display+=`<p style="text-align:center;">等待 ${alphaWolfId}号 (拍板狼) 投票...</p>`;
-            }
-            displayEl.innerHTML=display;
-        };
-        this.wolfVotesListener=db.ref(`games/${this.gameId}/wolfVotes`);
-        this.wolfVotesListener.on('value',this.wolfVotesCallbackRef);
-        this.wolfVotesListener.once('value').then(this.wolfVotesCallbackRef);
-
-        if(myRole==='狼人'){
-            const chatRef=db.ref(`games/${this.gameId}/wolfChat`);
-            const chatBox=this.$('wolf-chat-messages'); if(chatBox) chatBox.innerHTML='';
-            this.wolfChatListener=chatRef.limitToLast(50).on('child_added',s=>{
-                if(!s.exists()) return; const {pid,msg}=s.val(); const box=this.$('wolf-chat-messages'); if(box){ const p=document.createElement('p'); const b=document.createElement('b'); b.textContent=`${pid}号`; p.appendChild(b); p.appendChild(document.createTextNode(`：${this.escapeHTML(msg)}`)); box.appendChild(p); box.scrollTop=box.scrollHeight; }
-            });
-        }
-    },
-    stopWolfListeners(hideUI=true){
-        if(this.wolfVotesListener){ db.ref(`games/${this.gameId}/wolfVotes`).off('value',this.wolfVotesCallbackRef); this.wolfVotesListener=null; this.wolfVotesCallbackRef=null; }
-        if(this.wolfChatListener){ db.ref(`games/${this.gameId}/wolfChat`).off('child_added',this.wolfChatListener); this.wolfChatListener=null; }
-        if(hideUI){ const chatEl=this.$('wolf-chat-area'); if(chatEl) chatEl.classList.add('hidden'); }
+  gameId:null, playerId:null, isHost:false,
+  allPlayers:{}, playerData:null, fullGameData:null, gameState:null,
+  gameListener:null, logListener:null, logQueryRef:null, seenLogKeys:new Set(),
+  wolfChatListener:null, wolfVotesListener:null, wolfVotesCallbackRef:null,
+  selection:null, // { type:'seer'|'guard'|'wolf-vote'|'day-vote'|'knight'|'hunter'|'sheriff-vote'|'sheriff-pass'|'witch-poison', targetId:'id'|null }
+
+  $(id){return document.getElementById(id)},
+  escapeHTML(s){return typeof s==='string'?s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])):''},
+  showNotification(message,type='info',duration=5000){const c=this.$('notification-container');const d=document.createElement('div');d.className=`notification ${type}`;d.textContent=this.escapeHTML(message);c.appendChild(d);setTimeout(()=>d.remove(),duration);},
+  async addGameLog(message,isSecret=false){const entry={message,round:this.gameState?.round||0,timestamp:firebase.database.ServerValue.TIMESTAMP,isSecret}; await db.ref(`games/${this.gameId}/logs`).push(entry);},
+  _shuffle(a){let i=a.length,r;while(i){r=Math.floor(Math.random()*i--);[a[i],a[r]]=[a[r],a[i]]}return a;},
+
+  async init(){
+    const q=new URLSearchParams(location.search);
+    this.gameId=q.get('game'); this.playerId=q.get('player');
+
+    // 占位换座
+    if(this.gameId && this.playerId==='PLAYER_ID'){
+      const app=document.querySelector('.app');
+      app.innerHTML=`<div class="panel" style="padding:18px;">
+        <h3>输入你的座位号</h3>
+        <div class="info-box">请输入法官分配给你的座位号（数字），然后点击加入游戏。</div>
+        <div class="inline"><input type="number" id="player-id-input" placeholder="座位号" style="width:140px"><button class="confirm-btn" id="join-game-btn">加入游戏</button></div>
+      </div>`;
+      document.getElementById('join-game-btn').addEventListener('click',()=>{
+        const id=document.getElementById('player-id-input').value;
+        if(id && !isNaN(id) && id>0){ const u=new URL(location.href); u.searchParams.set('player',id); location.href=u.toString(); }
+        else this.showNotification('请输入有效座位号','error');
+      });
+      return;
     }
+
+    document.body.addEventListener('click',this.handleGlobalClick.bind(this));
+
+    if(!this.gameId){ this.showView('setup'); this.renderRoleSetup(); }
+    else { await this.startApp(); }
+  },
+
+  showView(v){ ['setup-view','game-view','god-view'].forEach(id=>{const el=this.$(id); if(el) el.classList.add('hidden');}); const t=this.$(v+'-view'); if(t) t.classList.remove('hidden'); },
+
+  async startApp(){
+    const snap=await db.ref(`games/${this.gameId}`).once('value');
+    if(!snap.exists()){ document.body.innerHTML='<h2 style="padding:18px;">游戏不存在或已损坏</h2>'; return; }
+    if(this.playerId==='0'){ this.showView('god'); this.listenToGameChanges(this.renderGodView.bind(this)); }
+    else { this.showView('game'); this.listenToGameChanges(this.renderAll.bind(this)); this.listenToLogs(); }
+  },
+
+  // 事件分发
+  handleGlobalClick(e){
+    const btn=e.target.closest('button[data-action]'); if(!btn) return;
+    const {action,id,value,inputid,target}=btn.dataset;
+
+    if(action==='copy-link'){ const el=this.$(inputid); if(el){ el.select(); el.setSelectionRange(0,99999); navigator.clipboard.writeText(el.value).then(()=>this.showNotification('链接已复制','success')); } return; }
+    if(action==='open-logs'){ this.openModal('logs-modal'); return; }
+    if(action==='open-wolf'){ this.openWolfModal(); return; }
+    if(action==='close-modal'){ this.closeModal(target); return; }
+
+    // 主持操作
+    if(action.startsWith('host-') && !this.isHost) return;
+    switch(action){
+      case 'join-as-creator': this.gameId=value; this.playerId='1'; history.pushState(null,'',`?game=${this.gameId}&player=${this.playerId}`); this.startApp(); return;
+      case 'create-game': this.createGame(); return;
+
+      // Host flow
+      case 'host-start': this.updatePhase('NIGHT',1); return;
+      case 'host-force-start': if(confirm('强制开始? 未准备玩家保持当前顺序')){ const up={}; Object.values(this.allPlayers).forEach(p=>{if(!p.isReady) up[`players/${p.id}/isReady`]=true}); db.ref(`games/${this.gameId}`).update(up).then(()=>this.updatePhase('NIGHT',1)); } return;
+      case 'host-sheriff-cand-init': this.updatePhase('SHERIFF_CAND'); return;
+      case 'host-sheriff-speech': this.updatePhase('SHERIFF_SPEECH'); return;
+      case 'host-sheriff-vote': this.hostEnterSheriffVote(); return;
+      case 'host-sheriff-elect-single': this.hostSheriffElectSingle(); return;
+      case 'host-tally-sheriff': this.tallySheriffVotes(); return;
+      case 'host-force-tally-sheriff': if(confirm('强制计票? 未投视为不计入')) this.tallySheriffVotes(); return;
+      case 'host-day': this.processNight(); return;
+      case 'host-force-day': if(confirm('强制进入白天？未行动视为无操作')) this.processNight(); return;
+      case 'host-open-day-vote': db.ref(`games/${this.gameId}/state/dayVotingOpen`).set(true); return;
+      case 'host-close-day-vote': db.ref(`games/${this.gameId}/state/dayVotingOpen`).set(false); return;
+      case 'host-tally-day': this.tallyDayVotes(); return;
+      case 'host-force-tally-day': this.tallyDayVotes(); return;
+      case 'host-force-badge-destroy': if(confirm('强制撕毁警徽?')) this.playerDestroyBadge(true); return;
+
+      // 玩家常规
+      case 'swap-identities': db.ref(`games/${this.gameId}/players/${this.playerId}/identities`).transaction(ids=>ids?[ids[1],ids[0]]:null); return;
+      case 'confirm-identities': db.ref(`games/${this.gameId}/players/${this.playerId}/isReady`).transaction(v=>v||true); return;
+
+      // Sheriff
+      case 'sheriff-cand': db.ref(`games/${this.gameId}/sheriff/candidates/${this.playerId}`).set(Number(value)); return;
+      case 'sheriff-drop': db.ref(`games/${this.gameId}/sheriff/drops/${this.playerId}`).set(true); return;
+
+      // Selection统一确认
+      case 'confirm-selection': this.confirmSelection(); return;
+      case 'skip-selection': this.skipSelection(); return;
+      case 'cancel-selection': this.clearSelection(); this.renderActionPanel(); return;
+
+      // 狼窝提交
+      case 'wolf-confirm': this.wolfConfirmKill(value); return;
+
+      // 警徽移交（从选择确认里处理）
+    }
+  },
+
+  openModal(id){ const m=this.$(id); if(!m) return; m.classList.add('open'); const onClick=(e)=>{ if(e.target===m){ this.closeModal(id); } }; m._outsideHandler=onClick; m.addEventListener('click',onClick); },
+  closeModal(id){ const m=this.$(id); if(!m) return; m.classList.remove('open'); if(m._outsideHandler){ m.removeEventListener('click',m._outsideHandler); m._outsideHandler=null; }},
+
+  // 狼窝：根据身份展示聊天和投票状态
+  openWolfModal(){
+    const myType=this.getViewerWolfType(); // 'regular'|'hidden'|null
+    const modal=this.$('wolf-modal');
+    const chatArea=this.$('wolf-chat-area');
+    const tips=this.$('wolf-modal-tips');
+    if(myType==='regular'){
+      chatArea.classList.remove('hidden');
+      tips.textContent='提示：所有普通狼人均可投票，拍板狼（最小座位号的存活普通狼）负责确认刀口。';
+    }else if(myType==='hidden'){
+      chatArea.classList.add('hidden');
+      tips.textContent='你是隐狼：可以看到普通狼人投票，但不能参与私聊与投票（除非场上无普通狼人存活）。';
+    }else{
+      chatArea.classList.add('hidden');
+      tips.textContent='你不是狼人，无法使用狼窝。';
+    }
+    this.openModal('wolf-modal');
+    this.initWolfListeners(); // 更新投票展示
+  },
+
+  // 监听日志（玩家端：非秘密）
+  listenToLogs(){
+    if(this.logQueryRef && this.logListener) this.logQueryRef.off('child_added',this.logListener);
+    this.seenLogKeys.clear();
+    this.logQueryRef=db.ref(`games/${this.gameId}/logs`).limitToLast(200);
+    this.logListener=this.logQueryRef.on('child_added',snap=>{
+      if(!snap.exists()) return;
+      const key=snap.key; if(this.seenLogKeys.has(key)) return; this.seenLogKeys.add(key);
+      const log=snap.val(); if(log && !log.isSecret){
+        const cont=this.$('game-log-content');
+        const p=document.createElement('div'); p.className='log-item';
+        const prefix=log.round>0?`[第 ${log.round} 轮] `:'';
+        p.textContent=prefix+log.message;
+        cont.appendChild(p); cont.scrollTop=cont.scrollHeight;
+        if(!this.isHost) this.showNotification(log.message,'info');
+      }
+    });
+  },
+
+  listenToGameChanges(render){
+    if(this.gameListener) db.ref(`games/${this.gameId}`).off('value',this.gameListener);
+    this.gameListener=db.ref(`games/${this.gameId}`).on('value',s=>{
+      if(!s.exists()){ document.body.innerHTML='<h2 style="padding:18px;">游戏已结束或不存在</h2>'; return; }
+      const g=s.val();
+      this.fullGameData=g; this.gameState=g.state; this.allPlayers=g.players;
+      if(this.playerId!=='0'){
+        if(!g.players || !g.players[this.playerId]){ document.body.innerHTML='<h2 style="padding:18px;">错误：你不是该游戏的玩家</h2>'; return; }
+        this.playerData=g.players[this.playerId];
+        this.isHost=this.playerData.id==this.gameState.creatorId;
+      }
+      // 关闭狼窝监听（非夜晚）
+      if(this.gameState.phase!=='NIGHT'){ this.stopWolfListeners(); this.closeModal('wolf-modal'); }
+      // 清空选择（跨阶段）
+      this.selection=null;
+      render();
+    });
+  },
+
+  // ===== 创建与设置 =====
+  renderRoleSetup(){
+    const c=this.$('role-setup'); c.innerHTML='';
+    const mk=(name)=>{const icon=ROLES[name].icon||''; const v=DEFAULT_SETUP[name]; const div=document.createElement('div'); div.className='role-setup-item'; div.innerHTML=`<span><span style="margin-right:8px">${icon}</span>${name}</span><input type="number" id="role-${name}" min="0" value="${v}">`; c.appendChild(div);};
+    Object.keys(DEFAULT_SETUP).forEach(mk);
+    const u=()=>{ let t=0; c.querySelectorAll('input').forEach(i=>t+=+i.value||0); this.$('total-roles').textContent=t; const pc=t>0 && t%2===0? t/2 : '身份总数必须为偶数'; this.$('player-cnt').textContent=pc; this.$('player-count-warning').textContent= typeof pc==='number' && pc>9 ? '(推荐≤9人)' : ''; };
+    c.oninput=u; u();
+  },
+
+  async createGame(){
+    const btn=this.$('btn-create'); btn.disabled=true; this.$('create-text').classList.add('hidden'); this.$('create-spinner').classList.remove('hidden');
+    const errorEl=this.$('setup-error'); errorEl.classList.add('hidden'); errorEl.textContent='';
+
+    const pool=[]; let cfg='当前配置：';
+    this.$('role-setup').querySelectorAll('input').forEach(i=>{const r=i.id.replace('role-',''), n=+i.value; if(n>0) cfg+=`${r}x${n} `; for(let k=0;k<n;k++) pool.push(r);});
+    if(pool.length===0 || pool.length%2!==0){ return this.setupFail('身份总数需为偶数且大于0'); }
+    if(pool.length/2>12){ return this.setupFail('玩家过多，建议不超过12人。'); }
+
+    const pairs=this.deal(pool);
+    if(!pairs){ return this.setupFail(`无法生成符合规则的牌组，请调整身份配置后重试。<br><small>${cfg}</small>`); }
+
+    const gId=db.ref('games').push().key, pc=pool.length/2, players={};
+    for(let i=1;i<=pc;i++){
+      players[i]={id:i,identities:pairs[i-1],originalIdentities:JSON.parse(JSON.stringify(pairs[i-1])),deaths:0,isAlive:true,isReady:false,isExposedIdiot:false,skillStates:{},badge:0};
+    }
+    const config={
+      pc,
+      witchSelfSaveRule: this.$('opt-witch-selfsave').value, // noFirstNightSelfSave | onlyFirstNightSelfSave
+      seerMode: this.$('opt-seer-mode').value,              // faction | identity
+      wolfWin: this.$('opt-wolf-win').value                 // edge | exterminate
+    };
+    await db.ref(`games/${gId}`).set({
+      state:{phase:'SETUP',round:0,peaceNightStreak:0,winner:null,creatorId:1,nightStatus:{},hunterQueue:{},postDeathState:null,dayVotingOpen:false},
+      players, config, wolfChat:{}, wolfVotes:{}, nightActions:{}, sheriff:{}, dayVotes:{}, logs:{}
+    });
+
+    this.showNotification('游戏创建成功！','success');
+    this.$('role-setup').classList.add('hidden'); btn.classList.add('hidden');
+    const info=this.$('game-creation-info'); info.classList.remove('hidden');
+    const base=`${location.origin}${location.pathname}`, url=`${base}?game=${gId}&player=PLAYER_ID`;
+    info.innerHTML=`<div class="info-box">将以下链接模板分发给玩家，将 PLAYER_ID 替换为座位号。</div>
+      <div class="inline"><input id="player-link-template" style="flex:1" value="${url}" readonly><button data-action="copy-link" data-inputid="player-link-template" class="control-btn">复制</button></div>
+      <div style="margin-top:8px;text-align:center;"><button data-action="join-as-creator" value="${gId}" class="confirm-btn">以1号玩家(主持人)进入</button></div>`;
+  },
+  setupFail(msg){ const e=this.$('setup-error'); e.innerHTML=msg; e.classList.remove('hidden'); const btn=this.$('btn-create'); btn.disabled=false; this.$('create-text').classList.remove('hidden'); this.$('create-spinner').classList.add('hidden'); },
+
+  // 发牌（盗贼完全复制；禁：双隐狼/隐狼+狼/盗贼+隐狼/预言家+狼/预言家+隐狼）
+  deal(pool){
+    for(let t=0;t<5000;t++){
+      const s=this._shuffle([...pool]); let ok=true;
+      const raw=[]; for(let i=0;i<s.length;i+=2){raw.push([s[i],s[i+1]].sort());}
+      for(const p of raw){ if(FORBIDDEN_RAW.some(([a,b])=>(a===p[0]&&b===p[1])||(a===p[1]&&b===p[0]))){ok=false;break;} }
+      if(!ok) continue;
+      const finalPairs=[], cnt={};
+      for(const p of raw){
+        let a,b;
+        if(p[0]==='盗贼'){ a={r:p[1],t:true}; b={r:p[1],t:false}; }
+        else { a={r:p[0],t:false}; b={r:p[1],t:false}; }
+        finalPairs.push([{role:a.r,isThiefCopy:a.t},{role:b.r,isThiefCopy:b.t}]);
+        cnt[a.r]=(cnt[a.r]||0)+1; cnt[b.r]=(cnt[b.r]||0)+1;
+      }
+      // 金宝宝 1~2
+      const golden=finalPairs.filter(p=>p[0].role==='平民'&&p[1].role==='平民').length;
+      if(golden<1||golden>2) continue;
+      // 最终禁配检查
+      for(const p of finalPairs){ const roles=[p[0].role,p[1].role].sort(); if(FORBIDDEN_RAW.some(([a,b])=>(a===roles[0]&&b===roles[1])||(a===roles[1]&&b===roles[0]))){ok=false;break;} }
+      if(!ok) continue;
+      // 至少有狼
+      const wolves=(cnt['狼人']||0)+(cnt['隐狼']||0); if(wolves===0) continue;
+      // 至少有神
+      const gods=Object.keys(cnt).reduce((s,r)=>s+(ROLES[r].isGod?cnt[r]:0),0); if(gods===0) continue;
+      return finalPairs;
+    }
+    return null;
+  },
+
+  // ===== 渲染主界面 =====
+  renderAll(){
+    // 顶部徽标
+    this.$('host-badge').classList.toggle('hidden', !this.isHost);
+    this.$('sheriff-badge-top').classList.toggle('hidden', !this.playerData?.badge);
+
+    this.renderStatus();
+    this.renderIdentityCard();
+    this.renderPersistentInfo();
+    this.renderPlayerGrid();
+    this.renderActionPanel();
+    if(this.isHost) this.renderHostControls();
+    // 狼窝按钮可见性
+    const myType=this.getViewerWolfType();
+    this.$('btn-wolf').classList.toggle('hidden', !myType || this.gameState.phase!=='NIGHT');
+  },
+
+  renderStatus(){
+    const m={SETUP:'⏳ 等待所有玩家准备',NIGHT:`🌙 第 ${this.gameState.round} 夜`,SHERIFF_CAND:'👑 警长竞选：是否上警',SHERIFF_SPEECH:'👑 警长竞选：发言/退水',SHERIFF_VOTE:'👑 警长竞选：投票',DAY:`☀️ 第 ${this.gameState.round} 天`,GAME_OVER:`🏆 ${this.gameState.winner}`,HUNTER_ACTION:'🔫 猎人正在开枪',SHERIFF_TRANSFER:'💔 警长阵亡，等待移交'};
+    const el=this.$('status-bar'); el.textContent=m[this.gameState.phase]||'进行中';
+    if(this.gameState.phase==='GAME_OVER'){ this.$('status-bar').style.background='linear-gradient(135deg,#667eea 0%,#764ba2 100%)'; this.$('status-bar').style.color='#fff'; }
+  },
+
+  renderIdentityCard(){
+    const pd=this.playerData; if(!pd) return;
+    const i=pd.identities, d=pd.deaths;
+    const fmt=(id)=>`${ROLES[id.role].icon} ${id.isThiefCopy?`<span class="thief-copy">${id.role}</span>`:id.role}`;
+    this.$('identity-card').innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div><strong>你的身份</strong></div>
+        ${this.gameState.phase==='SETUP'&&!pd.isReady?'<div class="inline"><button class="action-btn" data-action="swap-identities">交换</button><button class="confirm-btn" data-action="confirm-identities">确定</button></div>':''}
+      </div>
+      <div style="margin-top:6px;font-size:16px;">
+        ${d>=1?'<span class="dead-identity">':''}${fmt(i[0])}${d>=1?'</span>':''}
+        <span style="margin:0 10px;">+</span>
+        ${d>=2?'<span class="dead-identity">':''}${fmt(i[1])}${d>=2?'</span>':''}
+      </div>`;
+  },
+
+  renderPersistentInfo(){
+    let h='';
+    // 预言家查验历史（全局）
+    if(this.getActiveRole(this.playerData)==='预言家'){
+      const mode=this.fullGameData.config?.seerMode||'faction';
+      const r=this.getGlobalSkillState('seerResults')||{};
+      const l=Object.entries(r).map(([id,res])=>`${id}号(${this.escapeHTML(res)})`).join('、 ');
+      if(l) h+=`<div><strong>🔮 查验历史(${mode==='faction'?'阵营':'身份'}):</strong> ${l}</div>`;
+    }
+    const el=this.$('persist'); el.innerHTML=h; el.classList.toggle('hidden', !h);
+  },
+
+  // 玩家网格（左右两列）
+  renderPlayerGrid(){
+    const left=this.$('player-grid-left'), right=this.$('player-grid-right');
+    left.innerHTML=''; right.innerHTML='';
+    const players=Object.values(this.allPlayers).sort((a,b)=>a.id-b.id);
+
+    // 根据视角标记队友
+    const viewerType=this.getViewerWolfType(); // 'regular'|'hidden'|null
+
+    const isTeammateForViewer=(p)=>{
+      if(!viewerType) return false;
+      const hasRole=(pp,role)=> (pp.originalIdentities||pp.identities).some(id=>id.role===role);
+      if(viewerType==='regular'){
+        // 普通狼只看到“普通狼人”（任何一张是狼人）
+        return hasRole(p,'狼人');
+      }else{
+        // 隐狼看到普通狼人
+        return hasRole(p,'狼人');
+      }
+    };
+
+    // 选择模式可选性
+    const selectable = (p)=>{
+      if(!this.selection) return false;
+      const type=this.selection.type;
+      const me=this.playerData;
+      switch(type){
+        case 'seer': return p.isAlive && p.id!=me.id;
+        case 'guard': {
+          if(!p.isAlive) return false;
+          const last=this.getSkillState('lastGuardTarget'); if(last && +last===+p.id) return false; // 不可连守
+          return true; // 允许自守/空守
+        }
+        case 'witch-poison': return p.isAlive && !p.isExposedIdiot && p.id!=me.id;
+        case 'wolf-vote': {
+          // 只能在狼夜、可行动时投
+          if(!p.isAlive) return false;
+          if(!this.canWolfAct(me)) return false;
+          return true;
+        }
+        case 'day-vote': return p.isAlive && !p.isExposedIdiot; // 可投自己
+        case 'knight': return p.isAlive && !p.isExposedIdiot && p.id!=me.id;
+        case 'hunter': return p.isAlive;
+        case 'sheriff-vote': {
+          const cand=this.fullGameData.sheriff?.candidates||{}, drops=this.fullGameData.sheriff?.drops||{};
+          return p.isAlive && cand[p.id] && !drops[p.id];
+        }
+        case 'sheriff-pass': return p.isAlive && p.id!=me.id;
+      }
+      return false;
+    };
+
+    const isDisabledCard=(p)=>{
+      // 若无选择模式，默认不可点击；但为了提示，死亡/白痴翻牌呈现样式
+      if(!this.selection) return true;
+      return !selectable(p);
+    };
+
+    const isSelected=(p)=> this.selection && this.selection.targetId && +this.selection.targetId===+p.id;
+
+    // 分两列（尽量平均）
+    const half=Math.ceil(players.length/2);
+    const leftList=players.slice(0,half), rightList=players.slice(half);
+
+    const renderCard=(p)=>{
+      const live=2-p.deaths;
+      const card=document.createElement('div');
+      card.className='player-card';
+      if(this.playerId && +this.playerId===+p.id) card.classList.add('me');
+      if(!p.isAlive) card.classList.add('disabled');
+      if(isDisabledCard(p)) card.classList.add('disabled');
+      if(isSelected(p)) card.classList.add('selected');
+
+      card.dataset.pid=p.id;
+
+      const tags=[];
+      if(+this.playerId===+p.id) tags.push('<span class="tag tag-you">你</span>');
+      if(p.isExposedIdiot) tags.push('<span class="tag tag-idiot">白痴</span>');
+      // 狼队友标记（视角规则）
+      if(isTeammateForViewer(p)){
+        // 普通狼人不可看到隐狼；实现中未标隐狼，符合规则
+        tags.push('<span class="tag tag-wolf">队友</span>');
+      }
+
+      card.innerHTML=`
+        <div class="player-main">
+          <div class="player-number">${p.id}</div>
+          ${p.badge?'<div class="player-badge">👑</div>':''}
+          <div class="player-tags">${tags.join(' ')}</div>
+        </div>
+        <div class="life">
+          <span class="heart ${live<1?'off':''}">❤</span>
+          <span class="heart ${live<2?'off':''}">❤</span>
+        </div>
+        <span class="kill-dot"></span>
+      `;
+
+      if(!isDisabledCard(p)){
+        card.style.cursor='pointer';
+        card.addEventListener('click',()=>this.handleCardClick(p.id));
+      }
+      return card;
+    };
+
+    leftList.forEach(p=>left.appendChild(renderCard(p)));
+    rightList.forEach(p=>right.appendChild(renderCard(p)));
+  },
+
+  handleCardClick(pid){
+    if(!this.selection) return;
+    this.selection.targetId=pid.toString();
+    this.renderPlayerGrid(); // 更新高亮
+    this.renderActionPanel(); // 更新中央提示
+  },
+
+  setSelection(type){ if(!this.selection || this.selection.type!==type){ this.selection={type, targetId:null}; } },
+  clearSelection(){ this.selection=null; this.renderPlayerGrid(); },
+
+  // 中央操作面板
+  renderActionPanel(){
+    const panel=this.$('action-panel'); panel.innerHTML='';
+    if(this.gameState.phase==='GAME_OVER'){ panel.innerHTML='<div class="action-feedback">游戏结束</div>'; return; }
+
+    const isDead=!this.playerData.isAlive;
+    const nightStatus=this.gameState.nightStatus||{};
+    const role=this.getActiveRole(this.playerData);
+    const dayOpen=!!this.fullGameData?.state?.dayVotingOpen;
+
+    const info=(msg)=>`<div class="action-feedback">${this.escapeHTML(msg)}</div>`;
+    const selectionBar=(title,{confirmText='确认',skipText='跳过',allowSkip=true,allowCancel=true}={})=>{
+      const tgt=this.selection?.targetId? `${this.selection.targetId}号` : '未选择';
+      return `<div class="info-box"><strong>${this.escapeHTML(title)}</strong><div style="margin-top:6px;">当前目标：<b>${tgt}</b></div></div>
+        <div class="inline" style="margin-top:8px;">
+          <button class="confirm-btn" data-action="confirm-selection" ${!this.selection?.targetId?'disabled':''}>${confirmText}</button>
+          ${allowSkip?`<button class="control-btn" data-action="skip-selection">${skipText}</button>`:''}
+          ${allowCancel?`<button class="action-btn" data-action="cancel-selection">取消</button>`:''}
+        </div>`;
+    };
+
+    // 特殊阶段：警徽移交
+    if(this.gameState.phase==='SHERIFF_TRANSFER'){
+      const t=this.gameState.postDeathState;
+      if(t && this.playerId===t.deadSheriffId){
+        this.setSelection('sheriff-pass');
+        panel.innerHTML=selectionBar('你已阵亡，请选择警徽移交对象',{allowSkip:true,skipText:'撕毁警徽'});
+      }else{
+        panel.innerHTML=info('等待警长移交警徽...');
+      }
+      return;
+    }
+
+    if(isDead){
+      // 猎人连动
+      if(this.gameState.phase==='HUNTER_ACTION' && this.gameState.hunterQueue && this.gameState.hunterQueue[this.playerId]){
+        this.setSelection('hunter');
+        panel.innerHTML=selectionBar('你是猎人，请选择带走目标',{allowSkip:false});
+      }else{
+        panel.innerHTML=info('你已出局');
+      }
+      return;
+    }
+
+    // 上警/退水/投票
+    if(this.gameState.phase==='SHERIFF_CAND'){
+      const my=candVal(this.fullGameData,this.playerId);
+      if(my!=null){ panel.innerHTML=info(`你已选择 ${my?'上警':'不上警'}`); }
+      else{
+        panel.innerHTML=`<div class="inline"><button class="action-btn" data-action="sheriff-cand" data-value="1">我要上警</button><button class="control-btn" data-action="sheriff-cand" data-value="0">不上警</button></div>`;
+      }
+      return;
+    }
+    if(this.gameState.phase==='SHERIFF_SPEECH'){
+      const isC=this.fullGameData.sheriff?.candidates?.[this.playerId]; const drop=this.fullGameData.sheriff?.drops?.[this.playerId];
+      if(isC && !drop){ panel.innerHTML=`<button class="action-btn" data-action="sheriff-drop">💧 退水</button>`; }
+      else panel.innerHTML=info('等待主持人推进流程...');
+      return;
+    }
+    if(this.gameState.phase==='SHERIFF_VOTE'){
+      if(this.playerData.isExposedIdiot){ panel.innerHTML=info('你无法投票'); return; }
+      const v=this.fullGameData.sheriff?.votes?.[this.playerId];
+      if(v!=null){ panel.innerHTML=info(`你已投票给 ${v==='0'?'弃票':v+'号'}`); }
+      else{
+        this.setSelection('sheriff-vote');
+        panel.innerHTML=selectionBar('为警长投票',{allowSkip:true,skipText:'弃票'});
+      }
+      return;
+    }
+
+    // 白天
+    if(this.gameState.phase==='DAY'){
+      if(!dayOpen){
+        if(role==='骑士' && !this.getSkillState('hasUsedDuel')){
+          this.setSelection('knight');
+          panel.innerHTML=selectionBar('你是骑士，可在投票前发动决斗',{allowSkip:false});
+        }else{
+          panel.innerHTML=info('等待主持人开启投票…');
+        }
+      }else{
+        if(this.playerData.isExposedIdiot){ panel.innerHTML=info('你无法投票'); }
+        else{
+          const v=this.fullGameData.dayVotes?.[this.gameState.round]?.[this.playerId];
+          if(v!=null){ panel.innerHTML=info(`你已投票给 ${v==='0'?'弃票':v+'号'}`); }
+          else{ this.setSelection('day-vote'); panel.innerHTML=selectionBar('放逐投票',{allowSkip:true,skipText:'弃票'}); }
+        }
+      }
+      return;
+    }
+
+    // 夜晚
+    if(this.gameState.phase==='NIGHT'){
+      const ns=this.gameState.nightStatus||{};
+      // 守卫
+      if(role==='守卫' && ns.guard==='pending'){
+        this.setSelection('guard');
+        panel.innerHTML=selectionBar('守卫：请选择守护对象（不可连守）',{allowSkip:true,skipText:'空守'});
+        return;
+      }
+      // 预言家
+      if(role==='预言家' && ns.seer==='pending'){
+        this.setSelection('seer');
+        panel.innerHTML=selectionBar(`预言家：请选择查验目标（模式：${this.fullGameData.config?.seerMode==='identity'?'身份':'阵营'}）`,{allowSkip:true,skipText:'跳过'});
+        return;
+      }
+      // 女巫
+      if(role==='女巫' && ns.witch==='pending'){
+        const idx=this.playerData.deaths;
+        const hasCure=!this.getSkillState('hasUsedCure',this.playerData,idx);
+        const hasPoison=!this.getSkillState('hasUsedPoison',this.playerData,idx);
+        const nightTarget=this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
+        let html=`<div class="info-box">解药:${hasCure?'✅':'❌'} | 毒药:${hasPoison?'✅':'❌'}`;
+        const selfRule=this.fullGameData.config?.witchSelfSaveRule||'noFirstNightSelfSave';
+        html+=`<div style="margin-top:6px;color:${selfRule==='noFirstNightSelfSave'?'#ffb700':'#6fd3ff'};font-size:13px;">规则：${selfRule==='noFirstNightSelfSave'?'首夜不能自救':'仅首夜可以自救'}</div></div>`;
+        // 解药
+        if(hasCure && nightTarget && nightTarget!=='0'){
+          html+=`<div class="inline" style="margin:8px 0;"><button class="action-btn" onclick="App.witchTryCure('${nightTarget}')">💊 救 ${nightTarget}号</button></div>`;
+        }
+        // 毒药
+        if(hasPoison){
+          this.setSelection('witch-poison');
+          html+=selectionBar('毒药：请选择毒杀目标',{allowSkip:true,skipText:'不使用毒药'});
+        }else{
+          html+=`<div class="action-feedback">本条命毒药已用尽</div>`;
+        }
+        panel.innerHTML=html;
+        return;
+      }
+      // 狼人
+      if(['狼人','隐狼'].includes(role) && ns.wolf==='pending'){
+        // 投票在狼窝内进行，这里仅提示
+        const can=this.canWolfAct(this.playerData);
+        const alpha=this.getAlphaWolfId();
+        const mine=this.playerId;
+        let html=`<div class="info-box">狼队行动：${can?'可投票/拍板':'等待普通狼人行动'}</div>`;
+        // 显示当前我的投票（若有）
+        const myVote=this.fullGameData.wolfVotes?.[mine];
+        if(myVote!=null){
+          html+=`<div class="action-feedback">你的狼刀投票：${myVote==='0'?'空刀':myVote+'号'}</div>`;
+        }
+        html+=`<div class="inline" style="margin-top:8px;"><button class="control-btn" data-action="open-wolf">打开狼窝</button></div>`;
+        panel.innerHTML=html;
+        return;
+      }
+      // 默认
+      panel.innerHTML=info('等待其他角色行动...');
+      return;
+    }
+
+    // 默认
+    panel.innerHTML=info('进行中…');
+  },
+
+  // ===== 选择确认处理 =====
+  async confirmSelection(){
+    if(!this.selection || !this.selection.targetId) return;
+    const t=this.selection.targetId;
+    switch(this.selection.type){
+      case 'seer': await this.seerCheck(t); break;
+      case 'guard': await this.guardProtect(t); break;
+      case 'witch-poison': await this.witchUsePoison(t); break;
+      case 'wolf-vote':
+        if(!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){ this.showNotification('当前不可投票','error'); break; }
+        await db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set(t); this.showNotification(`已投票：${t}号`,'success'); break;
+      case 'day-vote': await db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set(t); break;
+      case 'knight': await this.knight(t); break;
+      case 'hunter': await this.hunter(t); break;
+      case 'sheriff-vote': await db.ref(`games/${this.gameId}/sheriff/votes/${this.playerId}`).set(t); break;
+      case 'sheriff-pass': await this.playerPassBadge(t); break;
+    }
+    this.clearSelection();
+  },
+  async skipSelection(){
+    if(!this.selection) return;
+    switch(this.selection.type){
+      case 'seer': await this.seerSkip(); break;
+      case 'guard': await this.guardSkip(); break;
+      case 'witch-poison': await this.witchSkip(); break;
+      case 'wolf-vote':
+        if(!this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){ this.showNotification('当前不可投票','error'); break; }
+        await db.ref(`games/${this.gameId}/wolfVotes/${this.playerId}`).set('0'); this.showNotification(`已选择空刀`,'success'); break;
+      case 'day-vote': await db.ref(`games/${this.gameId}/dayVotes/${this.gameState.round}/${this.playerId}`).set('0'); break;
+      case 'sheriff-pass': await this.playerDestroyBadge(); break;
+      default: break;
+    }
+    this.clearSelection();
+  },
+
+  // ===== Host 控制台 =====
+  renderHostControls(){
+    const el=this.$('host-controls'); el.classList.remove('hidden');
+    const ph=this.gameState.phase;
+    let h=`<div class="section-title">👑 主持人面板</div>`;
+    const renderStatus=(title,total,done)=>{ const p=total.filter(x=>done.includes(x.id)); const pending=total.filter(x=>!done.includes(x.id)); let s=`<div class="info-box">${title}：${p.length}/${total.length}</div>`; if(pending.length){ s+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;">'; pending.forEach(pp=>s+=`<div class="panel" style="padding:6px;font-size:12px;">${pp.id}号 未完成</div>`); s+='</div>'; } return s; };
+
+    if(ph==='SETUP'){
+      const tot=Object.values(this.allPlayers); const rdy=tot.filter(p=>p.isReady);
+      h+=renderStatus('玩家准备',tot,rdy);
+      if(rdy.length<tot.length) h+=`<button class="action-btn" data-action="host-force-start">强制开始</button>`;
+      h+=`<button class="control-btn" data-action="host-start" ${rdy.length<tot.length?'disabled':''}>🚀 开始游戏</button>`;
+    }
+    if(ph==='NIGHT'){
+      const ns=this.gameState.nightStatus||{}, done=Object.values(ns).every(s=>s==='complete');
+      h+=`<div class="info-box">夜晚进度：${Object.values(ns).filter(s=>s==='complete').length} / ${Object.values(ns).length}</div>`;
+      const hasSheriff=Object.values(this.allPlayers).some(p=>p.badge);
+      if(this.gameState.round===1 && !hasSheriff){
+        h+=`<button class="control-btn" data-action="host-sheriff-cand-init" ${!done?'disabled':''}>👑 开始上警</button>`;
+        if(!done) h+=`<button class="action-btn" data-action="host-force-day">强制天亮</button>`;
+      }else{
+        if(!done) h+=`<button class="action-btn" data-action="host-force-day">强制天亮</button>`;
+        h+=`<button class="control-btn" data-action="host-day" ${!done?'disabled':''}>☀️ 天亮了(结算夜晚)</button>`;
+      }
+    }
+    if(ph==='SHERIFF_CAND'){
+      const alive=Object.values(this.allPlayers).filter(p=>p.isAlive);
+      const decided=alive.filter(p=>candVal(this.fullGameData,p.id)!=null);
+      h+=renderStatus('上警意向',alive,decided);
+      h+=`<button class="control-btn" data-action="host-sheriff-speech" ${decided.length<alive.length?'disabled':''}>进入发言/退水</button>`;
+    }
+    if(ph==='SHERIFF_SPEECH'){
+      const cand=this.fullGameData.sheriff?.candidates||{}; const drops=this.fullGameData.sheriff?.drops||{};
+      const valid=Object.keys(cand).filter(id=>cand[id] && !drops[id]);
+      if(valid.length===1) h+=`<div class="info-box">独警：${valid[0]}号</div><button class="confirm-btn" data-action="host-sheriff-elect-single">直接当选</button>`;
+      h+=`<button class="control-btn" data-action="host-sheriff-vote">进入投票</button>`;
+    }
+    if(ph==='SHERIFF_VOTE'){
+      const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
+      const voted=Object.keys(this.fullGameData.sheriff?.votes||{}).map(id=>this.allPlayers[id]).filter(Boolean);
+      h+=`<div class="info-box">投票进度：${voted.length}/${voters.length}</div>`;
+      h+=`<button class="control-btn" data-action="host-tally-sheriff" ${voted.length<voters.length?'disabled':''}>📊 统计</button>`;
+      h+=`<button class="action-btn" data-action="host-force-tally-sheriff">强制计票</button>`;
+    }
+    if(ph==='DAY'){
+      const open=!!this.fullGameData.state.dayVotingOpen;
+      h+=`<div class="info-box">投票开关：${open?'已开启 ✅':'未开启 ⏳'}</div>`;
+      h+= open ? `<button class="action-btn" data-action="host-close-day-vote">关闭投票</button>` : `<button class="control-btn" data-action="host-open-day-vote">开启投票</button>`;
+      if(open){
+        const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
+        const voted=Object.keys(this.fullGameData.dayVotes?.[this.gameState.round]||{}).map(id=>this.allPlayers[id]).filter(Boolean);
+        h+=`<div class="info-box" style="margin-top:8px;">投票进度：${voted.length}/${voters.length}</div>`;
+        h+=`<button class="control-btn" data-action="host-tally-day" ${voted.length<voters.length?'disabled':''}>📊 统计放逐票</button>`;
+        h+=`<button class="action-btn" data-action="host-force-tally-day">强制计票</button>`;
+      }
+    }
+    if(ph==='SHERIFF_TRANSFER'){
+      h+=`<div class="info-box">警长已阵亡，等待移交或撕毁</div><button class="action-btn" data-action="host-force-badge-destroy">强制撕毁</button>`;
+    }
+    if(ph==='GAME_OVER'){
+      h+=`<div class="info-box">游戏结束</div>`;
+    }
+    el.innerHTML=h;
+  },
+
+  // ===== 上帝视角 =====
+  renderGodView(){
+    const list=this.$('god-player-list'); list.innerHTML='';
+    const f=(id)=>`${ROLES[id.role].icon} ${id.isThiefCopy?`<span class="thief-copy">${id.role}</span>`:id.role}`;
+    Object.values(this.fullGameData.players||{}).sort((a,b)=>a.id-b.id).forEach(p=>{
+      const live=2-p.deaths, ids=p.identities, d=p.deaths;
+      const row=document.createElement('div');
+      row.className=`god-row ${!p.isAlive?'dead-all':''}`;
+      row.innerHTML=`
+        <div style="min-width:60px;font-weight:700;">${p.id}号 ${p.badge?'👑':''}</div>
+        <div style="flex:1;display:flex;gap:8px;align-items:center;">
+          <span class="${d>=1?'dead-identity':''}">${f(ids[0])}</span><span>+</span>
+          <span class="${d>=2?'dead-identity':''}">${f(ids[1])}</span>
+        </div>
+        <div><span class="life-heart ${live<1?'lost':''}">❤</span><span class="life-heart ${live<2?'lost':''}">❤</span></div>
+      `;
+      list.appendChild(row);
+    });
+
+    // 日志
+    const godLog=this.$('god-log-content'); godLog.innerHTML='';
+    const logs=Object.values(this.fullGameData.logs||{}).sort((a,b)=>a.timestamp-b.timestamp);
+    if(logs.length===0){ godLog.innerHTML='<div class="log-item">暂无日志</div>'; }
+    logs.forEach(log=>{
+      const div=document.createElement('div'); div.className='log-item';
+      if(log.isSecret) div.classList.add('log-secret');
+      const prefix=log.round>0?`[第 ${log.round} 轮] `:'';
+      div.textContent=prefix+log.message;
+      godLog.appendChild(div);
+    });
+    godLog.scrollTop=godLog.scrollHeight;
+  },
+
+  // ===== 规则与技能 =====
+
+  // 夜晚/阶段切换
+  async updatePhase(phase,round=null){
+    const up={'state/phase':phase};
+    if(round!==null) up['state/round']=round;
+    else if(phase==='NIGHT') up['state/round']=this.gameState.round+1;
+
+    if(phase==='NIGHT'){
+      up['nightActions']={}; up['wolfVotes']={}; up['wolfChat']={};
+      const alive=Object.values(this.allPlayers).filter(p=>p.isAlive);
+      const exists=(role)=>alive.some(p=>this.getActiveRole(p)===role);
+      const witch=alive.find(p=>this.getActiveRole(p)==='女巫');
+      const wIdx=witch?witch.deaths:-1;
+      const canWitch=witch && (!this.getSkillState('hasUsedCure',witch,wIdx) || !this.getSkillState('hasUsedPoison',witch,wIdx));
+      const status={ guard:exists('守卫')?'pending':'complete', seer:exists('预言家')?'pending':'complete', wolf:this.isAnyWolfInGame()?'pending':'complete', witch:canWitch?'locked':'complete' };
+      if(status.wolf==='complete' && status.witch==='locked') status.witch='pending';
+      up['state/nightStatus']=status;
+    }
+    if(phase==='DAY'){ up['state/dayVotingOpen']=false; }
+    if(phase==='SHERIFF_CAND'){ up['sheriff']={candidates:{},drops:{},votes:{}}; }
+    await db.ref(`games/${this.gameId}`).update(up);
+  },
+
+  // 守卫
+  async guardProtect(id){ await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({target:id,actorId:this.playerId}); await this.addGameLog(`🛡️ 守卫(${this.playerId}号)守护了 ${id}号`,true); await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete'); await this.setSkillState('lastGuardTarget',id); this.showNotification(`你守护了 ${id}号`,'success'); },
+  async guardSkip(){ await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/guard`).set({target:null,actorId:this.playerId}); await this.addGameLog(`🛡️ 守卫(${this.playerId}号)空守`,true); await db.ref(`games/${this.gameId}/state/nightStatus/guard`).set('complete'); await this.setSkillState('lastGuardTarget',null); },
+
+  // 预言家
+  async seerCheck(id){
+    const mode=this.fullGameData.config?.seerMode||'faction';
+    let result='';
+    if(mode==='faction'){
+      const target=this.allPlayers[id];
+      const hasRegularWolf=(target.identities||[]).some(x=>x.role==='狼人');
+      // 隐狼不暴露；若有普通狼（哪怕在第二张），结果为“狼人”
+      result = hasRegularWolf ? '狼人' : '好人';
+    }else{
+      // 身份：只看当前生效
+      const role=this.getActiveRole(this.allPlayers[id])||'未知';
+      result=role;
+    }
+    await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({target:id,result,actorId:this.playerId});
+    await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete');
+    await this.addGameLog(`🔮 预言家(${this.playerId}号)查验 ${id}号，结果为 ${result}`,true);
+    const rec=this.getGlobalSkillState('seerResults')||{}; rec[id]=result; await this.setGlobalSkillState('seerResults',rec);
+    this.showNotification(`查验结果：${id}号 -> ${result}`,'success');
+  },
+  async seerSkip(){ await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/seer`).set({target:null,actorId:this.playerId,skipped:true}); await db.ref(`games/${this.gameId}/state/nightStatus/seer`).set('complete'); await this.addGameLog(`🔮 预言家(${this.playerId}号)跳过查验`,true); },
+
+  // 女巫
+  async witchTryCure(targetId){
+    const rule=this.fullGameData.config?.witchSelfSaveRule||'noFirstNightSelfSave';
+    const isSelf = +targetId===+this.playerId;
+    const isFirstNight = this.gameState.round===1;
+    if(rule==='noFirstNightSelfSave' && isSelf && isFirstNight){ this.showNotification('规则：首夜不能自救','error'); return; }
+    if(rule==='onlyFirstNightSelfSave' && isSelf && !isFirstNight){ this.showNotification('规则：仅首夜可自救','error'); return; }
+    // 通过后实际用药
+    const idx=this.playerData.deaths;
+    const ref=db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`);
+    ref.transaction(st=>{st=st||{};const k=`${idx}_hasUsedCure`; if(st[k]) return; st[k]=true; return st;})
+      .then(async res=>{
+        if(res.committed){
+          await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({cure:targetId});
+          await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+          await this.addGameLog(`🧪 女巫(${this.playerId}号)使用解药救了 ${targetId}号`,true);
+          this.showNotification(`你救了 ${targetId}号`,'success');
+        }
+      });
+  },
+  async witchUsePoison(id){
+    const idx=this.playerData.deaths;
+    const ref=db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates`);
+    ref.transaction(st=>{st=st||{};const k=`${idx}_hasUsedPoison`; if(st[k]) return; st[k]=true; return st;})
+      .then(async res=>{
+        if(res.committed){
+          await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({poison:id});
+          await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete');
+          await this.addGameLog(`🧪 女巫(${this.playerId}号)毒杀了 ${id}号`,true);
+          this.showNotification(`你毒杀了 ${id}号`,'error');
+        }
+      });
+  },
+  async witchSkip(){ await db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/witch`).update({actorId:this.playerId,skipped:true}); await db.ref(`games/${this.gameId}/state/nightStatus/witch`).set('complete'); await this.addGameLog(`🧪 女巫(${this.playerId}号)未使用药水`,true); },
+
+  // 骑士
+  async knight(id){
+    await this.setSkillState('hasUsedDuel',true);
+    const target=this.allPlayers[id], role=this.getActiveRole(target);
+    const isEvil=['狼人','隐狼'].includes(role);
+    const loser=isEvil? id : this.playerId;
+    const loserRole=isEvil? role : this.getActiveRole(this.playerData);
+    await this.addGameLog(`⚔️ 骑士 ${this.playerId}号 对 ${id}号 发动决斗！`);
+    const res=await this.kill(loser,'DUEL');
+    if(isEvil){
+      await this.addGameLog(`决斗成功！${loser}号(${loserRole}) 阵亡，进入夜晚。`);
+      await this.handlePostDeath({...res,nextPhaseIfNoAction:'NIGHT'});
+    }else{
+      await this.addGameLog(`决斗失败！骑士 ${loser}号 阵亡。`);
+      await this.handlePostDeath({...res,nextPhaseIfNoAction:'DAY'});
+    }
+  },
+
+  // 猎人
+  async hunter(id){
+    await this.addGameLog(`🔫 猎人 ${this.playerId}号 开枪带走了 ${id}号！`);
+    await db.ref(`games/${this.gameId}/state/hunterQueue/${this.playerId}`).set(null);
+    const res=await this.kill(id,'HUNTER');
+    if(res.sheriffDied) return;
+    const remain=(await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val()||{};
+    if(Object.keys(remain).length>0){ await this.updatePhase('HUNTER_ACTION'); }
+    else{
+      const next=this.gameState.postDeathState?.nextPhase || (this.gameState.phase==='DAY'?'NIGHT':'DAY');
+      if(!this.gameState.postDeathState || !this.gameState.postDeathState.deadSheriffId){
+        await db.ref(`games/${this.gameId}/state/postDeathState`).set(null);
+      }
+      await this.updatePhase(next);
+    }
+  },
+
+  // 狼窝
+  getViewerWolfType(){
+    if(!this.playerData) return null;
+    const has=(role)=> (this.playerData.originalIdentities||this.playerData.identities).some(x=>x.role===role);
+    if(has('狼人')) return 'regular';
+    if(has('隐狼')) return 'hidden';
+    return null;
+  },
+  canWolfAct(p){
+    const role=this.getActiveRole(p);
+    if(role==='狼人') return true;
+    if(role==='隐狼'){
+      const livingRegular=Object.values(this.allPlayers).filter(pp=>pp.isAlive && this.getActiveRole(pp)==='狼人');
+      return livingRegular.length===0;
+    }
+    return false;
+  },
+  getAlphaWolfId(){
+    const livingRegular=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='狼人');
+    if(livingRegular.length>0) return Math.min(...livingRegular.map(p=>p.id)).toString();
+    const livingInvisible=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='隐狼');
+    if(livingInvisible.length>0) return Math.min(...livingInvisible.map(p=>p.id)).toString();
+    return null;
+  },
+  initWolfListeners(){
+    this.stopWolfListeners(false);
+    const myType=this.getViewerWolfType(); if(!myType) return;
+
+    // 投票展示
+    this.wolfVotesCallbackRef=(snap)=>{
+      const votes=snap.val()||{};
+      const alpha=this.getAlphaWolfId();
+      const display=this.$('wolf-votes-display'); if(!display) return;
+
+      // 可显示的投票成员：当前生效为“狼人”的存活玩家；如无普通狼，则允许隐狼显示/参与
+      let voters=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='狼人');
+      if(voters.length===0){ voters=Object.values(this.allPlayers).filter(p=>p.isAlive && this.getActiveRole(p)==='隐狼'); }
+
+      let html='<div><strong>投票情况</strong></div>';
+      voters.sort((a,b)=>a.id-b.id).forEach(w=>{
+        const v=votes[w.id]; const vt=v!=null?(v==='0'?'空刀':`${v}号`):'未投票';
+        const isAlpha=(alpha && w.id.toString()===alpha);
+        html+=`<div class="log-item">${w.id}号 ${isAlpha?'(拍板狼)':''} → ${vt}</div>`;
+      });
+      // 拍板确认按钮（仅拍板狼且其已投票）
+      if(this.playerId===alpha && votes[alpha]!=null && this.gameState?.nightStatus?.wolf==='pending'){
+        const tgt=votes[alpha]; html+=`<div class="inline" style="margin-top:8px;"><button class="confirm-btn" data-action="wolf-confirm" value="${tgt}">确认袭击 ${tgt==='0'?'空刀':tgt+'号'}</button></div>`;
+      }
+      display.innerHTML=html;
+    };
+    this.wolfVotesListener=db.ref(`games/${this.gameId}/wolfVotes`);
+    this.wolfVotesListener.on('value',this.wolfVotesCallbackRef);
+    this.wolfVotesListener.once('value').then(this.wolfVotesCallbackRef);
+
+    // 狼聊（仅普通狼）
+    if(myType==='regular'){
+      const chatRef=db.ref(`games/${this.gameId}/wolfChat`);
+      const box=this.$('wolf-chat-messages'); if(box) box.innerHTML='';
+      this.wolfChatListener=chatRef.limitToLast(80).on('child_added',s=>{
+        const v=s.val(); if(!v) return;
+        const p=document.createElement('div'); p.textContent=`${v.pid}号：${v.msg}`;
+        this.$('wolf-chat-messages').appendChild(p);
+        this.$('wolf-chat-messages').scrollTop=this.$('wolf-chat-messages').scrollHeight;
+      });
+    }
+  },
+  stopWolfListeners(hide=true){
+    if(this.wolfVotesListener){ db.ref(`games/${this.gameId}/wolfVotes`).off('value',this.wolfVotesCallbackRef); this.wolfVotesListener=null; this.wolfVotesCallbackRef=null; }
+    if(this.wolfChatListener){ db.ref(`games/${this.gameId}/wolfChat`).off('child_added',this.wolfChatListener); this.wolfChatListener=null; }
+    if(hide) this.closeModal('wolf-modal');
+  },
+  async wolfConfirmKill(targetId){
+    const alpha=this.getAlphaWolfId();
+    if(this.playerId!==alpha || !this.canWolfAct(this.playerData) || this.gameState?.nightStatus?.wolf!=='pending'){
+      this.showNotification('你无权确认或当前不可确认','error'); return;
+    }
+    const ref=db.ref(`games/${this.gameId}/nightActions/${this.gameState.round}/wolf`);
+    ref.transaction(cur=>{ if(cur) return; return {target:targetId,actorId:this.playerId}; })
+      .then(async res=>{
+        if(res.committed){
+          await this.addGameLog(`🐺 狼队决定袭击 ${targetId==='0'?'空刀':targetId+'号'} (由${this.playerId}号确认)`,true);
+          await db.ref(`games/${this.gameId}/state/nightStatus`).transaction(st=>{ if(!st) return st; st.wolf='complete'; if(st.witch==='locked') st.witch='pending'; return st; });
+          this.showNotification(`已确认袭击 ${targetId==='0'?'空刀':targetId+'号'}`,'success');
+        }
+      });
+  },
+  sendWolfMessage(){
+    const type=this.getViewerWolfType(); if(type!=='regular'){ this.showNotification('你无法在狼窝发言','error'); return; }
+    const inp=this.$('wolf-chat-input'); const msg=(inp.value||'').trim(); if(!msg) return; if(msg.length>120){ this.showNotification('消息过长','error'); return; }
+    db.ref(`games/${this.gameId}/wolfChat`).push({pid:this.playerId,msg,ts:firebase.database.ServerValue.TIMESTAMP}); inp.value='';
+  },
+
+  // Sheriff流程
+  async hostEnterSheriffVote(){
+    const cand=this.fullGameData.sheriff?.candidates||{}, drops=this.fullGameData.sheriff?.drops||{};
+    const valid=Object.keys(cand).filter(id=>cand[id] && !drops[id]);
+    if(valid.length===1){
+      const sid=valid[0]; await db.ref(`games/${this.gameId}/players/${sid}/badge`).set(1);
+      await this.addGameLog(`👑 ${sid}号独警，直接当选警长！`);
+      if(this.gameState.round===1) await this.processNight(); else await this.updatePhase('DAY');
+    }else{
+      await this.updatePhase('SHERIFF_VOTE');
+    }
+  },
+  async hostSheriffElectSingle(){
+    const cand=this.fullGameData.sheriff?.candidates||{}, drops=this.fullGameData.sheriff?.drops||{};
+    const valid=Object.keys(cand).filter(id=>cand[id] && !drops[id]);
+    if(valid.length===1){
+      const sid=valid[0]; await db.ref(`games/${this.gameId}/players/${sid}/badge`).set(1);
+      await this.addGameLog(`👑 ${sid}号独警，直接当选警长！`);
+      if(this.gameState.round===1) await this.processNight(); else await this.updatePhase('DAY');
+    }else this.showNotification('当前非独警，无法直接当选','error');
+  },
+
+  // 计票
+  async tallySheriffVotes(){
+    const votes=this.fullGameData.sheriff?.votes||{}; const counts={};
+    Object.values(votes).forEach(t=>{ if(t!=='0') counts[t]=(counts[t]||0)+1; });
+    const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
+    let details='警长投票详情：'+voters.map(v=>{
+      const t=votes[v.id]; if(t===undefined) return `${v.id}号(未投)`; if(t==='0') return `${v.id}号(弃票)`; return `${v.id}号→${t}号`;
+    }).join('，');
+    await this.addGameLog(details);
+    const max=Object.keys(counts).length?Math.max(...Object.values(counts)):0;
+    const winners=Object.keys(counts).filter(id=>counts[id]===max);
+    if(winners.length===1){
+      const sid=winners[0]; await db.ref(`games/${this.gameId}/players/${sid}/badge`).set(1);
+      await this.addGameLog(`👑 ${sid}号当选警长！`);
+      if(this.gameState.round===1) await this.processNight(); else await this.updatePhase('DAY');
+    }else{
+      await this.addGameLog(winners.length>1?`⚖️ 平票：${winners.join('、')}号，重新发言并投票。`:'⚖️ 无人当选警长。');
+      const newC={}; if(winners.length>1) winners.forEach(id=>newC[id]=1);
+      await db.ref(`games/${this.gameId}/sheriff`).set({candidates:newC,drops:{},votes:{}});
+      if(winners.length>1) await this.updatePhase('SHERIFF_SPEECH');
+      else if(this.gameState.round===1) await this.processNight(); else await this.updatePhase('DAY');
+    }
+  },
+
+  async tallyDayVotes(){
+    const votes=this.fullGameData.dayVotes?.[this.gameState.round]||{}; const counts={};
+    const sheriffId=Object.keys(this.allPlayers).find(id=>this.allPlayers[id].badge);
+    const voters=Object.values(this.allPlayers).filter(p=>p.isAlive && !p.isExposedIdiot);
+    let details='放逐投票详情：'+voters.map(v=>{
+      const t=votes[v.id]; if(t===undefined) return `${v.id}号(未投)`; if(t==='0') return `${v.id}号(弃票)`; return `${v.id}号${sheriffId==v.id?'(警长)':''}→${t}号`;
+    }).join('，');
+    await this.addGameLog(details);
+    Object.entries(votes).forEach(([voter,target])=>{ if(target!=='0'){ const w=(voter==sheriffId)?1.5:1; counts[target]=(counts[target]||0)+w; } });
+    const max=Object.keys(counts).length?Math.max(...Object.values(counts)):0;
+    const outs=Object.keys(counts).filter(id=>counts[id]===max);
+    if(outs.length===1){
+      const id=outs[0];
+      await this.addGameLog(`⚖️ ${id}号以 ${counts[id]} 票被放逐。`);
+      const r=await this.kill(id,'VOTE'); await this.handlePostDeath({...r,nextPhaseIfNoAction:'NIGHT'});
+    }else{
+      await this.addGameLog(outs.length>1?`⚖️ 平票：${outs.join('、')}号。无人出局。`:'⚖️ 无人出局。');
+      await this.updatePhase('NIGHT');
+    }
+  },
+
+  // 警徽移交
+  async playerPassBadge(to){
+    const st=this.gameState.postDeathState||{};
+    if(this.playerId!==st.deadSheriffId){ this.showNotification('你无权操作警徽','error'); return; }
+    const up={[`players/${st.deadSheriffId}/badge`]:0,[`players/${to}/badge`]:1,'state/postDeathState':null};
+    await db.ref(`games/${this.gameId}`).update(up);
+    await this.addGameLog(`👑 警徽已由 ${st.deadSheriffId}号 移交给 ${to}号。`);
+    await this.handlePostDeath({hunterTriggered:st.hunterTriggered,sheriffDied:false,nextPhaseIfNoAction:st.nextPhase});
+  },
+  async playerDestroyBadge(isForced=false){
+    const st=this.gameState.postDeathState||{};
+    if(!isForced && this.playerId!==st.deadSheriffId){ this.showNotification('你无权操作警徽','error'); return; }
+    const up={[`players/${st.deadSheriffId}/badge`]:0,'state/postDeathState':null};
+    await db.ref(`games/${this.gameId}`).update(up);
+    await this.addGameLog(`💔 警徽已被 ${st.deadSheriffId}号 撕毁。`);
+    await this.handlePostDeath({hunterTriggered:st.hunterTriggered,sheriffDied:false,nextPhaseIfNoAction:st.nextPhase});
+  },
+
+  // 杀死/结算/胜负
+  async handlePostDeath({hunterTriggered,sheriffDied,nextPhaseIfNoAction='DAY'}){
+    if(sheriffDied) return;
+    const over=await this.checkWin(); if(over) return;
+    const q=(await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val()||{};
+    if(Object.keys(q).length>0){
+      await db.ref(`games/${this.gameId}/state/postDeathState`).transaction(v=>{v=v||{};v.nextPhase=nextPhaseIfNoAction;return v;});
+      await this.updatePhase('HUNTER_ACTION');
+    }else if(nextPhaseIfNoAction){
+      await this.updatePhase(nextPhaseIfNoAction);
+    }
+  },
+  async kill(pid,cause){
+    let result={hunterTriggered:false,sheriffDied:false};
+    const pBefore=this.allPlayers[pid]; if(!pBefore || !pBefore.isAlive) return result;
+    const roleBefore=this.getActiveRole(pBefore);
+    let idiotFlipped=false;
+    const trx=await db.ref(`games/${this.gameId}/players/${pid}`).transaction(p=>{
+      if(!p || !p.isAlive) return p;
+      const idx=p.deaths, iden=p.identities[idx];
+      if(cause==='VOTE' && iden && iden.role==='白痴' && !p.isExposedIdiot){ p.isExposedIdiot=true; idiotFlipped=true; }
+      p.deaths=Math.min(p.deaths+1,2); if(p.deaths>=2) p.isAlive=false; return p;
+    });
+    if(!trx.committed) return result;
+    if(idiotFlipped) await this.addGameLog(`🤪 ${pid}号被投票出局，翻开白痴身份！`);
+    const p=trx.snapshot.val();
+    const wasSheriff=pBefore.badge, nowDead=!p.isAlive;
+    // 猎人触发
+    const willHunter = roleBefore==='猎人' && (['NIGHT','VOTE','POISON','DUEL'].includes(cause));
+    if(willHunter){ await db.ref(`games/${this.gameId}/state/hunterQueue/${pid}`).set(true); result.hunterTriggered=true; }
+    // 警长死亡
+    if(nowDead && wasSheriff){
+      const next=(cause==='DAY'||cause==='VOTE'||cause==='DUEL')?'NIGHT':'DAY';
+      await db.ref(`games/${this.gameId}/state`).update({phase:'SHERIFF_TRANSFER',postDeathState:{deadSheriffId:pid,hunterTriggered:result.hunterTriggered,nextPhase:next}});
+      result.sheriffDied=true;
+    }
+    await this.checkWin();
+    return result;
+  },
+  async processNight(){
+    await this.addGameLog('🌙 天亮了。');
+    const actions=this.fullGameData.nightActions?.[this.gameState.round]||{};
+    const deaths=[];
+    const wolf=actions.wolf?.target, guard=actions.guard?.target, cure=actions.witch?.cure, poison=actions.witch?.poison;
+
+    if(wolf && wolf!=='0'){
+      const guarded=guard===wolf, cured=cure===wolf;
+      if(!guarded && !cured) deaths.push({pid:wolf,cause:'NIGHT'});
+    }
+    if(poison && !deaths.some(d=>d.pid===poison)) deaths.push({pid:poison,cause:'POISON'});
+
+    let anyH=false, anyS=false;
+    if(deaths.length){
+      const ids=[...new Set(deaths.map(d=>d.pid))].sort((a,b)=>a-b).join('号、');
+      await this.addGameLog(`死亡的玩家是：${ids}号`);
+      await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(0);
+      for(const d of deaths){
+        const r=await this.kill(d.pid,d.cause);
+        if(r.hunterTriggered) anyH=true;
+        if(r.sheriffDied){ anyS=true; break; }
+      }
+    }else{
+      await this.addGameLog('昨夜平安夜。');
+      const streak=(this.gameState.peaceNightStreak||0)+1;
+      await db.ref(`games/${this.gameId}/state/peaceNightStreak`).set(streak);
+    }
+    await this.handlePostDeath({hunterTriggered:anyH,sheriffDied:anyS,nextPhaseIfNoAction:'DAY'});
+  },
+
+  async checkWin(){
+    await new Promise(r=>setTimeout(r,100));
+    const s=await db.ref(`games/${this.gameId}`).once('value'); if(!s.exists()) return false;
+    const g=s.val(); if(g.state.phase==='GAME_OVER') return true;
+    let winner=null;
+    const all=Object.values(g.players);
+    const wolfPlayers=all.filter(p=>p.originalIdentities.some(id=>ROLES[id.role].faction==='bad'));
+    const goodPlayers=all.filter(p=>!p.originalIdentities.some(id=>ROLES[id.role].faction==='bad'));
+    const godPlayers=all.filter(p=>p.originalIdentities.some(id=>ROLES[id.role].isGod));
+    const goldenPlayers=all.filter(p=>p.originalIdentities.every(id=>id.role==='平民'));
+
+    // 好人胜利
+    const allWolvesDead=wolfPlayers.every(p=>!p.isAlive);
+    if(allWolvesDead) winner='游戏结束 - 好人阵营胜利！(狼人已全部出局)';
+    if(g.state.peaceNightStreak>=3) winner='游戏结束 - 好人阵营胜利！(连续三晚平安夜)';
+
+    // 狼人胜利
+    if(!winner){
+      const mode=g.config?.wolfWin || 'edge';
+      if(mode==='exterminate'){
+        const allGoodsDead=goodPlayers.length>0 && goodPlayers.every(p=>!p.isAlive);
+        if(allGoodsDead) winner='游戏结束 - 狼人阵营胜利！(屠城：好人全灭)';
+      }else{
+        const allGodsDead=godPlayers.length>0 && godPlayers.every(p=>!p.isAlive);
+        const allGoldenDead=goldenPlayers.length>0 && goldenPlayers.every(p=>!p.isAlive);
+        if(allGodsDead || allGoldenDead) winner='游戏结束 - 狼人阵营胜利！(屠边达成)';
+      }
+    }
+    if(winner){
+      await db.ref(`games/${this.gameId}/state`).update({phase:'GAME_OVER',winner});
+      await this.addGameLog(`🏆 ${winner}`);
+      return true;
+    }
+    return false;
+  },
+
+  // ===== 工具 =====
+  getActiveRole(p){ if(!p || !p.isAlive) return null; if(p.deaths>=p.identities.length) return null; const cur=p.identities[p.deaths]; return cur?cur.role:null; },
+  isAnyWolfInGame(){ return Object.values(this.allPlayers).some(p=>p.isAlive && ['狼人','隐狼'].includes(this.getActiveRole(p))); },
+  getSkillState(key,player=null,idx=-1){ const p=player||this.playerData; if(!p) return undefined; const i=idx!==-1?idx:p.deaths; return (p.skillStates||{})[`${i}_${key}`]; },
+  async setSkillState(key,value){ const i=this.playerData.deaths; await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/${i}_${key}`).set(value); },
+  getGlobalSkillState(key,player=null){ const p=player||this.playerData; if(!p) return undefined; return (p.skillStates||{})[`global_${key}`]; },
+  async setGlobalSkillState(key,val){ await db.ref(`games/${this.gameId}/players/${this.playerId}/skillStates/global_${key}`).set(val); },
 };
 
+// 辅助
+function candVal(g, pid){ return g.sheriff?.candidates?.[pid]; }
+
+// 启动
 window.App=App;
 document.addEventListener('DOMContentLoaded',()=>App.init());
 </script>

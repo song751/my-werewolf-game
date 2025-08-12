@@ -75,27 +75,30 @@ const App = {
     await db.ref(`games/${this.gameId}/logs`).push(entry);
   },
 
-  async init() {
-    const q = new URLSearchParams(location.search);
-    this.gameId = q.get('game');
-    this.playerId = q.get('player');
+// This is the main entry point of the application.
+  init() {
+    const urlParams = new URLSearchParams(window.location.search);
+    this.gameId = urlParams.get('game');
+    this.playerId = urlParams.get('player');
 
-    document.body.classList.add('loading');
-    setTimeout(() => document.body.classList.remove('loading'), 400);
+    this.attachGlobalListeners();
 
-    if (this.gameId && this.playerId === 'PLAYER_ID') {
-      return this.renderJoinPage();
-    }
-
-    document.body.addEventListener('click', this.handleGlobalClick.bind(this));
-    // MODIFICATION #9: Add listener to clean up on page exit
-    window.addEventListener('beforeunload', () => this.detachAllListeners());
-
-    if (!this.gameId) {
-      this.showView('setup');
-      this.renderRoleSetup();
+    if (this.gameId && this.playerId) {
+      this.$('setup-screen').classList.add('hidden');
+      this.$('game-layout').classList.remove('hidden');
+      this.listenToGameChanges(true);
     } else {
-      await this.startApp();
+      // MODIFICATION: This block is the correct place to reset the setup UI.
+      // It ensures that when no game is joined, the role configuration is always visible.
+      this.$('setup-screen').classList.remove('hidden');
+      this.$('game-layout').classList.add('hidden');
+      
+      // Explicitly show the role setup and hide the post-creation info.
+      this.$('role-setup').classList.remove('hidden');
+      this.$('btn-create').classList.remove('hidden');
+      this.$('game-creation-info').classList.add('hidden');
+      
+      this.renderRoleSetup();
     }
   },
 

@@ -1,11 +1,13 @@
 /* ========================================
-   双身份狼人杀 V10.3 - 美化增强版 
+   双身份狼人杀 V10.3 - 美化增强修复版 
    ======================================== */
-/* 设置全局颜色模式，强制浏览器使用深色原生控件 */
+
+/* 设置全局颜色模式，强制浏览器使用深色原生控件 (关键修复) */
 html {
   color-scheme: dark;
 }
 
+/* CSS 变量定义 */
 :root {
   /* 色彩系统 - 深邃夜空主题 */
   --bg-primary: #050812;
@@ -63,7 +65,7 @@ html {
   --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   
-  /* 响应式布局（缩窄左右列） */
+  /* 响应式布局 */
   --side-width: 68px;
   --center-min: 320px;
 }
@@ -73,9 +75,6 @@ html {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-
-  /* This tells the browser to use dark-themed native UI elements (like dropdowns). */
-  color-scheme: dark;
 }
 
 html, body {
@@ -299,31 +298,6 @@ h1 {
   font-weight: 500;
 }
 
-.role-setup-item input[type="number"] {
-  width: 50px;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  text-align: center;
-  font-size: 14px;
-  transition: all var(--transition-base);
-  -moz-appearance: textfield; /* 隐藏 Firefox 的上下箭头 */
-}
-.role-setup-item input[type="number"]::-webkit-outer-spin-button,
-.role-setup-item input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none; /* 隐藏 Chrome/Safari 的上下箭头 */
-  margin: 0;
-}
-
-
-.role-setup-item input[type="number"]:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  background: rgba(255, 255, 255, 0.08);
-}
-
 /* 规则选项 */
 .rule-options {
   display: flex;
@@ -339,6 +313,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--spacing-md);
   transition: all var(--transition-base);
 }
 
@@ -365,22 +340,46 @@ h1 {
   color: var(--text-tertiary);
 }
 
+/* ========================================= */
+/*  下拉列表样式 (关键修复)                   */
+/* ========================================= */
+select,
 .rule-select {
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
+  /* 重置浏览器默认外观 */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  /* 布局与尺寸 */
+  min-width: 180px; /* 修复：使用最小宽度而不是100% */
+  
+  /* 内边距与字体 */
+  padding: 10px 36px 10px 14px; /* 右侧为箭头留出空间 */
+  font-size: 14px;
+  
+  /* 颜色与边框 */
+  background-color: rgba(255, 255, 255, 0.05); /* 修复：使用有效的背景色 */
+  color: var(--text-primary);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 13px;
+
+  /* 自定义箭头图标 */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23cccccc' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 1em;
+
+  /* 交互效果 */
   cursor: pointer;
   transition: all var(--transition-base);
-  min-width: 160px;
 }
 
+select:focus,
 .rule-select:focus {
   outline: none;
   border-color: var(--accent-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.35); /* 增加聚焦效果，提升可访问性 */
 }
 
 /* 统计信息 */
@@ -427,6 +426,7 @@ h1 {
   color: var(--color-warning);
   font-size: 13px;
   margin-top: var(--spacing-sm);
+  min-height: 18px;
 }
 
 .error-message {
@@ -949,7 +949,7 @@ button:focus-visible {
   max-height: calc(80vh - 80px);
 }
 
-/* 狼窝聊天/投票区（位于主界面） */
+/* 狼窝聊天/投票区 */
 .wolf-chat-section {
   margin-top: var(--spacing-md);
 }
@@ -1167,7 +1167,7 @@ button:focus-visible {
 /* 狼人投票角标 */
 .wolf-corner {
   position: absolute;
-  top: 4px; /* 初始位置 */
+  top: 4px;
   right: 4px;
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.8));
   color: #fff;
@@ -1214,6 +1214,28 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.role-setup-item input[type="number"] {
+  width: 50px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  text-align: center;
+  font-size: 14px;
+  transition: all var(--transition-base);
+  -moz-appearance: textfield;
+}
+.role-setup-item input[type="number"]::-webkit-outer-spin-button,
+.role-setup-item input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.role-setup-item input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
 }
 
 .counter-btn {
@@ -1262,6 +1284,7 @@ button:focus-visible {
   font-size: 13px;
   color: var(--text-secondary);
   min-width: 60px;
+  flex-shrink: 0;
 }
 .player-tags {
   display: flex;
@@ -1345,38 +1368,3 @@ button:focus-visible {
 .witch-actions-container button {
     flex: 1;
 }
-/* ========================================= */
-/*  最终的下拉列表样式 (已修复)                */
-/* ========================================= */
-select,
-.rule-select {
-  /* 外观重置 */
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-
-  /* 颜色与背景 (仅针对收起状态) */
-  background-color: var(--surface-raised);
-  color: var(--text-primary);
-  
-  /* 边框与尺寸 */
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  width: 100%;
-  
-  /* 内边距与字体 */
-  padding: 10px 36px 10px 14px; /* 右侧留出箭头空间 */
-  font-size: 14px;
-  cursor: pointer;
-
-  /* 自定义箭头 */
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23cccccc' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 0.8rem center;
-  background-size: 1em;
-}
-
-/* 
-  注意：我们不再需要为 'select option' 设置样式。
-  html { color-scheme: dark; } 会自动处理展开后选项的颜色。
-*/

@@ -541,7 +541,7 @@ const App = {
         const allDone = Object.values(ns).every(s => s === 'complete');
         const hasSheriff = allPlayers.some(p => p.badge);
         const isFirstNight = this.gameState.round === 1;
-        h += `<div class="host-status"><div class="host-status-title">夜晚行动中...</div><p style="font-size:13px; color:var(--text-tertiary); margin-top: 4px;">为保证公平，上帝视角不显示具体角色进度。</p></div>`;
+        h += `<div class="host-status"><div class="host-status-title">夜晚行动中...</div></div>`;
         h += `<div class="host-actions" style="display:flex; gap:8px;">`;
         if (isFirstNight && !hasSheriff) {
             if (!allDone) h += `<button class="action-btn" data-action="host-force-day" style="flex:1;">强制上警</button>`;

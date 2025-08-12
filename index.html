@@ -44,14 +44,19 @@
 
       <div id="game-creation-info" class="hidden"></div>
 
-      <!-- 身份配置区 -->
-      <div class="setup-section">
-        <h3 class="section-title">
-          <span class="section-icon">👥</span>
-          身份配置
-        </h3>
-        <div id="role-setup" class="role-grid"></div>
-      </div>
+<!-- =================== 身份配置区 (已修复) =================== -->
+          <div id="role-setup" class="setup-section">
+            <div class="section-header">
+              <span class="section-icon">👥</span>
+              <h3>身份配置</h3>
+            </div>
+            <!-- 
+              【关键修复】下面这个 div 就是之前丢失的容器。
+              JavaScript 需要它来动态添加所有角色的设置选项。
+            -->
+            <div id="role-grid" class="role-grid-container"></div>
+          </div>
+          <!-- ========================================================== -->
 
       <!-- 规则选项区 -->
       <div class="setup-section">
@@ -202,4 +207,5 @@
 <script src="assets/js/app.js"></script>
 </body>
 </html>
+
 

@@ -971,6 +971,7 @@ button:focus-visible {
   color: var(--text-primary);
   font-size: 14px;
   transition: all var(--transition-base);
+  min-width: 0;
 }
 
 .chat-input:focus {

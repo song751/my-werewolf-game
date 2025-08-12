@@ -729,7 +729,7 @@ const App = {
     await db.ref(`games/${this.gameId}/playerSelections/${this.playerId}`).remove();
   },
 
-  renderActionPanel() {
+renderActionPanel() {
     const panel = this.$('action-panel');
     panel.innerHTML = '';
 
@@ -753,7 +753,10 @@ const App = {
     if (this.gameState.phase === 'SHERIFF_TRANSFER') {
         const t = this.gameState.postDeathState;
         if (t && this.playerId == t.deadSheriffId) {
-            this.setSelection({type: 'sheriff-pass'});
+            // MODIFIED: Add conditional check to prevent overwriting player's selection.
+            if (!this.selection || this.selection.type !== 'sheriff-pass') {
+                this.setSelection({type: 'sheriff-pass'});
+            }
             panel.innerHTML = bar('你已阵亡，请选择警徽移交对象', { allowSkip: true, skipText: '撕毁警徽' });
         } else panel.innerHTML = info('等待警长移交警徽...');
         return;
@@ -761,7 +764,10 @@ const App = {
 
     if (isDead) {
         if (this.gameState.phase === 'HUNTER_ACTION' && this.gameState.hunterQueue && this.gameState.hunterQueue[this.playerId]) {
-            this.setSelection({type: 'hunter'});
+            // MODIFIED: Add conditional check to prevent overwriting player's selection.
+            if (!this.selection || this.selection.type !== 'hunter') {
+                this.setSelection({type: 'hunter'});
+            }
             panel.innerHTML = bar('你是猎人，请选择带走目标', { allowSkip: false });
         } else panel.innerHTML = `<div class="dead-panel"><div class="dead-icon">💀</div><div class="dead-text">你已出局</div></div>`;
         return;
@@ -798,14 +804,23 @@ const App = {
         if (this.playerData.isExposedIdiot) { panel.innerHTML = info('你无法投票'); return; }
         const v = this.fullGameData.sheriff?.votes?.[this.playerId];
         if (v != null) { panel.innerHTML = info(`你已投票给 ${v === '0' ? '弃票' : v + '号'}`); }
-        else { this.setSelection({type: 'sheriff-vote'}); panel.innerHTML = bar('为警长投票', { allowSkip: true, skipText: '弃票' }); }
+        else { 
+            // MODIFIED: Add conditional check to prevent overwriting player's selection.
+            if (!this.selection || this.selection.type !== 'sheriff-vote') {
+                this.setSelection({type: 'sheriff-vote'}); 
+            }
+            panel.innerHTML = bar('为警长投票', { allowSkip: true, skipText: '弃票' }); 
+        }
         return;
     }
 
     if (this.gameState.phase === 'DAY') {
         if (!dayOpen) {
             if (role === '骑士' && !this.getSkillState('hasUsedDuel')) {
-                this.setSelection({type: 'knight'});
+                // MODIFIED: Add conditional check to prevent overwriting player's selection.
+                if (!this.selection || this.selection.type !== 'knight') {
+                    this.setSelection({type: 'knight'});
+                }
                 panel.innerHTML = bar('你是骑士，可在投票前发动决斗', { allowSkip: false, confirmText: '决斗', allowCancel: true });
             } else panel.innerHTML = info('等待主持人开启投票…');
         } else {
@@ -813,7 +828,13 @@ const App = {
             else {
                 const v = this.fullGameData.dayVotes?.[this.gameState.round]?.[this.playerId];
                 if (v != null) { panel.innerHTML = info(`你已投票给 ${v === '0' ? '弃票' : v + '号'}`); }
-                else { this.setSelection({type: 'day-vote'}); panel.innerHTML = bar('放逐投票', { allowSkip: true, skipText: '弃票' }); }
+                else { 
+                    // MODIFIED: Add conditional check to prevent overwriting player's selection.
+                    if (!this.selection || this.selection.type !== 'day-vote') {
+                        this.setSelection({type: 'day-vote'});
+                    }
+                    panel.innerHTML = bar('放逐投票', { allowSkip: true, skipText: '弃票' }); 
+                }
             }
         }
         return;
@@ -861,7 +882,10 @@ const App = {
         if (['狼人', '隐狼'].includes(role)) {
             if (ns.wolf === 'pending') {
                 const can = this.canWolfAct(this.playerData);
-                this.setSelection({type: 'wolf-vote'});
+                // MODIFIED: Add conditional check to prevent overwriting player's selection.
+                if (!this.selection || this.selection.type !== 'wolf-vote') {
+                    this.setSelection({type: 'wolf-vote'});
+                }
                 let wolfPanelHtml = `<div class="wolf-inline-panel"><div class="wolf-hint">${can ? '🎯 点击上方玩家卡片投票，或选择空刀' : '⏳ 等待同伴行动'}</div><div id="wolf-votes-display" class="wolf-votes-section"></div>`;
                 if(can){
                     wolfPanelHtml += `<div class="wolf-actions" style="margin-top:8px;"><button class="control-btn" data-action="skip-selection">🔪 空刀</button></div>`;
@@ -878,8 +902,22 @@ const App = {
                 return;
             }
         }
-        if (role === '守卫' && ns.guard === 'pending') { this.setSelection({ type: 'guard' }); panel.innerHTML = bar('守卫：请选择守护对象', { allowSkip: true, skipText: '空守' }); return; }
-        if (role === '预言家' && ns.seer === 'pending') { this.setSelection({ type: 'seer' }); panel.innerHTML = bar(`预言家：请选择查验目标`, { allowSkip: true, skipText: '跳过' }); return; }
+        if (role === '守卫' && ns.guard === 'pending') { 
+            // MODIFIED: Add conditional check to prevent overwriting player's selection.
+            if (!this.selection || this.selection.type !== 'guard') {
+                this.setSelection({ type: 'guard' }); 
+            }
+            panel.innerHTML = bar('守卫：请选择守护对象', { allowSkip: true, skipText: '空守' }); 
+            return; 
+        }
+        if (role === '预言家' && ns.seer === 'pending') { 
+            // MODIFIED: Add conditional check to prevent overwriting player's selection.
+            if (!this.selection || this.selection.type !== 'seer') {
+                this.setSelection({ type: 'seer' }); 
+            }
+            panel.innerHTML = bar(`预言家：请选择查验目标`, { allowSkip: true, skipText: '跳过' }); 
+            return; 
+        }
         
         panel.innerHTML = info('等待其他角色行动...');
         return;

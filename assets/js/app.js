@@ -76,6 +76,7 @@ const App = {
   },
 
 // This is the main entry point of the application.
+// This is the main entry point of the application.
   init() {
     const urlParams = new URLSearchParams(window.location.search);
     this.gameId = urlParams.get('game');
@@ -84,20 +85,27 @@ const App = {
     this.attachGlobalListeners();
 
     if (this.gameId && this.playerId) {
+      // If joining a game, hide setup and show game layout
       this.$('setup-screen').classList.add('hidden');
       this.$('game-layout').classList.remove('hidden');
       this.listenToGameChanges(true);
     } else {
-      // MODIFICATION: This block is the correct place to reset the setup UI.
-      // It ensures that when no game is joined, the role configuration is always visible.
+      // FINAL FIX: This block ensures the setup screen is ALWAYS correctly initialized.
+      // It runs when the page is loaded without game parameters.
       this.$('setup-screen').classList.remove('hidden');
       this.$('game-layout').classList.add('hidden');
       
-      // Explicitly show the role setup and hide the post-creation info.
+      // Explicitly show the role configuration and hide the post-creation info.
       this.$('role-setup').classList.remove('hidden');
       this.$('btn-create').classList.remove('hidden');
+      this.$('btn-create').disabled = false;
+      this.$('create-text').classList.remove('hidden');
+      this.$('create-spinner').classList.add('hidden');
       this.$('game-creation-info').classList.add('hidden');
+      this.$('setup-error').classList.add('hidden');
+      this.$('setup-error').textContent = '';
       
+      // Now, render the content inside the visible setup container.
       this.renderRoleSetup();
     }
   },
@@ -591,14 +599,22 @@ const App = {
     this.showNotification('游戏已重置！请所有玩家确认新身份。', 'success');
   },
 
-  setupFail(msg) {
-    const e = this.$('setup-error');
-    e.innerHTML = msg;
-    e.classList.remove('hidden');
-    const btn = this.$('btn-create');
-    btn.disabled = false;
+setupFail(msg) {
+    // Show the error message to the user
+    const errorEl = this.$('setup-error');
+    errorEl.textContent = msg;
+    errorEl.classList.remove('hidden');
+    
+    // FINAL FIX: Fully reset the UI to the pre-creation state.
+    // This is crucial for allowing the user to correct settings and try again.
     this.$('create-text').classList.remove('hidden');
     this.$('create-spinner').classList.add('hidden');
+    this.$('btn-create').disabled = false;
+    
+    // Ensure the role configuration is visible again after a failed attempt
+    this.$('role-setup').classList.remove('hidden');
+    this.$('btn-create').classList.remove('hidden');
+    this.$('game-creation-info').classList.add('hidden');
   },
 
   deal(pool) {

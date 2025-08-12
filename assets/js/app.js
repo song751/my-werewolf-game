@@ -753,7 +753,6 @@ renderActionPanel() {
     if (this.gameState.phase === 'SHERIFF_TRANSFER') {
         const t = this.gameState.postDeathState;
         if (t && this.playerId == t.deadSheriffId) {
-            // MODIFIED: Add conditional check to prevent overwriting player's selection.
             if (!this.selection || this.selection.type !== 'sheriff-pass') {
                 this.setSelection({type: 'sheriff-pass'});
             }
@@ -764,7 +763,6 @@ renderActionPanel() {
 
     if (isDead) {
         if (this.gameState.phase === 'HUNTER_ACTION' && this.gameState.hunterQueue && this.gameState.hunterQueue[this.playerId]) {
-            // MODIFIED: Add conditional check to prevent overwriting player's selection.
             if (!this.selection || this.selection.type !== 'hunter') {
                 this.setSelection({type: 'hunter'});
             }
@@ -773,7 +771,6 @@ renderActionPanel() {
         return;
     }
 
-    // MODIFICATION #4: Handle sheriff drop state
     if (this.gameState.phase === 'SHERIFF_CAND') {
         const myCand = this.fullGameData.sheriff?.candidates?.[this.playerId];
         const hasDropped = this.fullGameData.sheriff?.drops?.[this.playerId];
@@ -805,7 +802,6 @@ renderActionPanel() {
         const v = this.fullGameData.sheriff?.votes?.[this.playerId];
         if (v != null) { panel.innerHTML = info(`你已投票给 ${v === '0' ? '弃票' : v + '号'}`); }
         else { 
-            // MODIFIED: Add conditional check to prevent overwriting player's selection.
             if (!this.selection || this.selection.type !== 'sheriff-vote') {
                 this.setSelection({type: 'sheriff-vote'}); 
             }
@@ -817,7 +813,6 @@ renderActionPanel() {
     if (this.gameState.phase === 'DAY') {
         if (!dayOpen) {
             if (role === '骑士' && !this.getSkillState('hasUsedDuel')) {
-                // MODIFIED: Add conditional check to prevent overwriting player's selection.
                 if (!this.selection || this.selection.type !== 'knight') {
                     this.setSelection({type: 'knight'});
                 }
@@ -829,7 +824,6 @@ renderActionPanel() {
                 const v = this.fullGameData.dayVotes?.[this.gameState.round]?.[this.playerId];
                 if (v != null) { panel.innerHTML = info(`你已投票给 ${v === '0' ? '弃票' : v + '号'}`); }
                 else { 
-                    // MODIFIED: Add conditional check to prevent overwriting player's selection.
                     if (!this.selection || this.selection.type !== 'day-vote') {
                         this.setSelection({type: 'day-vote'});
                     }
@@ -844,7 +838,6 @@ renderActionPanel() {
         if (actionInProgress) { panel.innerHTML = info('操作已确认，等待天亮...'); return; }
 
         if (role === '女巫' && ns.witch === 'pending') {
-            // MODIFICATION #1: Complete Witch Logic Overhaul
             const idx = this.playerData.deaths;
             const hasCure = !this.getSkillState('hasUsedCure', this.playerData, idx);
             const hasPoison = !this.getSkillState('hasUsedPoison', this.playerData, idx);
@@ -882,7 +875,7 @@ renderActionPanel() {
         if (['狼人', '隐狼'].includes(role)) {
             if (ns.wolf === 'pending') {
                 const can = this.canWolfAct(this.playerData);
-                // MODIFIED: Add conditional check to prevent overwriting player's selection.
+                // MODIFIED: This conditional check is the core fix for the "double click" issue.
                 if (!this.selection || this.selection.type !== 'wolf-vote') {
                     this.setSelection({type: 'wolf-vote'});
                 }
@@ -903,7 +896,6 @@ renderActionPanel() {
             }
         }
         if (role === '守卫' && ns.guard === 'pending') { 
-            // MODIFIED: Add conditional check to prevent overwriting player's selection.
             if (!this.selection || this.selection.type !== 'guard') {
                 this.setSelection({ type: 'guard' }); 
             }
@@ -911,7 +903,6 @@ renderActionPanel() {
             return; 
         }
         if (role === '预言家' && ns.seer === 'pending') { 
-            // MODIFIED: Add conditional check to prevent overwriting player's selection.
             if (!this.selection || this.selection.type !== 'seer') {
                 this.setSelection({ type: 'seer' }); 
             }
@@ -1132,7 +1123,7 @@ renderActionPanel() {
     if (livingInvisible.length > 0) return Math.min(...livingInvisible.map(p => p.id)).toString();
     return null;
   },
-  initWolfListeners() {
+initWolfListeners() {
     this.stopWolfListeners(false);
     const myType = this.getViewerWolfType(); if (!myType) return;
 
@@ -1170,6 +1161,23 @@ renderActionPanel() {
         p.innerHTML = `<span class="chat-sender">${v.pid}号:</span> <span class="chat-text">${this.escapeHTML(v.msg)}</span>`;
         if (box) { box.appendChild(p); box.scrollTop = box.scrollHeight; }
       });
+      
+      // MODIFICATION START: Add event listener for Enter key
+      const chatInput = this.$('wolf-chat-input');
+      if (chatInput) {
+        // To prevent adding multiple listeners, we replace the element to clear old ones.
+        // A more robust solution would be to manage the listener's lifecycle, but this is simple and effective here.
+        const newChatInput = chatInput.cloneNode(true);
+        chatInput.parentNode.replaceChild(newChatInput, chatInput);
+        
+        newChatInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault(); // Prevent new line
+            this.sendWolfMessage();
+          }
+        });
+      }
+      // MODIFICATION END
     }
   },
   stopWolfListeners(hide = true) {

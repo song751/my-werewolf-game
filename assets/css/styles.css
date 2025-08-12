@@ -38,7 +38,6 @@
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
-  /* MODIFICATION #14: New glow shadows for selection states */
   --shadow-glow-selected: 0 0 25px rgba(16, 185, 129, 0.5);
   --shadow-glow-target: 0 0 25px rgba(239, 68, 68, 0.45);
   
@@ -592,21 +591,21 @@ button:focus-visible {
   gap: var(--spacing-sm);
 }
 
-/* MODIFICATION #3: Thief UI styles */
-.identity-icon.thief-icon {
-  filter: grayscale(80%);
-  opacity: 0.7;
-}
-.identity-name.thief-copy-text {
-  color: var(--text-tertiary);
-  font-style: italic;
-}
-
 .identity-actions {
   display: flex;
   justify-content: center;
   gap: var(--spacing-md);
   margin-top: var(--spacing-md);
+}
+
+/* 盗贼身份UI样式 */
+.identity-icon.thief-icon {
+  filter: grayscale(50%);
+  opacity: 0.8;
+}
+.identity-name.thief-copy-text {
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 .persist-info {
@@ -646,6 +645,7 @@ button:focus-visible {
 .player-card {
   background: rgba(26, 31, 46, 0.8);
   backdrop-filter: blur(8px);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm);
   width: 100%;
@@ -656,15 +656,13 @@ button:focus-visible {
   align-items: center;
   gap: 4px;
   position: relative;
-  cursor: pointer;
-  /* MODIFICATION #14: Enhanced transition */
   transition: all var(--transition-base), border-color 0.1s ease-in-out;
-  border: 1px solid var(--border-primary);
+  cursor: pointer;
 }
 
-/* MODIFICATION #14: Enhanced hover effect */
+/* 增强的悬浮效果 */
 .player-card:hover:not(.disabled) {
-  background: rgba(35, 41, 58, 0.95);
+  background: rgba(26, 31, 46, 0.95);
   border-color: var(--accent-primary);
   transform: translateX(4px) scale(1.02);
   box-shadow: var(--shadow-glow);
@@ -680,8 +678,14 @@ button:focus-visible {
   border-color: var(--color-success);
   box-shadow: var(--shadow-glow-selected);
   transform: scale(1.05);
-  /* MODIFICATION #14: New animation for selected state */
   animation: subtle-pulse 2s infinite;
+}
+
+/* 玩家作为被选择目标时的样式 */
+.player-card.action-target {
+    border-color: var(--color-danger) !important;
+    box-shadow: var(--shadow-glow-target) !important;
+    animation: glow 1.5s infinite alternate;
 }
 
 .player-card.disabled {
@@ -690,7 +694,6 @@ button:focus-visible {
   pointer-events: none;
   transform: none;
   box-shadow: none;
-  cursor: not-allowed;
 }
 
 .player-number {
@@ -752,8 +755,9 @@ button:focus-visible {
 }
 
 .player-card.wolf-final-target {
-  border-color: rgba(239, 68, 68, 0.8) !important;
-  /* MODIFICATION #14: Use glow animation */
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.28);
+  transform: translateX(2px) scale(1.02);
   animation: glow 1.5s infinite alternate;
 }
 
@@ -942,32 +946,6 @@ button:focus-visible {
 .wolf-chat-section {
   margin-top: var(--spacing-md);
 }
-.wolf-votes-section {
-    padding: var(--spacing-sm);
-    background: rgba(0,0,0,0.1);
-    border-radius: var(--radius-md);
-}
-.wolf-vote-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-sm);
-    text-align: center;
-}
-.wolf-vote-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-xs) var(--spacing-sm);
-}
-.wolf-vote-item {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: 13px;
-}
-.voter { color: var(--text-primary); }
-.vote-arrow { color: var(--text-tertiary); }
-.vote-target.voted { color: var(--color-warning); font-weight: 600; }
 
 .chat-messages {
   background: rgba(0, 0, 0, 0.2);
@@ -1124,6 +1102,18 @@ button:focus-visible {
 @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+@keyframes clickPulse { 0% { transform: scale(1); } 50% { transform: scale(0.92); box-shadow: none; } 100% { transform: scale(1); } }
+@keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+@keyframes glow {
+    from { box-shadow: 0 0 8px -2px rgba(239, 68, 68, 0.4); }
+    to { box-shadow: 0 0 18px 2px rgba(239, 68, 68, 0.7); }
+}
+@keyframes subtle-pulse {
+    0% { box-shadow: var(--shadow-glow-selected); }
+    50% { box-shadow: 0 0 35px rgba(16, 185, 129, 0.6); }
+    100% { box-shadow: var(--shadow-glow-selected); }
+}
 
 /* 响应式设计 */
 @media (max-width: 1024px) {
@@ -1171,7 +1161,7 @@ button:focus-visible {
 /* 狼人投票角标 */
 .wolf-corner {
   position: absolute;
-  top: 4px;
+  top: 4px; /* 初始位置 */
   right: 4px;
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.8));
   color: #fff;
@@ -1204,22 +1194,14 @@ button:focus-visible {
   box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
 }
 
-/* 输入错误时的抖动动画 */
-.shake { animation: shake 0.5s; }
-@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
-
 /* 按钮点击动画 */
 .clicked { animation: clickPulse 0.3s; }
-/* MODIFICATION #14: Enhanced click animation */
-@keyframes clickPulse { 0% { transform: scale(1); } 50% { transform: scale(0.92); box-shadow: none; } 100% { transform: scale(1); } }
-
 
 /* 页面加载/视图切换动画 */
 .loading { opacity: 0; animation: fadeIn 0.5s forwards; }
 .view-active { animation: slideUp 0.5s ease-out; }
 .fade-in { animation: fadeIn 0.3s ease-out; }
 .fade-out { animation: fadeOut 0.3s ease-out forwards; }
-@keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
 
 /* 身份配置计数器 */
 .role-counter {
@@ -1316,14 +1298,13 @@ button:focus-visible {
   gap: var(--spacing-sm);
 }
 
-/* MODIFICATION #1 & #14: Witch action panel styles */
+/* 女巫操作面板样式 */
 .witch-panel {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
     width: 100%;
     align-items: center;
-    padding: var(--spacing-sm) 0;
 }
 .witch-status {
     width: 100%;
@@ -1331,9 +1312,8 @@ button:focus-visible {
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-xs);
-    padding-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
     border-bottom: 1px solid var(--border-primary);
-    margin-bottom: var(--spacing-sm);
 }
 .potion-status {
     display: flex;
@@ -1341,23 +1321,14 @@ button:focus-visible {
 }
 .potion {
     font-weight: 600;
-    padding: 4px 10px;
+    padding: 4px 8px;
     border-radius: var(--radius-sm);
     opacity: 0.4;
-    filter: grayscale(1);
     transition: all var(--transition-base);
 }
 .potion.available {
     opacity: 1;
-    filter: grayscale(0);
-}
-.potion:first-child.available {
-    color: var(--color-success);
-    background: rgba(16, 185, 129, 0.1);
-}
-.potion:last-child.available {
-    color: var(--color-danger);
-    background: rgba(239, 68, 68, 0.1);
+    color: var(--text-primary);
 }
 .witch-actions-container {
     display: flex;
@@ -1367,15 +1338,4 @@ button:focus-visible {
 }
 .witch-actions-container button {
     flex: 1;
-}
-
-/* MODIFICATION #14: New animations */
-@keyframes glow {
-    from { box-shadow: 0 0 8px -2px rgba(239, 68, 68, 0.4); }
-    to { box-shadow: 0 0 18px 2px rgba(239, 68, 68, 0.7); }
-}
-@keyframes subtle-pulse {
-    0% { box-shadow: var(--shadow-glow-selected); }
-    50% { box-shadow: 0 0 35px rgba(16, 185, 129, 0.6); }
-    100% { box-shadow: var(--shadow-glow-selected); }
 }

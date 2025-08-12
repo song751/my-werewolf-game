@@ -232,11 +232,11 @@ const App = {
             this.startApp();
             return;
         }
-          case 'host-transfer-pregame': {
+        case 'transfer-host-pregame': {
             const gameId = btn.dataset.gameid;
             const newHostId = this.$('host-transfer-select').value;
             if (newHostId && gameId) {
-                db.ref(`games/${gameId}/state/creatorId`).set(newHostId).then(() => {
+                db.ref(`games/${gameId}/state/creatorId`).set(Number(newHostId)).then(() => {
                     this.showNotification(`房主已成功移交给 ${newHostId} 号玩家！`, 'success');
                     this.$('host-transfer-select').value = '';
                 });
@@ -246,6 +246,17 @@ const App = {
             return;
         }
         // NEW CASE: for restarting the game
+        case 'host-transfer-ingame': {
+            const newHostId = this.$('host-transfer-select-ingame').value;
+            if (newHostId) {
+                db.ref(`games/${this.gameId}/state/creatorId`).set(Number(newHostId)).then(() => {
+                    this.showNotification(`主持人已成功移交给 ${newHostId} 号玩家！`, 'success');
+                });
+            } else {
+                this.showNotification('请选择一个玩家进行移交。', 'error');
+            }
+            return;
+        }
         case 'host-restart-game': {
             if (confirm('确定要为所有玩家开启新的一局游戏吗？')) {
                 btn.disabled = true;
@@ -323,15 +334,6 @@ const App = {
         return;
       }
       const g = s.val();
-       // MODIFICATION: Check for redirection to a new game
-      if (g.state?.nextGameId) {
-        this.detachAllListeners();
-        const newUrl = new URL(location.href);
-        newUrl.searchParams.set('game', g.state.nextGameId);
-        // Player ID remains the same
-        location.href = newUrl.toString();
-        return;
-      }
       this.fullGameData = g;
       this.gameState = g.state;
       this.allPlayers = g.players;
@@ -510,18 +512,19 @@ const App = {
             <option value="">将房主移交给...</option>
             ${playerOptions}
           </select>
-          <button data-action="host-transfer-pregame" data-gameid="${result.gameId}" class="control-btn">确认移交</button>
+          <button data-action="transfer-host-pregame" data-gameid="${result.gameId}" class="control-btn">确认移交</button>
         </div>
         <button data-action="join-as-creator" data-gameid="${result.gameId}" class="btn-primary btn-large"><span>以房主身份进入</span></button>
       </div>`;
   },
 
    // NEW FUNCTION: To handle the "Restart Game" action
+// REWRITTEN FUNCTION: To handle "in-place" game restart
   async restartGame() {
-    this.showNotification('正在准备新一局游戏...', 'info');
+    this.showNotification('正在重置游戏...', 'info');
     const oldGame = this.fullGameData;
     if (!oldGame) {
-      this.showNotification('无法获取上一局游戏数据，请手动创建。', 'error');
+      this.showNotification('无法获取游戏数据，请刷新后重试。', 'error');
       return;
     }
 
@@ -532,31 +535,57 @@ const App = {
             roleSetup[id.role] = (roleSetup[id.role] || 0) + 1;
         });
     });
-    // Since each player has two identities, we divide by 2
-    Object.keys(roleSetup).forEach(role => {
-        roleSetup[role] /= 2;
-    });
-    
-    const gameConfig = {
-        roleSetup,
-        rules: {
-            witchSelfSaveRule: oldGame.config.witchSelfSaveRule,
-            seerMode: oldGame.config.seerMode,
-            wolfWin: oldGame.config.wolfWin,
-        }
-    };
+    Object.keys(roleSetup).forEach(role => { roleSetup[role] /= 2; });
 
-    // 2. Create the new game
-    const result = await this._executeGameCreation(gameConfig);
-    if (result.error) {
-      this.showNotification(`创建新游戏失败: ${result.error}`, 'error');
-      return;
+    // 2. Re-deal cards
+    const pool = [];
+    Object.entries(roleSetup).forEach(([role, count]) => {
+      for (let k = 0; k < count; k++) pool.push(role);
+    });
+    const newPairs = this.deal(pool);
+    if (!newPairs) {
+        this.showNotification('无法生成符合规则的牌组，请检查身份配置。', 'error');
+        return;
     }
 
-    // 3. Set the redirection link in the old game's database
-    await db.ref(`games/${this.gameId}/state/nextGameId`).set(result.gameId);
-    this.showNotification('新游戏已创建！正在引导所有玩家进入...', 'success');
-    // The listener will automatically handle the redirection for all players.
+    // 3. Create a new players object, resetting their state
+    const newPlayers = {};
+    Object.values(oldGame.players).forEach((p, index) => {
+        newPlayers[p.id] = { 
+            id: p.id, 
+            identities: newPairs[index], 
+            originalIdentities: JSON.parse(JSON.stringify(newPairs[index])), 
+            deaths: 0, 
+            isAlive: true, 
+            isReady: false, 
+            isExposedIdiot: false, 
+            skillStates: {}, 
+            badge: 0 
+        };
+    });
+
+    // 4. Create the full update package to reset the game
+    const updates = {
+        'state/phase': 'SETUP',
+        'state/round': 0,
+        'state/peaceNightStreak': 0,
+        'state/winner': null,
+        'state/nightStatus': {},
+        'state/hunterQueue': {},
+        'state/postDeathState': null,
+        'state/dayVotingOpen': false,
+        'players': newPlayers,
+        'playerSelections': {},
+        'wolfChat': {},
+        'wolfVotes': {},
+        'nightActions': {},
+        'sheriff': {},
+        'dayVotes': {},
+        'logs': {}
+    };
+
+    await db.ref(`games/${this.gameId}`).update(updates);
+    this.showNotification('游戏已重置！请所有玩家确认新身份。', 'success');
   },
 
   setupFail(msg) {
@@ -616,31 +645,28 @@ const App = {
 renderIdentityCard() {
     const pd = this.playerData;
     if (!pd) return;
-    const i = pd.identities, d = pd.deaths;
+    const i = pd.identities, o = pd.originalIdentities, d = pd.deaths;
     
-    // MODIFICATION: Improved formatter logic for Thief UI
-    const fmt = (id) => {
-      // The original "Thief" role itself should not be styled as a copy.
-      if (id.role === '盗贼') {
+    // FINAL FIX: This logic correctly identifies which card was originally the Thief's.
+    const fmt = (identity, originalIdentity) => {
+      // If this card was originally the 'Thief', display its current role but with Thief styling.
+      if (originalIdentity.role === '盗贼') {
+        const currentRoleName = identity.role;
         return `<span class="identity-item">
-                  <span class="identity-icon">${ROLES['盗贼'].icon}</span>
-                  <span class="identity-name">${'盗贼'}</span>
+                  <span class="identity-icon thief-icon">🎭</span>
+                  <span class="identity-name thief-copy-text">${currentRoleName}</span>
                 </span>`;
       }
       
-      // Only apply special styling if it's a copy made by the thief.
-      const isThiefCopy = id.isThiefCopy;
-      const icon = ROLES[id.role].icon;
-      const textClass = isThiefCopy ? 'thief-copy-text' : '';
-      const iconClass = isThiefCopy ? 'thief-icon' : '';
-
+      // Otherwise, it's a normal card.
+      const roleInfo = ROLES[identity.role];
       return `<span class="identity-item">
-                <span class="identity-icon ${iconClass}">${icon}</span>
-                <span class="identity-name ${textClass}">${id.role}</span>
+                <span class="identity-icon">${roleInfo.icon}</span>
+                <span class="identity-name">${identity.role}</span>
               </span>`;
     };
     
-    let cardContent = `<div class="identity-header">你的身份</div><div class="identity-display">${d >= 1 ? '<span class="identity-dead">' : ''}${fmt(i[0])}${d >= 1 ? '</span>' : ''}<span class="identity-separator">+</span>${d >= 2 ? '<span class="identity-dead">' : ''}${fmt(i[1])}${d >= 2 ? '</span>' : ''}</div>`;
+    let cardContent = `<div class="identity-header">你的身份</div><div class="identity-display">${d >= 1 ? '<span class="identity-dead">' : ''}${fmt(i[0], o[0])}${d >= 1 ? '</span>' : ''}<span class="identity-separator">+</span>${d >= 2 ? '<span class="identity-dead">' : ''}${fmt(i[1], o[1])}${d >= 2 ? '</span>' : ''}</div>`;
     
     if (this.gameState.phase === 'SETUP' && !pd.isReady) {
       cardContent += `
@@ -724,12 +750,30 @@ renderIdentityCard() {
         }
     }
     if (ph === 'SHERIFF_TRANSFER') { h += `<div class="transfer-status" style="text-align:center; margin-bottom:8px;">⚰️ 警长已阵亡，等待移交或撕毁</div><button class="action-btn" data-action="host-force-badge-destroy" style="width:100%;">强制撕毁</button>`; }
-   if (ph === 'GAME_OVER') {
-      h += `<div class="game-over-host" style="text-align:center; color:var(--text-secondary); margin-bottom: 16px;">🎮 游戏已结束</div>`;
-      // MODIFICATION: Add restart button for the host
-      h += `<button class="btn-primary btn-large" data-action="host-restart-game"><span>🔁 重新开始一局</span></button>`;
+    if (ph === 'GAME_OVER') {
+        h += `<div class="game-over-host" style="text-align:center; color:var(--text-secondary); margin-bottom: 16px;">🎮 游戏已结束</div>`;
+        
+        // MODIFICATION: Add host transfer and restart options
+        const otherPlayers = allPlayers.filter(p => p.id != this.playerId);
+        let playerOptions = '';
+        if(otherPlayers.length > 0) {
+            playerOptions = otherPlayers.map(p => `<option value="${p.id}">${p.id}号玩家</option>`).join('');
+            h += `
+              <div class="host-transfer-section" style="margin-bottom: 16px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <select id="host-transfer-select-ingame" class="rule-select" style="flex-grow:1;">
+                    <option value="">将会长移交给...</option>
+                    ${playerOptions}
+                  </select>
+                  <button data-action="host-transfer-ingame" class="control-btn">确认移交</button>
+                </div>
+              </div>`;
+        }
+        h += `<button class="btn-primary btn-large" data-action="host-restart-game"><span>🔁 重新开始一局</span></button>`;
     }
     h += `</div>`;
+    el.innerHTML = h;
+  },
     el.innerHTML = h;
   },
 
@@ -984,28 +1028,42 @@ renderActionPanel() {
 
             let html = `<div class="witch-panel"><div class="witch-status"><div class="potion-status"><span class="potion ${hasCure ? 'available' : 'used'}">💊 解药</span><span class="potion ${hasPoison ? 'available' : 'used'}">☠️ 毒药</span></div></div>`;
 
-            if (this.selection?.type === 'witch-poison') {
-                html += bar('毒药：请选择目标', { allowSkip: true, skipText: '不使用毒药', allowCancel: true });
-            } else {
-                html += '<div class="witch-actions-container">';
-                if (hasCure && wolfTarget && wolfTarget !== '0') {
-                    const selfRule = this.fullGameData.config?.witchSelfSaveRule || 'noFirstNightSelfSave';
-                    const isSelf = +wolfTarget === +this.playerId;
-                    const isFirstNight = this.gameState.round === 1;
-                    let canSave = true;
-                    if (isSelf && ((selfRule === 'noFirstNightSelfSave' && isFirstNight) || (selfRule === 'onlyFirstNightSelfSave' && !isFirstNight))) {
-                        canSave = false;
-                    }
-                    html += `<button class="confirm-btn" data-action="witch-cure" data-target="${wolfTarget}" ${!canSave ? 'disabled' : ''}>💊 救 ${wolfTarget}号</button>`;
-                }
-                if (hasPoison) {
-                    html += `<button class="action-btn" data-action="witch-poison-start">☠️ 用毒药</button>`;
-                }
-                html += '</div>';
-                if (!hasCure && !hasPoison) { html += info('本条命药水已用尽'); }
-                else if ((!wolfTarget || wolfTarget === '0') && !hasPoison) { html += info('今晚无人被刀，且无毒药可用'); }
-                else if ((!wolfTarget || wolfTarget === '0') && hasPoison) { html += info('今晚无人被刀'); }
+        if (role === '女巫' && ns.witch === 'pending') {
+            // MODIFICATION: Reworked Witch UX to "Select then Act"
+            const idx = this.playerData.deaths;
+            const hasCure = !this.getSkillState('hasUsedCure', this.playerData, idx);
+            const hasPoison = !this.getSkillState('hasUsedPoison', this.playerData, idx);
+            const wolfTarget = this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
+            const selectedTarget = this.selection?.targetId;
+
+            if (!this.selection || this.selection.type !== 'witch-poison') {
+                this.setSelection({ type: 'witch-poison' });
             }
+
+            let html = `<div class="witch-panel"><div class="witch-status"><div class="potion-status"><span class="potion ${hasCure ? 'available' : 'used'}">💊 解药</span><span class="potion ${hasPoison ? 'available' : 'used'}">☠️ 毒药</span></div></div>`;
+            
+            html += `<div class="action-target" style="margin-top: 8px; text-align:center;">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>`;
+
+            html += '<div class="witch-actions-container" style="margin-top: 8px;">';
+            if (hasCure && wolfTarget && wolfTarget !== '0') {
+                const selfRule = this.fullGameData.config?.witchSelfSaveRule || 'noFirstNightSelfSave';
+                const isSelf = +wolfTarget === +this.playerId;
+                const isFirstNight = this.gameState.round === 1;
+                let canSave = true;
+                if (isSelf && ((selfRule === 'noFirstNightSelfSave' && isFirstNight) || (selfRule === 'onlyFirstNightSelfSave' && !isFirstNight))) {
+                    canSave = false;
+                }
+                html += `<button class="confirm-btn" data-action="witch-cure" data-target="${wolfTarget}" ${!canSave ? 'disabled' : ''}>💊 救 ${wolfTarget}号</button>`;
+            }
+            if (hasPoison) {
+                // The button now directly confirms the selection
+                html += `<button class="action-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>☠️ 使用毒药</button>`;
+            }
+            html += '</div>';
+
+            if (!hasCure && !hasPoison) { html += info('本条命药水已用尽'); }
+            else if ((!wolfTarget || wolfTarget === '0') && !hasPoison) { html += info('今晚无人被刀，且无毒药可用'); }
+            
             html += `</div>`;
             panel.innerHTML = html;
             return;

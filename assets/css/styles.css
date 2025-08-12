@@ -1137,8 +1137,6 @@ button:focus-visible {
 @media (max-width: 480px) {
   :root { --side-width: 48px; --center-min: 240px; }
   .top-bar-content { gap: var(--spacing-xs); }
-  h1 { display: none; }
-  .badge span:not(.badge-icon) { display: none; }
   #game-layout { gap: 6px; }
   .player-card { min-height: 64px; }
   .player-number { font-size: 16px; }

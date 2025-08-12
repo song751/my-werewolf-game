@@ -1,211 +1,204 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
-  <title>双身份狼人杀 - 电子法官 (V10.1)</title>
-  <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>双身份狼人杀 - 电子法官 (V10.3 修复版)</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-<div class="app">
+  <div class="app">
 
-  <!-- 顶部栏 -->
-  <div class="top-bar">
-    <div class="top-bar-content">
-      <div class="logo-section">
-        <span class="logo-icon">🌙</span>
-        <h1>双身份狼人杀</h1>
+    <!-- 顶部信息栏 -->
+    <header class="top-bar">
+      <div class="top-bar-content">
+        <div class="logo-section">
+          <span class="logo-icon">🌙</span>
+          <h1>双身份狼人杀</h1>
+        </div>
+        <div class="top-actions">
+          <span id="host-badge" class="badge badge-host hidden">
+            <span class="badge-icon">👑</span>
+            <span>主持</span>
+          </span>
+          <span id="sheriff-badge-top" class="badge badge-sheriff hidden">
+            <span class="badge-icon">⭐</span>
+            <span>警长</span>
+          </span>
+          <button class="btn-icon" data-action="open-logs" title="游戏日志" style="gap: 6px; width: auto; padding: 0 12px;">
+            <span class="btn-icon-emoji">📜</span>
+            <span>日志</span>
+          </button>
+        </div>
       </div>
-      <div class="top-actions">
-        <span id="host-badge" class="badge badge-host hidden">
-          <span class="badge-icon">👑</span>
-          <span>主持</span>
-        </span>
-        <span id="sheriff-badge-top" class="badge badge-sheriff hidden">
-          <span class="badge-icon">⭐</span>
-          <span>警长</span>
-        </span>
-        <button class="btn-icon" data-action="open-logs" title="游戏日志" style="gap: 6px; width: auto; padding: 0 12px;">
-          <span class="btn-icon-emoji">📜</span>
-          <span>日志</span>
-        </button>
-        <!-- 狼窝按钮已被移除 -->
-      </div>
-    </div>
-  </div>
+    </header>
 
-  <!-- 设置/创建 -->
-  <div id="setup-view" class="view-container">
-    <div class="setup-container">
-      <div class="setup-header">
-        <h2>游戏设置</h2>
-        <p class="setup-subtitle">配置身份和规则，创建精彩对局</p>
-      </div>
+    <main>
+      <!-- 游戏设置与创建界面 -->
+      <div id="setup-view" class="view-container">
+        <div class="setup-container">
+          <div class="setup-header">
+            <h2>游戏设置</h2>
+            <p class="setup-subtitle">配置身份和规则，创建精彩对局</p>
+          </div>
 
-      <div id="game-creation-info" class="hidden"></div>
+          <!-- 游戏创建成功后的信息展示区 -->
+          <div id="game-creation-info" class="hidden"></div>
 
-<!-- =================== 身份配置区 (已修复) =================== -->
-          <div id="role-setup" class="setup-section">
-            <div class="section-header">
+          <!-- 身份配置区 -->
+          <section id="role-setup-section" class="setup-section">
+            <h3 class="section-title">
               <span class="section-icon">👥</span>
-              <h3>身份配置</h3>
+              身份配置
+            </h3>
+            <!-- JS将在此处动态渲染所有角色配置项 -->
+            <div id="role-grid" class="role-grid"></div>
+          </section>
+
+          <!-- 游戏规则区 -->
+          <section class="setup-section">
+            <h3 class="section-title">
+              <span class="section-icon">⚙️</span>
+              游戏规则
+            </h3>
+            <div class="rule-options">
+              <div class="rule-item">
+                <label for="opt-witch-selfsave">
+                  <span class="rule-label">女巫自救</span>
+                  <span class="rule-hint">决定女巫能否自救的时机</span>
+                </label>
+                <select id="opt-witch-selfsave" class="rule-select">
+                  <option value="noFirstNightSelfSave">首夜不能自救</option>
+                  <option value="onlyFirstNightSelfSave">仅首夜可以自救</option>
+                </select>
+              </div>
+              <div class="rule-item">
+                <label for="opt-seer-mode">
+                  <span class="rule-label">预言家模式</span>
+                  <span class="rule-hint">查验结果的显示方式</span>
+                </label>
+                <select id="opt-seer-mode" class="rule-select">
+                  <option value="faction">查阵营</option>
+                  <option value="identity">查身份</option>
+                </select>
+              </div>
+              <div class="rule-item">
+                <label for="opt-wolf-win">
+                  <span class="rule-label">狼人获胜</span>
+                  <span class="rule-hint">狼人阵营的胜利条件</span>
+                </label>
+                <select id="opt-wolf-win" class="rule-select">
+                  <option value="edge">屠边</option>
+                  <option value="exterminate">屠城</option>
+                </select>
+              </div>
             </div>
-            <!-- 
-              【关键修复】下面这个 div 就是之前丢失的容器。
-              JavaScript 需要它来动态添加所有角色的设置选项。
-            -->
-            <div id="role-grid" class="role-grid-container"></div>
-          </div>
-          <!-- ========================================================== -->
+          </section>
 
-      <!-- 规则选项区 -->
-      <div class="setup-section">
-        <h3 class="section-title">
-          <span class="section-icon">⚙️</span>
-          游戏规则
+          <!-- 统计信息 -->
+          <div class="setup-stats">
+            <div class="stat-item">
+              <span class="stat-label">总身份数</span>
+              <span class="stat-value" id="total-roles">0</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-label">玩家数</span>
+              <span class="stat-value" id="player-cnt">0</span>
+            </div>
+          </div>
+          <div id="player-count-warning" class="warning-text"></div>
+
+          <!-- 错误信息提示 -->
+          <div id="setup-error" class="error-message hidden"></div>
+
+          <!-- 创建游戏按钮 -->
+          <button id="btn-create" class="btn-primary btn-large" data-action="create-game">
+            <span id="create-text">创建游戏</span>
+            <span id="create-spinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 游戏主界面 -->
+      <div id="game-view" class="hidden">
+        <div id="game-layout">
+          <!-- 左侧玩家列表 -->
+          <div id="player-grid-left" class="player-grid"></div>
+
+          <!-- 中央核心操作面板 -->
+          <div class="center-panel">
+            <div id="status-bar" class="status-bar">
+              <span class="status-text">等待游戏开始...</span>
+            </div>
+            <div id="identity-card" class="identity-card"></div>
+            <div id="persist" class="persist-info hidden"></div>
+            <div id="action-panel" class="action-panel"></div>
+            <div id="host-controls" class="host-controls hidden"></div>
+          </div>
+
+          <!-- 右侧玩家列表 -->
+          <div id="player-grid-right" class="player-grid"></div>
+        </div>
+      </div>
+
+      <!-- 上帝（后台）视角 -->
+      <div id="god-view" class="hidden">
+        <div class="god-container">
+          <div class="god-header">
+            <h2>上帝视角</h2>
+            <p class="god-subtitle">掌控全局，洞察一切</p>
+          </div>
+          <div class="god-section">
+            <h3 class="section-title">
+              <span class="section-icon">👁️</span>
+              玩家状态
+            </h3>
+            <div id="god-player-list" class="god-player-list"></div>
+          </div>
+          <div class="god-section">
+            <h3 class="section-title">
+              <span class="section-icon">🤫</span>
+              秘密日志
+            </h3>
+            <div id="god-log-content" class="god-log-content"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- 浮动通知容器 -->
+  <div id="notification-container"></div>
+
+  <!-- 游戏日志模态框 -->
+  <div id="logs-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span class="modal-icon">📜</span>
+          游戏日志
         </h3>
-        <div class="rule-options">
-          <div class="rule-item">
-            <label for="opt-witch-selfsave">
-              <span class="rule-label">女巫自救</span>
-              <span class="rule-hint">决定女巫能否自救的时机</span>
-            </label>
-            <select id="opt-witch-selfsave" class="rule-select">
-              <option value="noFirstNightSelfSave">首夜不能自救</option>
-              <option value="onlyFirstNightSelfSave">仅首夜可以自救</option>
-            </select>
-          </div>
-          <div class="rule-item">
-            <label for="opt-seer-mode">
-              <span class="rule-label">预言家模式</span>
-              <span class="rule-hint">查验结果的显示方式</span>
-            </label>
-            <select id="opt-seer-mode" class="rule-select">
-              <option value="faction">查阵营</option>
-              <option value="identity">查身份</option>
-            </select>
-          </div>
-          <div class="rule-item">
-            <label for="opt-wolf-win">
-              <span class="rule-label">狼人获胜</span>
-              <span class="rule-hint">狼人阵营的胜利条件</span>
-            </label>
-            <select id="opt-wolf-win" class="rule-select">
-              <option value="edge">屠边</option>
-              <option value="exterminate">屠城</option>
-            </select>
-          </div>
-        </div>
+        <button class="modal-close" data-action="close-modal" data-target="logs-modal">
+          <span>×</span>
+        </button>
       </div>
-
-      <!-- 统计信息 -->
-      <div class="setup-stats">
-        <div class="stat-item">
-          <span class="stat-label">总身份数</span>
-          <span class="stat-value" id="total-roles">0</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-label">玩家数</span>
-          <span class="stat-value" id="player-cnt">0</span>
-        </div>
-      </div>
-      <div id="player-count-warning" class="warning-text"></div>
-
-      <div id="setup-error" class="error-message hidden"></div>
-
-      <button id="btn-create" class="btn-primary btn-large" data-action="create-game">
-        <span id="create-text">创建游戏</span>
-        <span id="create-spinner" class="spinner hidden"></span>
-      </button>
-    </div>
-  </div>
-
-  <!-- 游戏主界面 -->
-  <div id="game-view" class="hidden">
-    <div id="game-layout">
-      <!-- 左侧玩家列 -->
-      <div id="player-grid-left" class="player-grid"></div>
-
-      <!-- 中央面板 -->
-      <div class="center-panel">
-        <div id="status-bar" class="status-bar">
-          <span class="status-text">等待游戏开始...</span>
-        </div>
-        
-        <div id="identity-card" class="identity-card"></div>
-        
-        <div id="persist" class="persist-info hidden"></div>
-        
-        <div id="action-panel" class="action-panel"></div>
-        
-        <div id="host-controls" class="host-controls hidden"></div>
-      </div>
-
-      <!-- 右侧玩家列 -->
-      <div id="player-grid-right" class="player-grid"></div>
-    </div>
-  </div>
-
-  <!-- 上帝后台 -->
-  <div id="god-view" class="hidden">
-    <div class="god-container">
-      <div class="god-header">
-        <h2>上帝视角</h2>
-        <p class="god-subtitle">掌控全局，洞察一切</p>
-      </div>
-      
-      <div class="god-section">
-        <h3 class="section-title">
-          <span class="section-icon">👁️</span>
-          玩家状态
-        </h3>
-        <div id="god-player-list" class="god-player-list"></div>
-      </div>
-
-      <div class="god-section">
-        <h3 class="section-title">
-          <span class="section-icon">🤫</span>
-          秘密日志
-        </h3>
-        <div id="god-log-content" class="god-log-content"></div>
+      <div class="modal-body">
+        <div id="game-log-content" class="log-content"></div>
       </div>
     </div>
   </div>
 
-</div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-<!-- 浮动通知 -->
-<div id="notification-container"></div>
-
-<!-- 日志模态 -->
-<div id="logs-modal" class="modal">
-  <div class="modal-overlay"></div>
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3 class="modal-title">
-        <span class="modal-icon">📜</span>
-        游戏日志
-      </h3>
-      <button class="modal-close" data-action="close-modal" data-target="logs-modal">
-        <span>×</span>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div id="game-log-content" class="log-content"></div>
-    </div>
-  </div>
-</div>
-
-<!-- 狼窝模态框已被移除 -->
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<!-- App -->
-<script src="assets/js/app.js"></script>
+  <!-- 主应用逻辑 -->
+  <script src="app.js"></script>
 </body>
+
 </html>
-
-

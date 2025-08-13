@@ -576,7 +576,7 @@ const App = {
    * @param {string} action - 动作名称
    * @param {HTMLElement} btn - 被点击的按钮元素
    */
-  handleSimpleAction(action, btn) {
+  async handleSimpleAction(action, btn) {
     switch(action) {
         case 'join-as-creator': {
             const gid = btn.dataset.gameid || btn.getAttribute('value');
@@ -613,9 +613,21 @@ const App = {
         }
         case 'host-restart-game': {
             if (confirm('确定要为所有玩家开启新的一局游戏吗？此操作会重置所有身份和状态。')) {
+                // [BUG修复] 使用 try...finally 确保按钮状态一定会被重置
+                const originalText = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner"></span> 正在创建...';
-                this.restartGame();
+                try {
+                    // [BUG修复] 使用 await 等待异步函数执行完毕
+                    await this.restartGame();
+                } catch (error) {
+                    console.error("重启游戏失败:", error);
+                    this.showNotification('重启游戏失败，请检查控制台日志。', 'error');
+                } finally {
+                    // 无论成功或失败，都恢复按钮状态
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
             }
             return;
         }
@@ -908,7 +920,7 @@ const App = {
         html += `<div class="host-status"><div class="host-status-title">夜晚行动中...</div></div>`;
         html += `<div class="host-actions" style="display:flex; gap:8px;">`;
         if (isFirstNight && !hasSheriff) { // 首夜且无警长，则天亮后进入上警环节
-            if (!allDone) html += `<button class="action-btn" data-action="host-force-day" style="flex:1;">强制上警</button>`;
+            if (!allDone) html += `<button class="action-btn" data-action="host-sheriff-cand-init" style="flex:1;">强制上警</button>`;
             html += `<button class="confirm-btn" data-action="host-sheriff-cand-init" ${!allDone ? 'disabled' : ''} style="flex:1;">👑 开始上警</button>`;
         } else {
             if (!allDone) html += `<button class="action-btn" data-action="host-force-day" style="flex:1;">强制天亮</button>`;

@@ -1153,30 +1153,63 @@ const App = {
     if (!isHost) { host.innerHTML = ''; return; }
 
     const st = data.state;
-    let html = `<div class="host-panel"><div class="host-status-title">主持控制台</div><div class="host-actions">`;
-    
+    let html = `<div class="host-panel">`;
+
+    // 1. 渲染状态监控面板
+    html += this.renderHostStatusDashboard();
+
+    // 2. 渲染控制按钮
+    html += `<div class="host-actions-wrapper">`;
+    html += `<div class="host-status-title">主持控制台</div><div class="host-actions">`;
+
     if (st.phase === PHASE.SETUP) {
-        const allReady = Object.values(data.players || {}).every(p => p.isReady);
-        html += `<button class="btn-primary" data-action="host-start" ${allReady ? '' : 'disabled'}>开始游戏 (N1)</button>`;
+      const allReady = Object.values(data.players || {}).every(p => p.isReady);
+      html += `<button class="btn-primary" data-action="host-start" ${allReady ? '' : 'disabled'}>开始游戏</button>`;
+      html += `<button class="action-btn" data-action="host-start">强制开始</button>`;
     }
     if (st.phase === PHASE.SHERIFF_CAND) {
-        html += `<button class="btn-primary" data-action="host-speech">进入发言</button>`;
+      html += `<button class="btn-primary" data-action="host-speech">进入发言</button>`;
     }
     if (st.phase === PHASE.SHERIFF_SPEECH) {
-        html += `<button class="btn-primary" data-action="host-sheriff-vote">进入投票</button>`;
+      html += `<button class="btn-primary" data-action="host-sheriff-vote">进入投票</button>`;
+    }
+    if (st.phase === PHASE.SHERIFF_VOTE) {
+        html += `<button class="action-btn" data-action="host-force-sheriff-tally">强制计票</button>`;
     }
     if (st.phase === PHASE.DAY_TALK) {
-        html += `<button class="btn-primary" data-action="host-day-vote">开启放逐投票</button>
-                 <button class="control-btn" data-action="host-skip-day">直接入夜</button>`;
+      html += `<button class="btn-primary" data-action="host-day-vote">开启放逐投票</button>`;
+      html += `<button class="control-btn" data-action="host-skip-day">直接入夜</button>`;
+    }
+    if (st.phase === PHASE.DAY_VOTE) {
+        html += `<button class="action-btn" data-action="host-force-day-tally">强制计票</button>`;
     }
     if (st.phase === PHASE.GAME_OVER) {
-        html += `<button class="btn-primary" data-action="host-restart">重新开始</button>`;
+      html += `<button class="btn-primary" data-action="host-restart">返回设置</button>`;
+    }
+    html += `</div></div>`;
+
+    // 3. 仅在 SETUP 阶段显示主持人移交和链接复制
+    if (st.phase === PHASE.SETUP) {
+      html += `<div class="host-extra-controls">`;
+      // 主持人移交
+      const players = Object.values(data.players || {});
+      html += `<div class="host-transfer">
+                 <select id="host-transfer-select">
+                   ${players.map(p => `<option value="${p.id}" ${String(p.id) === String(st.host) ? 'selected' : ''}>玩家 ${p.id}</option>`).join('')}
+                 </select>
+                 <button class="control-btn" data-action="host-transfer">移交主持</button>
+               </div>`;
+      // 链接复制
+      html += `<div class="host-links-section">
+                 <div class="section-title" style="font-size:14px; margin-bottom:8px;">游戏链接</div>
+                 ${this.generateGameLinks()}
+               </div>`;
+      html += `</div>`;
     }
 
-    html += `</div></div>`;
+    html += `</div>`;
     host.innerHTML = html;
   },
-
   /* ---------- 7. 事件处理 ---------- */
   async onClick(e) {
     const a = e.target.closest('[data-action]');
@@ -1207,9 +1240,36 @@ const App = {
     }
     if (act === 'host-speech') return this.engine.to(PHASE.SHERIFF_SPEECH);
     if (act === 'host-sheriff-vote') return this.engine.to(PHASE.SHERIFF_VOTE);
+    if (act === 'host-force-sheriff-tally') { // [新增]
+        this.toast('主持人强制结束警长投票', 'info');
+        return this.engine.tallySheriff();
+    }
     if (act === 'host-day-vote') return this.engine.to(PHASE.DAY_VOTE);
+    if (act === 'host-force-day-tally') { // [新增]
+        this.toast('主持人强制结束放逐投票', 'info');
+        return this.engine.tallyDayVote();
+    }
     if (act === 'host-skip-day') return this.engine.startNight(r + 1);
-    if (act === 'host-restart') { /* TODO: 实现重启逻辑 */ this.toast('重启功能待实现', 'info'); return; }
+    if (act === 'host-restart') { // [修改]
+        location.href = location.pathname; // 重启最简单的方式是返回首页
+        return;
+    }
+    if (act === 'host-transfer') { // [新增]
+        const newHostId = $('host-transfer-select').value;
+        await db.ref(`games/${this.gameId}/state/host`).set(Number(newHostId));
+        this.toast(`主持人已移交给玩家 ${newHostId}`, 'success');
+        return;
+    }
+    if (act === 'copy-link') { // [新增]
+        const link = a.dataset.link;
+        try {
+            await navigator.clipboard.writeText(link);
+            this.toast('链接已复制到剪贴板', 'success');
+        } catch (err) {
+            this.toast('复制失败', 'error');
+        }
+        return;
+    }
 
     // 玩家行动
     const meId = this.me;
@@ -1338,6 +1398,93 @@ const App = {
     const n = el(`<div class="notification ${type}">${escapeHtml(txt)}</div>`);
     $('notification-container').appendChild(n);
     setTimeout(() => n.remove(), 3000);
+  },
+   /**
+   * [新增] 生成游戏链接，用于主持人分享给其他玩家。
+   * @returns {string} - 包含所有玩家链接的HTML字符串。
+   */
+  generateGameLinks() {
+    if (!this.gameId) return '游戏ID无效。';
+    const players = Object.values(this.full.players || {});
+    if (players.length === 0) return '没有玩家信息。';
+
+    const baseUrl = `${location.origin}${location.pathname}`;
+    let linksHtml = '<div class="game-links-container">';
+    players.forEach(p => {
+      const link = `${baseUrl}?game=${this.gameId}&player=${p.id}`;
+      linksHtml += `
+        <div class="game-link-item">
+          <span>玩家 ${p.id}:</span>
+          <input type="text" class="fancy-input" value="${link}" readonly />
+          <button class="control-btn" data-action="copy-link" data-link="${link}">复制</button>
+        </div>
+      `;
+    });
+    linksHtml += '</div>';
+    return linksHtml;
+  },
+
+  /**
+   * [新增] 渲染主持人专用的状态监控面板。
+   * @returns {string} - 包含当前阶段完成情况的HTML字符串。
+   */
+  renderHostStatusDashboard() {
+    const st = this.full.state;
+    const players = Object.values(this.full.players || {});
+    const alivePlayers = players.filter(p => p.isAlive);
+    let statusText = '';
+
+    switch (st.phase) {
+      case PHASE.SETUP: {
+        const readyCount = players.filter(p => p.isReady).length;
+        statusText = `身份确认: ${readyCount} / ${players.length}`;
+        break;
+      }
+      case PHASE.NIGHT: {
+        // 计算夜晚需要行动的总人数和已行动人数
+        const activatedHidden = this.engine.isHiddenWolfActivated(this.full.players, st);
+        const actingWolves = this.engine.getAliveActingWolves(this.full.players, st);
+        const seer = alivePlayers.find(p => this.engine.activeRole(p) === '预言家');
+        const guard = alivePlayers.find(p => this.engine.activeRole(p) === '守卫');
+        
+        let total = actingWolves.length > 0 ? 1 : 0; // 狼人算一个集体行动
+        if (seer) total++;
+        if (guard) total++;
+
+        let acted = 0;
+        const nightActions = this.full.actions?.[st.round]?.NIGHT || {};
+        if (nightActions.WOLF?.final !== undefined || actingWolves.length === 0) acted++;
+        if (nightActions.SEER) acted++;
+        if (nightActions.GUARD) acted++;
+        
+        statusText = `夜晚行动: ${acted} / ${total} 组完成`;
+        break;
+      }
+      case PHASE.NIGHT_WITCH: {
+        const witchDone = this.full.actions?.[st.round]?.NIGHT_WITCH?.done;
+        statusText = `女巫行动: ${witchDone ? '已完成' : '进行中'}`;
+        break;
+      }
+      case PHASE.SHERIFF_CAND: {
+        const decidedCount = Object.keys(st.sheriff?.candidates || {}).length;
+        statusText = `上警意向: ${decidedCount} / ${alivePlayers.length}`;
+        break;
+      }
+      case PHASE.SHERIFF_VOTE:
+      case PHASE.DAY_VOTE: {
+        const voters = alivePlayers.filter(p => !p.isExposedIdiot);
+        const votes = (st.phase === PHASE.SHERIFF_VOTE) 
+            ? (st.sheriff?.votes || {}) 
+            : (this.full.actions?.[st.round]?.DAY_VOTE || {});
+        const votedCount = Object.keys(votes).length;
+        statusText = `投票进度: ${votedCount} / ${voters.length}`;
+        break;
+      }
+      default:
+        return ''; // 其他阶段不显示状态
+    }
+    
+    return `<div class="host-status-dashboard">${statusText}</div>`;
   },
 
   /* ---------- 9. 清理工作 ---------- */

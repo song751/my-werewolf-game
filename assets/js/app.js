@@ -613,18 +613,16 @@ const App = {
         }
         case 'host-restart-game': {
             if (confirm('确定要为所有玩家开启新的一局游戏吗？此操作会重置所有身份和状态。')) {
-                // [BUG修复] 使用 try...finally 确保按钮状态一定会被重置
                 const originalText = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner"></span> 正在创建...';
                 try {
-                    // [BUG修复] 使用 await 等待异步函数执行完毕
                     await this.restartGame();
                 } catch (error) {
                     console.error("重启游戏失败:", error);
-                    this.showNotification('重启游戏失败，请检查控制台日志。', 'error');
+                    // 错误信息已在 restartGame 内部显示，这里可以不重复显示
                 } finally {
-                    // 无论成功或失败，都恢复按钮状态
+                    // [BUG修复] 确保无论成功或失败，按钮状态都一定会被重置
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                 }
@@ -772,12 +770,17 @@ const App = {
    * [新增] “重新开始一局”的逻辑。
    * 此函数会重置游戏状态，但保留原有玩家和身份配置，并重新发牌。
    */
+  /**
+   * [已修复] “重新开始一局”的逻辑。
+   * 修复了因玩家对象遍历顺序不确定导致的发牌失败和卡死问题。
+   */
   async restartGame() {
     this.showNotification('正在重置游戏...', 'info');
     const oldGame = this.fullGameData;
     if (!oldGame) {
       this.showNotification('无法获取旧游戏数据，请刷新后重试。', 'error');
-      return;
+      // [BUG修复] 抛出错误以便上层捕获并处理UI
+      throw new Error("旧游戏数据无法获取。");
     }
 
     // 1. 从原始身份数据中重建身份池
@@ -787,7 +790,7 @@ const App = {
             roleSetup[id.role] = (roleSetup[id.role] || 0) + 1;
         });
     });
-    Object.keys(roleSetup).forEach(role => { roleSetup[role] /= 2; }); // 因为每人双身份，所以要除以2
+    Object.keys(roleSetup).forEach(role => { roleSetup[role] /= 2; });
 
     // 2. 重新发牌
     const pool = [];
@@ -797,12 +800,14 @@ const App = {
     const newPairs = this.deal(pool);
     if (!newPairs) {
         this.showNotification('重新发牌失败，无法生成符合规则的牌组。', 'error');
-        return;
+        // [BUG修复] 抛出错误以便上层捕获并处理UI
+        throw new Error("重新发牌失败。");
     }
 
     // 3. 创建新的玩家状态对象，重置所有状态
     const newPlayers = {};
-    Object.values(oldGame.players).forEach((p, index) => {
+    // [BUG修复] 必须对玩家数组按 ID 排序，否则发牌会错乱！
+    Object.values(oldGame.players).sort((a, b) => a.id - b.id).forEach((p, index) => {
         newPlayers[p.id] = { 
             id: p.id, 
             identities: newPairs[index], 
@@ -827,7 +832,6 @@ const App = {
         'state/postDeathState': null,
         'state/dayVotingOpen': false,
         'players': newPlayers,
-        // 清空所有上一局的临时数据
         'playerSelections': {},
         'wolfChat': {},
         'wolfVotes': {},

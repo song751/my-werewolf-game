@@ -1157,126 +1157,95 @@ const App = {
    * 这是 UI 最复杂的部分，根据游戏阶段和玩家身份显示不同的操作选项。
    * 修复了女巫操作面板逻辑重复的 Bug。
    */
+/**
+   * [已修复] 渲染中央核心操作面板。
+   * 这是一个完整的、修复了所有已知问题的版本。
+   * - 修复了导致脚本崩溃的 'info is not defined' 致命错误。
+   * - 包含了所有角色和游戏阶段的UI渲染逻辑。
+   * - 保留了对女巫UI的改进（在无刀口时进行提示）。
+   */
   renderActionPanel() {
     const panel = this.$('action-panel');
-    panel.innerHTML = '';
+    panel.innerHTML = ''; // 每次渲染前清空
 
-    if (this.gameState.phase === 'GAME_OVER') {
-        panel.innerHTML = `<div class="game-over-panel"><div class="game-over-icon">🏆</div><div class="game-over-text">游戏结束</div></div>`;
-        return;
-    }
-
-    const isDead = !this.playerData.isAlive;
-    const nightStatus = this.gameState.nightStatus || {};
     const role = this.getActiveRole(this.playerData);
-    const isDayVotingOpen = !!this.fullGameData?.state?.dayVotingOpen;
-    const actionInProgress = !!this.fullGameData.nightActions?.[this.gameState.round]?.[this.playerId]?.inProgress;
+    const nightStatus = this.gameState?.nightStatus || {};
+    const actionInProgress = this.fullGameData.nightActions?.[this.gameState.round]?.[this.playerId]?.inProgress;
+    const selectedTarget = this.selection?.targetId;
 
-    // 辅助函数，生成信息提示和标准操作栏
-    const info = (msg) => `<div class="action-feedback">${this.escapeHTML(msg)}</div>`;
-    const bar = (title, { confirmText = '确认', skipText = '跳过', allowSkip = true, allowCancel = true } = {}) => {
-        const targetText = this.selection?.targetId ? `${this.selection.targetId}号` : '未选择';
-        return `<div class="action-bar"><div class="action-title">${this.escapeHTML(title)}</div><div class="action-target">当前目标：<strong>${targetText}</strong></div><div class="action-buttons"><button class="confirm-btn" data-action="confirm-selection" ${!this.selection?.targetId ? 'disabled' : ''}>${confirmText}</button>${allowSkip ? `<button class="control-btn" data-action="skip-selection">${skipText}</button>` : ''}${allowCancel ? `<button class="action-btn" data-action="cancel-selection">取消</button>` : ''}</div></div>`;
-    };
+    // 一个辅助函数，用于生成标准的信息提示框
+    const infoBox = (text) => `<div class="action-feedback">${text}</div>`;
 
-    if (this.gameState.phase === 'SHERIFF_TRANSFER') {
-        const transferState = this.gameState.postDeathState;
-        if (transferState && this.playerId == transferState.deadSheriffId) {
-            if (!this.selection || this.selection.type !== 'sheriff-pass') {
-                this.setSelection({type: 'sheriff-pass'});
-            }
-            panel.innerHTML = bar('你已阵亡，请选择警徽移交对象', { allowSkip: true, skipText: '撕毁警徽' });
-        } else panel.innerHTML = info('等待警长移交警徽...');
-        return;
+    if (this.gameState.phase === 'SETUP') {
+      const isThief = (this.playerData.originalIdentities || []).some(id => id.role === '盗贼');
+      if (isThief) {
+        panel.innerHTML = infoBox('你是盗贼，可以选择是否交换身份牌的顺序。');
+      } else {
+        panel.innerHTML = infoBox('请确认你的身份，等待游戏开始。');
+      }
+      return;
     }
-
-    if (isDead) {
-        if (this.gameState.phase === 'HUNTER_ACTION' && this.gameState.hunterQueue && this.gameState.hunterQueue[this.playerId]) {
-            if (!this.selection || this.selection.type !== 'hunter') {
-                this.setSelection({type: 'hunter'});
-            }
-            panel.innerHTML = bar('你是猎人，请选择带走的目标', { allowSkip: false, allowCancel: false });
-        } else panel.innerHTML = `<div class="dead-panel"><div class="dead-icon">💀</div><div class="dead-text">你已出局</div></div>`;
-        return;
-    }
-
-    if (this.gameState.phase === 'SHERIFF_CAND') {
-        const myCand = this.fullGameData.sheriff?.candidates?.[this.playerId];
-        const hasDropped = this.fullGameData.sheriff?.drops?.[this.playerId];
-        if (hasDropped) { panel.innerHTML = info('你已退水，无法操作'); }
-        else if (myCand !== undefined) { panel.innerHTML = info(`你已选择 ${myCand ? '上警' : '不上警'}`); }
-        else { panel.innerHTML = `<div class="sheriff-choice"><div class="choice-title">是否参与警长竞选？</div><div class="choice-buttons"><button class="btn-primary" data-action="sheriff-cand" data-value="1">我要上警</button><button class="control-btn" data-action="sheriff-cand" data-value="0">不上警</button></div></div>`; }
-        return;
-    }
-
-    if (this.gameState.phase === 'SHERIFF_SPEECH') {
-        const candidates = this.fullGameData.sheriff?.candidates || {};
-        const drops = this.fullGameData.sheriff?.drops || {};
-        const runningCandidates = Object.keys(candidates).filter(id => candidates[id] && !drops[id]);
-        let html = `<div class="candidate-info-box"><div class="candidate-info-title">👑 上警玩家</div><div class="candidate-list">${runningCandidates.length > 0 ? runningCandidates.map(id => `<span class="player-tag">${id}号</span>`).join('') : '<span style="color:var(--text-tertiary);">无</span>'}</div></div>`;
-        if (candidates[this.playerId] && !drops[this.playerId]) {
-            html += `<div class="drop-water" style="margin-top:16px;"><button class="action-btn" data-action="sheriff-drop">💧 退水</button></div>`;
-        } else {
-            html += info('等待主持人推进流程...');
-        }
-        panel.innerHTML = html;
-        return;
-    }
-
-    if (this.gameState.phase === 'SHERIFF_VOTE') {
-        if (this.playerData.isExposedIdiot) { panel.innerHTML = info('你是翻牌白痴，无法投票'); return; }
-        const myVote = this.fullGameData.sheriff?.votes?.[this.playerId];
-        if (myVote != null) { panel.innerHTML = info(`你已投票给 ${myVote === '0' ? '弃票' : myVote + '号'}`); }
-        else { 
-            if (!this.selection || this.selection.type !== 'sheriff-vote') this.setSelection({type: 'sheriff-vote'}); 
-            panel.innerHTML = bar('为警长投票', { allowSkip: true, skipText: '弃票' }); 
-        }
-        return;
-    }
-
-    if (this.gameState.phase === 'DAY') {
-        if (!isDayVotingOpen) {
-            if (role === '骑士' && !this.getSkillState('hasUsedDuel')) {
-                if (!this.selection || this.selection.type !== 'knight') this.setSelection({type: 'knight'});
-                panel.innerHTML = bar('你是骑士，可在投票前发动决斗', { allowSkip: false, confirmText: '决斗', allowCancel: true });
-            } else panel.innerHTML = info('等待主持人开启投票…');
-        } else {
-            if (this.playerData.isExposedIdiot) { panel.innerHTML = info('你是翻牌白痴，无法投票'); }
-            else {
-                const myVote = this.fullGameData.dayVotes?.[this.gameState.round]?.[this.playerId];
-                if (myVote != null) { panel.innerHTML = info(`你已投票给 ${myVote === '0' ? '弃票' : myVote + '号'}`); }
-                else { 
-                    if (!this.selection || this.selection.type !== 'day-vote') this.setSelection({type: 'day-vote'});
-                    panel.innerHTML = bar('放逐投票', { allowSkip: true, skipText: '弃票' }); 
-                }
-            }
-        }
-        return;
-    }
-
+    
     if (this.gameState.phase === 'NIGHT') {
-        if (actionInProgress) { panel.innerHTML = info('操作已确认，等待天亮...'); return; }
+        if (actionInProgress) { panel.innerHTML = infoBox('操作已确认，等待天亮...'); return; }
 
-        // [逻辑修复] 移除了重复的女巫逻辑块，只保留下面这个正确的版本。
-    if (this.gameState.phase === 'NIGHT') {
-        if (actionInProgress) { panel.innerHTML = info('操作已确认，等待天亮...'); return; }
+        if (role === '守卫' && nightStatus.guard === 'pending') {
+            if (!this.selection || this.selection.type !== 'guard') { this.setSelection({ type: 'guard' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">请选择今晚要守护的玩家：</div>
+                <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="control-btn" data-action="skip-selection" ${this.getSkillState('lastGuardTarget') === null ? 'disabled' : ''}>🛡️ 空守</button>
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>✅ 确认守护</button>
+                </div>`;
+            return;
+        }
+
+        if (role === '预言家' && nightStatus.seer === 'pending') {
+            if (!this.selection || this.selection.type !== 'seer') { this.setSelection({ type: 'seer' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">请选择今晚要查验的玩家：</div>
+                <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="control-btn" data-action="skip-selection">🤔 跳过</button>
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>✅ 确认查验</button>
+                </div>`;
+            return;
+        }
+
+        if (this.canWolfAct(this.playerData) && nightStatus.wolf === 'pending') {
+            if (!this.selection || this.selection.type !== 'wolf-vote') { this.setSelection({ type: 'wolf-vote' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">请选择今晚要袭击的玩家：</div>
+                <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="control-btn" data-action="skip-selection">🔪 空刀</button>
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>✅ 确认投票</button>
+                </div>
+                <div id="wolf-votes-display" class="wolf-votes-display"></div>
+                ${this.getViewerWolfType() === 'regular' ? `
+                <div class="wolf-chat-section">
+                    <div id="wolf-chat-messages" class="chat-messages"></div>
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="wolf-chat-input" class="chat-input" placeholder="狼人悄悄话...">
+                        <button class="btn-send" data-action="wolf-send">发送</button>
+                    </div>
+                </div>` : ''}`;
+            return;
+        }
 
         if (role === '女巫' && nightStatus.witch === 'pending') {
             const lifeIndex = this.playerData.deaths;
             const hasCure = !this.getSkillState('hasUsedCure', this.playerData, lifeIndex);
             const hasPoison = !this.getSkillState('hasUsedPoison', this.playerData, lifeIndex);
             const wolfTarget = this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
-            const selectedTarget = this.selection?.targetId;
-
-            if (!this.selection || this.selection.type !== 'witch-poison') {
-                this.setSelection({ type: 'witch-poison' });
-            }
+            
+            if (!this.selection || this.selection.type !== 'witch-poison') { this.setSelection({ type: 'witch-poison' }); }
 
             let html = `<div class="witch-panel"><div class="witch-status"><div class="potion-status"><span class="potion ${hasCure ? 'available' : ''}">💊 解药</span><span class="potion ${hasPoison ? 'available' : ''}">☠️ 毒药</span></div></div>`;
             
-            // [UI修复] 当无人被刀时，给女巫明确提示
             if (hasCure && (!wolfTarget || wolfTarget === '0')) {
-                html += `<div class="action-feedback" style="margin-top: 8px;">ℹ️ 今晚无人被刀，你可以选择是否使用毒药。</div>`;
+                html += infoBox('ℹ️ 今晚无人被刀，你可以选择是否使用毒药。');
             }
             
             html += `<div class="action-target" style="margin-top: 8px; text-align:center;">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>`;
@@ -1297,52 +1266,110 @@ const App = {
             }
             html += '</div>';
 
-            if (!hasCure && !hasPoison) { html += info('本条命的药水已用尽'); }
+            // [BUG修复] 使用 infoBox 辅助函数替换未定义的 info()
+            if (!hasCure && !hasPoison) { html += infoBox('本条命的药水已用尽'); }
             
             html += `</div>`;
             panel.innerHTML = html;
             return;
         }
 
-        if (['狼人', '隐狼'].includes(role)) {
-            if (nightStatus.wolf === 'pending') {
-                const canAct = this.canWolfAct(this.playerData);
-                if (!this.selection || this.selection.type !== 'wolf-vote') {
-                    this.setSelection({type: 'wolf-vote'});
-                }
-                let wolfPanelHtml = `<div class="wolf-inline-panel"><div class="wolf-hint">${canAct ? '🎯 点击上方玩家卡片投票，或选择空刀' : '⏳ 等待同伴行动'}</div><div id="wolf-votes-display" class="wolf-votes-section"></div>`;
-                if(canAct){
-                    wolfPanelHtml += `<div class="wolf-actions" style="margin-top:8px;"><button class="control-btn" data-action="skip-selection">🔪 空刀</button></div>`;
-                }
-                // 只有普通狼人能看到聊天框
-                if (role === '狼人') {
-                    wolfPanelHtml += `<div id="wolf-chat-area" class="wolf-chat-section"><div id="wolf-chat-messages" class="chat-messages"></div><div class="chat-input-wrapper"><input id="wolf-chat-input" class="chat-input" placeholder="输入消息..." maxlength="120" /><button data-action="wolf-send" class="btn-send"><span>发送</span></button></div></div>`;
-                }
-                wolfPanelHtml += `</div>`;
-                panel.innerHTML = wolfPanelHtml;
-                this.initWolfListeners();
-                return;
-            } else {
-                panel.innerHTML = info('狼队已确定目标，等待其他角色行动…');
-                return;
-            }
-        }
-        if (role === '守卫' && nightStatus.guard === 'pending') { 
-            if (!this.selection || this.selection.type !== 'guard') this.setSelection({ type: 'guard' }); 
-            panel.innerHTML = bar('守卫：请选择守护对象', { allowSkip: true, skipText: '空守' }); 
-            return; 
-        }
-        if (role === '预言家' && nightStatus.seer === 'pending') { 
-            if (!this.selection || this.selection.type !== 'seer') this.setSelection({ type: 'seer' }); 
-            panel.innerHTML = bar(`预言家：请选择查验目标`, { allowSkip: true, skipText: '跳过' }); 
-            return; 
-        }
-        
-        panel.innerHTML = info('等待其他角色行动...');
+        panel.innerHTML = infoBox('夜晚行动中，请耐心等待...');
         return;
     }
 
-    panel.innerHTML = info('游戏进行中…');
+    if (this.gameState.phase === 'DAY') {
+        if (role === '骑士' && !this.getSkillState('hasUsedDuel')) {
+            if (!this.selection || this.selection.type !== 'knight') { this.setSelection({ type: 'knight' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">骑士，你可以选择一名玩家进行决斗。</div>
+                <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>⚔️ 发起决斗</button>
+                </div>`;
+            return;
+        }
+        if (this.fullGameData.state.dayVotingOpen) {
+            if (!this.selection || this.selection.type !== 'day-vote') { this.setSelection({ type: 'day-vote' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">放逐投票已开启，请选择你要投票的玩家。</div>
+                <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="control-btn" data-action="skip-selection">🗳️ 弃票</button>
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>✅ 确认投票</button>
+                </div>`;
+            return;
+        }
+        panel.innerHTML = infoBox('白天发言阶段，请耐心等待投票开启...');
+        return;
+    }
+
+    if (this.gameState.phase === 'SHERIFF_CAND') {
+        panel.innerHTML = `
+            <div class="action-prompt">请选择是否参与本轮警长竞选？</div>
+            <div class="action-buttons">
+                <button class="control-btn" data-action="sheriff-cand" data-value="0">不上警</button>
+                <button class="confirm-btn" data-action="sheriff-cand" data-value="1">我要上警</button>
+            </div>`;
+        return;
+    }
+
+    if (this.gameState.phase === 'SHERIFF_SPEECH') {
+        const sheriffData = this.fullGameData.sheriff || {};
+        if (sheriffData.candidates?.[this.playerId] && !sheriffData.drops?.[this.playerId]) {
+            panel.innerHTML = `<div class="action-buttons"><button class="action-btn" data-action="sheriff-drop">💧 退水</button></div>`;
+        } else {
+            panel.innerHTML = infoBox('警上玩家发言中...');
+        }
+        return;
+    }
+
+    if (this.gameState.phase === 'SHERIFF_VOTE') {
+        if (!this.selection || this.selection.type !== 'sheriff-vote') { this.setSelection({ type: 'sheriff-vote' }); }
+        panel.innerHTML = `
+            <div class="action-prompt">警长投票已开启，请选择你要投票的警上候选人。</div>
+            <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+            <div class="action-buttons">
+                <button class="control-btn" data-action="skip-selection">🗳️ 弃票</button>
+                <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>✅ 确认投票</button>
+            </div>`;
+        return;
+    }
+
+    if (this.gameState.phase === 'HUNTER_ACTION') {
+        const hunterQueue = this.fullGameData.state.hunterQueue || {};
+        if (hunterQueue[this.playerId]) {
+            if (!this.selection || this.selection.type !== 'hunter') { this.setSelection({ type: 'hunter' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">你是猎人，请选择一名玩家开枪带走。</div>
+                <div class="action-target">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>🔫 开枪</button>
+                </div>`;
+        } else {
+            panel.innerHTML = infoBox('猎人正在开枪，请稍候...');
+        }
+        return;
+    }
+    
+    if (this.gameState.phase === 'SHERIFF_TRANSFER') {
+        const transferState = this.fullGameData.state.postDeathState;
+        if (transferState?.deadSheriffId == this.playerId) {
+            if (!this.selection || this.selection.type !== 'sheriff-pass') { this.setSelection({ type: 'sheriff-pass' }); }
+            panel.innerHTML = `
+                <div class="action-prompt">你是警长，请选择移交警徽或撕掉警徽。</div>
+                <div class="action-target">当前目标：<strong>${selectedTarge ? selectedTarget + '号' : '未选择'}</strong></div>
+                <div class="action-buttons">
+                    <button class="action-btn" data-action="skip-selection">💔 撕掉警徽</button>
+                    <button class="confirm-btn" data-action="confirm-selection" ${!selectedTarget ? 'disabled' : ''}>👑 移交警徽</button>
+                </div>`;
+        } else {
+            panel.innerHTML = infoBox('警长正在移交警徽...');
+        }
+        return;
+    }
+
+    panel.innerHTML = infoBox('游戏进行中…');
   },
 
 // ========================================

@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="app">
-    <!-- 顶部信息栏 -->
+    <!-- 顶部信息栏（移除标题旁的主持/警长徽章） -->
     <header class="top-bar">
       <div class="top-bar-content">
         <div class="logo-section">
@@ -16,14 +16,7 @@
           <h1>双身份狼人杀</h1>
         </div>
         <div class="top-actions">
-          <span id="host-badge" class="badge badge-host hidden">
-            <span class="badge-icon">👑</span>
-            <span>主持</span>
-          </span>
-          <span id="sheriff-badge-top" class="badge badge-sheriff hidden">
-            <span class="badge-icon">⭐</span>
-            <span>警长</span>
-          </span>
+          <!-- 只保留日志按钮 -->
           <button class="btn-icon" data-action="open-logs" title="游戏日志" style="gap: 6px; width: auto; padding: 0 12px;">
             <span class="btn-icon-emoji">📜</span>
             <span>日志</span>
@@ -88,6 +81,17 @@
                 <select id="opt-wolf-win" class="rule-select">
                   <option value="edge">屠边</option>
                   <option value="exterminate">屠城</option>
+                </select>
+              </div>
+              <!-- 新增：狼人可见策略 -->
+              <div class="rule-item">
+                <label for="opt-wolf-visibility">
+                  <span class="rule-label">狼人可见策略</span>
+                  <span class="rule-hint">选择狼人之间的可见范围</span>
+                </label>
+                <select id="opt-wolf-visibility" class="rule-select">
+                  <option value="activeOnly">仅可行动狼人互见</option>
+                  <option value="allWolves">所有携带狼身份互见</option>
                 </select>
               </div>
             </div>

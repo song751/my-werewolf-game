@@ -146,6 +146,11 @@ const App = {
       case 'host-open-day-vote': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.setPhase(PHASE.DAY_VOTE); return;
       case 'host-tally-day': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.tallyDayVotes(); return;
       case 'host-tally-sheriff': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.tallySheriffVotes(); return;
+      case 'host-force-start': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.hostForceStartGame(); return;
+      case 'host-force-end-night': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.hostForceEndNight(); return;
+      case 'host-force-end-cand': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.hostForceEndSheriffCand(); return;
+      case 'host-force-end-dayvote': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.hostForceEndDayVote(); return;
+      case 'host-force-end-sheriffvote': if(!this.isHost) return this.notify('仅主持可操作','error'); await this.hostForceEndSheriffVote(); return;
 
       /* 身份确认 */
       case 'swap-identities': await this.swapIdentities(); return;
@@ -375,31 +380,132 @@ const App = {
     arr.slice(0,half).forEach(p=>L.appendChild(make(p)));
     arr.slice(half).forEach(p=>R.appendChild(make(p)));
   },
-  renderHostPanel(){
+renderHostPanel(){
     const el=this.$('host-controls'); if(!el) return;
     if(!this.isHost){ el.classList.add('hidden'); el.innerHTML=''; return; }
     el.classList.remove('hidden');
 
     const phase=this.state.phase;
+    const ps=Object.values(this.players).sort((a,b)=>a.id-b.id);
+    const round=this.state.round||0;
+
+    const tag = (p, done)=> `<span class="player-tag ${done?'done':'pending'}">${p.id}号</span>`;
+    const section = (title, doneList, pendingList)=> `
+      <div class="host-status">
+        <div class="host-status-title">${title}</div>
+        <div class="status-category">
+          <div class="category-title">已完成:</div>
+          <div class="player-tags">${doneList.length?doneList.join(''):'<span style="color:var(--text-tertiary);">无</span>'}</div>
+        </div>
+        <div class="status-category">
+          <div class="category-title">未完成:</div>
+          <div class="player-tags">${pendingList.length?pendingList.join(''):'<span style="color:var(--text-tertiary);">无</span>'}</div>
+        </div>
+      </div>`;
+
     let html = `<div class="host-panel">`;
+
+    // SETUP：显示准备情况；增加“强制开始”
     if(phase===PHASE.SETUP){
-      const ps=Object.values(this.players);
-      const ready=ps.filter(p=>p.isReady).length;
-      html+=`<div class="host-status"><div class="host-status-title">玩家准备 (${ready}/${ps.length})</div></div>
-             <div class="host-actions" style="display:flex;gap:8px;">
-               <button class="confirm-btn" data-action="host-start" ${ready<ps.length?'disabled':''}>🚀 开始游戏</button>
-             </div>`;
-    }else{
-      html+=`<div class="host-status"><div class="host-status-title">当前阶段：${this.$('status-bar')?.innerText||''}</div></div>
-             <div class="host-actions" style="display:flex;gap:8px;">
-               <button class="control-btn" data-action="host-next">➡️ 推进</button>`;
-      if(phase===PHASE.DAY_TALK) html+=`<button class="confirm-btn" data-action="host-open-day-vote">🗳️ 开启放逐投票</button>`;
-      if(phase===PHASE.DAY_VOTE) html+=`<button class="confirm-btn" data-action="host-tally-day">📊 统计放逐</button>`;
-      if(phase===PHASE.SHERIFF_VOTE) html+=`<button class="confirm-btn" data-action="host-tally-sheriff">📊 统计警长</button>`;
-      html+=`</div>`;
+      const ready=ps.filter(p=>p.isReady), pend=ps.filter(p=>!p.isReady);
+      html += section(`玩家准备 (${ready.length}/${ps.length})`,
+        ready.map(p=>tag(p,true)), pend.map(p=>tag(p,false)));
+      html += `<div class="host-actions" style="display:flex;gap:8px;">
+        <button class="confirm-btn" data-action="host-start" ${pend.length>0?'disabled':''}>🚀 开始游戏</button>
+        <button class="action-btn" data-action="host-force-start">⚡ 强制开始</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
     }
-    html+=`</div>`;
-    el.innerHTML=html;
+
+    // 夜间阶段：不显示进度，避免暴露信息；提供“强制结束夜晚”
+    if([PHASE.NIGHT_GUARD,PHASE.NIGHT_SEER,PHASE.NIGHT_WOLVES,PHASE.NIGHT_WITCH,PHASE.DAWN_RESOLVE].includes(phase)){
+      html += `<div class="host-status">
+        <div class="host-status-title">夜间行动中（出于保密，夜间不显示操作进度）</div>
+      </div>
+      <div class="host-actions" style="display:flex;gap:8px;">
+        <button class="action-btn" data-action="host-force-end-night">🌅 强制结束夜晚</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 上警意向：显示谁已决定/未决定；提供“强制结束上警”
+    if(phase===PHASE.SHERIFF_CAND){
+      const cand=this.sheriff?.candidates||{};
+      const decided=ps.filter(p=>p.isAlive && cand[p.id]!==undefined);
+      const pending=ps.filter(p=>p.isAlive && cand[p.id]===undefined);
+      html += section(`上警意向 (${decided.length}/${ps.filter(p=>p.isAlive).length})`,
+        decided.map(p=>tag(p,true)), pending.map(p=>tag(p,false)));
+      html += `<div class="host-actions" style="display:flex;gap:8px;">
+        <button class="action-btn" data-action="host-force-end-cand">⏭️ 强制结束上警</button>
+        <button class="confirm-btn" data-action="host-next">➡️ 推进</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 上警发言：仅提供推进
+    if(phase===PHASE.SHERIFF_SPEECH){
+      html += `<div class="host-actions" style="display:flex;gap:8px;">
+        <button class="confirm-btn" data-action="host-next">➡️ 进入警长投票</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 警长投票：显示已投/未投；提供“强制结束投票”
+    if(phase===PHASE.SHERIFF_VOTE){
+      const votes=this.sheriff?.votes||{};
+      const voters=ps.filter(p=>p.isAlive && !p.isExposedIdiot);
+      const done=voters.filter(p=>votes[p.id]!==undefined);
+      const pend=voters.filter(p=>votes[p.id]===undefined);
+      html += section(`警长投票 (${done.length}/${voters.length})`,
+        done.map(p=>tag(p,true)), pend.map(p=>tag(p,false)));
+      html += `<div class="host-actions" style="display:flex;gap:8px;">
+        <button class="action-btn" data-action="host-force-end-sheriffvote">🗳️ 强制结束投票</button>
+        <button class="confirm-btn" data-action="host-tally-sheriff" ${pend.length>0?'disabled':''}>📊 统计</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 白天发言：提供开启投票/推进
+    if(phase===PHASE.DAY_TALK){
+      html += `<div class="host-actions" style="display:flex;gap:8px;">
+        <button class="confirm-btn" data-action="host-open-day-vote">🗳️ 开启放逐投票</button>
+        <button class="control-btn" data-action="host-next">➡️ 推进</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 白天投票：显示已投/未投；提供“强制结束投票”
+    if(phase===PHASE.DAY_VOTE){
+      const votes=(this.actions[round]||{})[PHASE.DAY_VOTE]||{};
+      const voters=ps.filter(p=>p.isAlive && !p.isExposedIdiot);
+      const done=voters.filter(p=>votes[p.id]!==undefined);
+      const pend=voters.filter(p=>votes[p.id]===undefined);
+      html += section(`放逐投票 (${done.length}/${voters.length})`,
+        done.map(p=>tag(p,true)), pend.map(p=>tag(p,false)));
+      html += `<div class="host-actions" style="display:flex;gap:8px;">
+        <button class="action-btn" data-action="host-force-end-dayvote">🗳️ 强制结束投票</button>
+        <button class="confirm-btn" data-action="host-tally-day" ${pend.length>0?'disabled':''}>📊 统计</button>
+      </div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 猎人/警徽移交/结束
+    if(phase===PHASE.HUNTER_ACTION){
+      html += `<div class="host-status"><div class="host-status-title">猎人行动阶段</div></div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+    if(phase===PHASE.SHERIFF_TRANSFER){
+      html += `<div class="host-status"><div class="host-status-title">警徽移交阶段</div></div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+    if(phase===PHASE.GAME_OVER){
+      html += `<div class="host-status"><div class="host-status-title">🎮 游戏已结束</div></div>`;
+      el.innerHTML=html+`</div>`; return;
+    }
+
+    // 兜底
+    html += `<div class="host-actions"><button class="control-btn" data-action="host-next">➡️ 推进</button></div>`;
+    el.innerHTML=html+`</div>`;
   },
 
   renderActionPanel(){
@@ -1117,15 +1223,115 @@ const App = {
     const v=(await db.ref(`games/${this.gameId}/actions/${r}/${PHASE.NIGHT_WOLVES}`).once('value')).val()||{};
     return v.alphaTarget!=null;
   },
+   async hostForceStartGame(){
+    if(this.state.phase!==PHASE.SETUP) return this.notify('当前不是准备阶段','error');
+    const updates={};
+    Object.values(this.players).forEach(p=>{
+      updates[`players/${p.id}/isReady`] = true;
+      // 身份顺序按当前展示锁定，无需额外写入
+    });
+    await db.ref(`games/${this.gameId}`).update(updates);
+    await this.startNight(1);
+  },
+   async hostForceEndNight(){
+    const r=this.state.round;
+    // 守卫：无行动则空守 + 记录 lastGuardTarget=null
+    const guardP = Object.values(this.players).find(p=>p.isAlive && this.getActiveRole(p)==='守卫');
+    if(guardP){
+      const gAct = (this.actions[r]||{})[PHASE.NIGHT_GUARD]?.[guardP.id];
+      if(!gAct){
+        await db.ref(`games/${this.gameId}/actions/${r}/${PHASE.NIGHT_GUARD}/${guardP.id}`)
+          .set({ target:null, ts:firebase.database.ServerValue.TIMESTAMP });
+        const lifeIdx=guardP.deaths;
+        await db.ref(`games/${this.gameId}/players/${guardP.id}/skillStates/${lifeIdx}_lastGuardTarget`).set(null);
+      }
+    }
+    // 预言家：无行动则 target:null
+    const seerP = Object.values(this.players).find(p=>p.isAlive && this.getActiveRole(p)==='预言家');
+    if(seerP){
+      const sAct = (this.actions[r]||{})[PHASE.NIGHT_SEER]?.[seerP.id];
+      if(!sAct){
+        await db.ref(`games/${this.gameId}/actions/${r}/${PHASE.NIGHT_SEER}/${seerP.id}`)
+          .set({ target:null, ts:firebase.database.ServerValue.TIMESTAMP });
+      }
+    }
+    // 狼人：若未拍板则空刀
+    const wRef = db.ref(`games/${this.gameId}/actions/${r}/${PHASE.NIGHT_WOLVES}`);
+    const wolfAct = (await wRef.once('value')).val()||{};
+    if(wolfAct.alphaTarget==null){
+      const alpha=this.getAlphaWolfId();
+      await wRef.update({ alphaTarget:'0', alphaActor: alpha||'0', ts: firebase.database.ServerValue.TIMESTAMP });
+    }
+    // 女巫：若存在但未行动则视为 skipped
+    const witchP = Object.values(this.players).find(p=>p.isAlive && this.getActiveRole(p)==='女巫');
+    if(witchP){
+      const wAct = (this.actions[r]||{})[PHASE.NIGHT_WITCH]?.[witchP.id];
+      if(!wAct){
+        await db.ref(`games/${this.gameId}/actions/${r}/${PHASE.NIGHT_WITCH}/${witchP.id}`)
+          .set({ skipped:true, ts:firebase.database.ServerValue.TIMESTAMP });
+      }
+    }
+
+    // 结算夜晚；首夜 -> 上警；后续 -> 白天
+    const hasSheriff = Object.values(this.players).some(p=>p.badge);
+    const next = (this.state.round===1 && !hasSheriff) ? PHASE.SHERIFF_CAND : PHASE.DAY_TALK;
+    await this.resolveNight(next);
+  },
+   async hostForceEndSheriffCand(){
+    if(this.state.phase!==PHASE.SHERIFF_CAND) return this.notify('当前不是上警阶段','error');
+    const cand=this.sheriff?.candidates||{};
+    const updates={};
+    Object.values(this.players).forEach(p=>{
+      if(p.isAlive && cand[p.id]===undefined){
+        updates[`sheriff/candidates/${p.id}`]=0;
+      }
+    });
+    if(Object.keys(updates).length){
+      await db.ref(`games/${this.gameId}`).update(updates);
+    }
+    await this.setPhase(PHASE.SHERIFF_SPEECH);
+  },
+   async hostForceEndDayVote(){
+    if(this.state.phase!==PHASE.DAY_VOTE) return this.notify('当前不是放逐投票阶段','error');
+    const r=this.state.round;
+    const votes=(this.actions[r]||{})[PHASE.DAY_VOTE]||{};
+    const voters=Object.values(this.players).filter(p=>p.isAlive && !p.isExposedIdiot);
+    const updates={};
+    voters.forEach(v=>{
+      if(votes[v.id]===undefined){
+        updates[`actions/${r}/${PHASE.DAY_VOTE}/${v.id}`]={ target:'0', ts:firebase.database.ServerValue.TIMESTAMP };
+      }
+    });
+    if(Object.keys(updates).length){
+      await db.ref(`games/${this.gameId}`).update(updates);
+    }
+    await this.tallyDayVotes();
+  },
+   async hostForceEndSheriffVote(){
+    if(this.state.phase!==PHASE.SHERIFF_VOTE) return this.notify('当前不是警长投票阶段','error');
+    const votes=this.sheriff?.votes||{};
+    const voters=Object.values(this.players).filter(p=>p.isAlive && !p.isExposedIdiot);
+    const updates={};
+    voters.forEach(v=>{
+      if(votes[v.id]===undefined){
+        updates[`sheriff/votes/${v.id}`]='0';
+      }
+    });
+    if(Object.keys(updates).length){
+      await db.ref(`games/${this.gameId}`).update(updates);
+    }
+    await this.tallySheriffVotes();
+  },
+   
 
   /* ----------------- 夜晚结算 ----------------- */
-  async resolveNight(){
+async resolveNight(nextIfNoAction = PHASE.DAY_TALK){
     await this.setPhase(PHASE.DAWN_RESOLVE);
     const r=this.state.round;
     const guard = (this.actions[r]||{})[PHASE.NIGHT_GUARD]||{};
-    const seer  = (this.actions[r]||{})[PHASE.NIGHT_SEER]||{};
     const wolf  = (this.actions[r]||{})[PHASE.NIGHT_WOLVES]||{};
     const witch = (this.actions[r]||{})[PHASE.NIGHT_WITCH]||{};
+
     const wolfTarget = wolf.alphaTarget||null;
     const guardTarget = Object.values(guard)[0]?.target ?? undefined; // 守卫唯一
     const cureTarget = Object.values(witch)[0]?.cure ?? null;
@@ -1154,29 +1360,11 @@ const App = {
 
     let anyHunter=false, anySheriff=false;
     for(const d of deaths){
-      const r=await this.kill(d.pid, d.cause);
-      anyHunter = anyHunter || r.hunterTriggered;
-      if(r.sheriffDied){ anySheriff=true; break; }
+      const r2=await this.kill(d.pid, d.cause);
+      anyHunter = anyHunter || r2.hunterTriggered;
+      if(r2.sheriffDied){ anySheriff=true; break; }
     }
-    await this.handlePostDeath({ hunterTriggered:anyHunter, sheriffDied:anySheriff }, PHASE.DAY_TALK);
-  },
-
-  async resolveAfterHunters(){
-    const post=this.state.postDeath||{};
-    const queue = (await db.ref(`games/${this.gameId}/state/hunterQueue`).once('value')).val()||{};
-    if(Object.values(queue).some(v=>v===true)){
-      // 仍有猎人
-      await this.setPhase(PHASE.HUNTER_ACTION);
-      return;
-    }
-    // 没有猎人待行动，继续之前的下一阶段
-    const next = post.nextPhase || (this.state.phase===PHASE.DAY_TALK?PHASE.NIGHT_GUARD:PHASE.DAY_TALK);
-    await db.ref(`games/${this.gameId}/state/postDeath`).set(null);
-    if(next===PHASE.NIGHT_GUARD){
-      await this.setPhase(PHASE.NIGHT_GUARD, this.state.round+1);
-    }else{
-      await this.setPhase(next);
-    }
+    await this.handlePostDeath({ hunterTriggered:anyHunter, sheriffDied:anySheriff }, nextIfNoAction);
   },
 
   /* ----------------- 击杀与后续 ----------------- */

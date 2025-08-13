@@ -441,8 +441,13 @@ const App = {
    * @param {Array<string>} pool - 包含所有待分配身份的数组
    * @returns {Array|null} - 返回一个合规的身份对数组，如果无法生成则返回 null
    */
+  /**
+   * [已修复] 发牌算法。
+   * 修正了处理盗贼身份对时的逻辑，确保正确生成一个复制身份和一个原始身份。
+   * @param {Array<string>} pool - 包含所有待分配身份的数组
+   * @returns {Array|null} - 返回一个合规的身份对数组，如果无法生成则返回 null
+   */
   deal(pool) {
-    // 尝试5000次以找到一个有效的组合
     for (let t = 0; t < 5000; t++) {
       const shuffledPool = this._shuffle([...pool]);
       let isCombinationOk = true;
@@ -451,48 +456,46 @@ const App = {
         rawPairs.push([shuffledPool[i], shuffledPool[i + 1]].sort());
       }
 
-      // 检查是否有被禁止的身份组合
       for (const pair of rawPairs) {
         if (FORBIDDEN_RAW.some(([a, b]) => (a === pair[0] && b === pair[1]) || (a === pair[1] && b === pair[0]))) {
           isCombinationOk = false;
           break;
         }
       }
-      if (!isCombinationOk) continue; // 如果不合规，开始下一次尝试
+      if (!isCombinationOk) continue;
 
       const finalPairs = [], roleCounts = {};
       for (const p of rawPairs) {
+        // [BUG修复] 重写盗贼身份的处理逻辑
         let id1, id2;
-        // 特殊处理盗贼
         if (p[0] === '盗贼') {
-          id1 = { r: p[1], t: true }; // 标记为盗贼复制的身份
-          id2 = { r: p[1], t: true };
+          // 如果第一张是盗贼，它将复制第二张的身份
+          // 第一张身份：角色变为第二张的，并标记为盗贼复制品
+          id1 = { role: p[1], isThiefCopy: true };
+          // 第二张身份：保持原样
+          id2 = { role: p[1], isThiefCopy: false };
         } else {
-          id1 = { r: p[0], t: false };
-          id2 = { r: p[1], t: false };
+          // 普通组合
+          id1 = { role: p[0], isThiefCopy: false };
+          id2 = { role: p[1], isThiefCopy: false };
         }
-        finalPairs.push([
-          { role: id1.r, isThiefCopy: id1.t },
-          { role: id2.r, isThiefCopy: id2.t }
-        ]);
-        roleCounts[id1.r] = (roleCounts[id1.r] || 0) + 1;
-        roleCounts[id2.r] = (roleCounts[id2.r] || 0) + 1;
+        
+        finalPairs.push([id1, id2]);
+        // 统计时，要统计最终身份
+        roleCounts[id1.role] = (roleCounts[id1.role] || 0) + 1;
+        roleCounts[id2.role] = (roleCounts[id2.role] || 0) + 1;
       }
 
-      // 检查规则：金水数量（双民）必须在1-2之间
-      const goldenPairsCount = finalPairs.filter(p => p[0].role === '平民' && p[1].role === '平民').length;
+      const goldenPairsCount = finalPairs.filter(p => p[0].role === '平民' && p[1].role === '平民' && !p[0].isThiefCopy && !p[1].isThiefCopy).length;
       if (goldenPairsCount < 1 || goldenPairsCount > 2) continue;
       
-      // 检查规则：必须有狼和神
       const wolfCount = (roleCounts['狼人'] || 0) + (roleCounts['隐狼'] || 0);
       if (wolfCount === 0) continue;
       const godCount = Object.keys(roleCounts).reduce((sum, role) => sum + (ROLES[role].isGod ? roleCounts[role] : 0), 0);
       if (godCount === 0) continue;
 
-      // 如果所有规则都通过，返回这个组合
       return finalPairs;
     }
-    // 如果尝试多次后仍然失败，返回 null
     return null;
   },
 
@@ -849,21 +852,24 @@ const App = {
    * [已修复] 渲染玩家的身份卡片。
    * 修正了盗贼身份的显示逻辑，确保正确显示其复制的身份和特殊样式。
    */
+  /**
+   * [已修复] 渲染玩家的身份卡片。
+   * 修正了盗贼身份的显示逻辑，现在它依赖于身份对象自身的 `isThiefCopy` 属性。
+   */
   renderIdentityCard() {
     const pd = this.playerData;
     if (!pd) return;
+    // [BUG修复] 不再需要 originalIdentities，因为 deal 函数生成的数据已包含所有信息
     const identities = pd.identities;
-    const originalIdentities = pd.originalIdentities;
     const deaths = pd.deaths;
     
-    // 格式化单个身份的显示，特别处理盗贼
-    const formatIdentity = (identity, originalIdentity) => {
-      // 如果这个身份牌的原始身份是盗贼，则应用特殊样式
-      if (originalIdentity.role === '盗贼') {
-        const currentRoleName = identity.role;
+    // 格式化单个身份的显示
+    const formatIdentity = (identity) => {
+      // [BUG修复] 直接检查身份对象上的 isThiefCopy 标志
+      if (identity.isThiefCopy) {
         return `<span class="identity-item">
                   <span class="identity-icon thief-icon">🎭</span>
-                  <span class="identity-name thief-copy-text">${currentRoleName} (盗)</span>
+                  <span class="identity-name thief-copy-text">${identity.role}</span>
                 </span>`;
       }
       
@@ -876,9 +882,8 @@ const App = {
     };
     
     // 组合成完整的身份卡片内容
-    let cardContent = `<div class="identity-header">你的身份</div><div class="identity-display">${deaths >= 1 ? '<span class="identity-dead">' : ''}${formatIdentity(identities[0], originalIdentities[0])}${deaths >= 1 ? '</span>' : ''}<span class="identity-separator">+</span>${deaths >= 2 ? '<span class="identity-dead">' : ''}${formatIdentity(identities[1], originalIdentities[1])}${deaths >= 2 ? '</span>' : ''}</div>`;
+    let cardContent = `<div class="identity-header">你的身份</div><div class="identity-display">${deaths >= 1 ? '<span class="identity-dead">' : ''}${formatIdentity(identities[0])}${deaths >= 1 ? '</span>' : ''}<span class="identity-separator">+</span>${deaths >= 2 ? '<span class="identity-dead">' : ''}${formatIdentity(identities[1])}${deaths >= 2 ? '</span>' : ''}</div>`;
     
-    // 如果在设置阶段且玩家未准备好，显示操作按钮
     if (this.gameState.phase === 'SETUP' && !pd.isReady) {
       cardContent += `
         <div class="identity-actions">

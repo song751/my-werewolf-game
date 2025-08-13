@@ -1,21 +1,13 @@
-<!-- =================================================================== -->
-<!--                        文件: index.html                           -->
-<!--                  (此文件已是最终版本，无需修改)                     -->
-<!-- =================================================================== -->
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>双身份狼人杀 - 电子法官 (V10.3 修复版)</title>
-  <!-- 路径已正确指向 assets/css/styles.css -->
+  <title>双身份狼人杀 - 电子法官 (FSM 精简版)</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
-
 <body>
   <div class="app">
-
     <!-- 顶部信息栏 -->
     <header class="top-bar">
       <div class="top-bar-content">
@@ -41,7 +33,7 @@
     </header>
 
     <main>
-      <!-- 游戏设置与创建界面 (ID: setup-view) -->
+      <!-- 游戏设置与创建界面 -->
       <div id="setup-view" class="view-container">
         <div class="setup-container">
           <div class="setup-header">
@@ -52,17 +44,16 @@
           <!-- 游戏创建成功后的信息展示区 -->
           <div id="game-creation-info" class="hidden"></div>
 
-          <!-- 身份配置区 (ID: role-setup-section) -->
+          <!-- 身份配置区 -->
           <section id="role-setup-section" class="setup-section">
             <h3 class="section-title">
               <span class="section-icon">👥</span>
               身份配置
             </h3>
-            <!-- JS 渲染的目标容器 (ID: role-grid) -->
             <div id="role-grid" class="role-grid"></div>
           </section>
 
-          <!-- 游戏规则区 -->
+          <!-- 游戏规则 -->
           <section class="setup-section">
             <h3 class="section-title">
               <span class="section-icon">⚙️</span>
@@ -116,10 +107,10 @@
           </div>
           <div id="player-count-warning" class="warning-text"></div>
 
-          <!-- 错误信息提示 -->
+          <!-- 错误提示 -->
           <div id="setup-error" class="error-message hidden"></div>
 
-          <!-- 创建游戏按钮 -->
+          <!-- 创建按钮 -->
           <button id="btn-create" class="btn-primary btn-large" data-action="create-game">
             <span id="create-text">创建游戏</span>
             <span id="create-spinner" class="spinner hidden"></span>
@@ -127,13 +118,13 @@
         </div>
       </div>
 
-      <!-- 游戏主界面 (ID: game-view) -->
+      <!-- 游戏主界面 -->
       <div id="game-view" class="hidden">
         <div id="game-layout">
           <!-- 左侧玩家列表 -->
           <div id="player-grid-left" class="player-grid"></div>
 
-          <!-- 中央核心操作面板 -->
+          <!-- 中央面板 -->
           <div class="center-panel">
             <div id="status-bar" class="status-bar">
               <span class="status-text">等待游戏开始...</span>
@@ -149,7 +140,7 @@
         </div>
       </div>
 
-      <!-- 上帝（后台）视角 (ID: god-view) -->
+      <!-- 上帝视角 -->
       <div id="god-view" class="hidden">
         <div class="god-container">
           <div class="god-header">
@@ -173,13 +164,12 @@
         </div>
       </div>
     </main>
-
   </div>
 
   <!-- 浮动通知容器 -->
   <div id="notification-container"></div>
 
-  <!-- 游戏日志模态框 -->
+  <!-- 游戏日志模态框（玩家端仅显示公开日志） -->
   <div id="logs-modal" class="modal">
     <div class="modal-overlay"></div>
     <div class="modal-content">
@@ -202,8 +192,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  <!-- 路径已正确指向 assets/js/app.js -->
+  <!-- App -->
   <script src="assets/js/app.js"></script>
 </body>
-
 </html>

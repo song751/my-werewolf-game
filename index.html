@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>双身份狼人杀 - 电子法官</title>
+  <title>双身份狼人杀 - 电子法官 (FSM版)</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
   <div class="app">
-    <!-- 顶部信息栏（移除标题旁的主持/警长徽章） -->
+    <!-- 顶部信息栏 -->
     <header class="top-bar">
       <div class="top-bar-content">
         <div class="logo-section">
@@ -16,7 +16,6 @@
           <h1>双身份狼人杀</h1>
         </div>
         <div class="top-actions">
-          <!-- 只保留日志按钮 -->
           <button class="btn-icon" data-action="open-logs" title="游戏日志" style="gap: 6px; width: auto; padding: 0 12px;">
             <span class="btn-icon-emoji">📜</span>
             <span>日志</span>
@@ -33,9 +32,6 @@
             <h2>游戏设置</h2>
             <p class="setup-subtitle">配置身份和规则，创建精彩对局</p>
           </div>
-
-          <!-- 游戏创建成功后的信息展示区 -->
-          <div id="game-creation-info" class="hidden"></div>
 
           <!-- 身份配置区 -->
           <section id="role-setup-section" class="setup-section">
@@ -83,7 +79,6 @@
                   <option value="exterminate">屠城</option>
                 </select>
               </div>
-              <!-- 新增：狼人可见策略 -->
               <div class="rule-item">
                 <label for="opt-wolf-visibility">
                   <span class="rule-label">狼人可见策略</span>
@@ -111,13 +106,9 @@
           </div>
           <div id="player-count-warning" class="warning-text"></div>
 
-          <!-- 错误提示 -->
-          <div id="setup-error" class="error-message hidden"></div>
-
           <!-- 创建按钮 -->
           <button id="btn-create" class="btn-primary btn-large" data-action="create-game">
-            <span id="create-text">创建游戏</span>
-            <span id="create-spinner" class="spinner hidden"></span>
+            创建游戏
           </button>
         </div>
       </div>
@@ -130,9 +121,7 @@
 
           <!-- 中央面板 -->
           <div class="center-panel">
-            <div id="status-bar" class="status-bar">
-              <span class="status-text">等待游戏开始...</span>
-            </div>
+            <div id="status-bar" class="status-bar"></div>
             <div id="identity-card" class="identity-card"></div>
             <div id="persist" class="persist-info hidden"></div>
             <div id="action-panel" class="action-panel"></div>
@@ -144,28 +133,11 @@
         </div>
       </div>
 
-      <!-- 上帝视角 -->
+      <!-- 上帝视角 (此版本暂未实现，保留结构) -->
       <div id="god-view" class="hidden">
-        <div class="god-container">
-          <div class="god-header">
-            <h2>上帝视角</h2>
-            <p class="god-subtitle">掌控全局，洞察一切</p>
-          </div>
-          <div class="god-section">
-            <h3 class="section-title">
-              <span class="section-icon">👁️</span>
-              玩家状态
-            </h3>
-            <div id="god-player-list" class="god-player-list"></div>
-          </div>
-          <div class="god-section">
-            <h3 class="section-title">
-              <span class="section-icon">🤫</span>
-              秘密日志
-            </h3>
-            <div id="god-log-content" class="god-log-content"></div>
-          </div>
-        </div>
+        <h2>上帝视角</h2>
+        <div id="god-player-list"></div>
+        <div id="god-log-content"></div>
       </div>
     </main>
   </div>
@@ -173,9 +145,9 @@
   <!-- 浮动通知容器 -->
   <div id="notification-container"></div>
 
-  <!-- 游戏日志模态框（玩家端仅显示公开日志） -->
+  <!-- 游戏日志模态框 -->
   <div id="logs-modal" class="modal">
-    <div class="modal-overlay"></div>
+    <div class="modal-overlay" data-action="close-modal"></div>
     <div class="modal-content">
       <div class="modal-header">
         <h3 class="modal-title">

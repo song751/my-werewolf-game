@@ -1258,6 +1258,9 @@ const App = {
         if (actionInProgress) { panel.innerHTML = info('操作已确认，等待天亮...'); return; }
 
         // [逻辑修复] 移除了重复的女巫逻辑块，只保留下面这个正确的版本。
+    if (this.gameState.phase === 'NIGHT') {
+        if (actionInProgress) { panel.innerHTML = info('操作已确认，等待天亮...'); return; }
+
         if (role === '女巫' && nightStatus.witch === 'pending') {
             const lifeIndex = this.playerData.deaths;
             const hasCure = !this.getSkillState('hasUsedCure', this.playerData, lifeIndex);
@@ -1265,12 +1268,17 @@ const App = {
             const wolfTarget = this.fullGameData.nightActions?.[this.gameState.round]?.wolf?.target;
             const selectedTarget = this.selection?.targetId;
 
-            // 确保选择类型正确
             if (!this.selection || this.selection.type !== 'witch-poison') {
                 this.setSelection({ type: 'witch-poison' });
             }
 
             let html = `<div class="witch-panel"><div class="witch-status"><div class="potion-status"><span class="potion ${hasCure ? 'available' : ''}">💊 解药</span><span class="potion ${hasPoison ? 'available' : ''}">☠️ 毒药</span></div></div>`;
+            
+            // [UI修复] 当无人被刀时，给女巫明确提示
+            if (hasCure && (!wolfTarget || wolfTarget === '0')) {
+                html += `<div class="action-feedback" style="margin-top: 8px;">ℹ️ 今晚无人被刀，你可以选择是否使用毒药。</div>`;
+            }
+            
             html += `<div class="action-target" style="margin-top: 8px; text-align:center;">当前目标：<strong>${selectedTarget ? selectedTarget + '号' : '未选择'}</strong></div>`;
             html += '<div class="witch-actions-container" style="margin-top: 8px;">';
 
@@ -1290,7 +1298,6 @@ const App = {
             html += '</div>';
 
             if (!hasCure && !hasPoison) { html += info('本条命的药水已用尽'); }
-            else if ((!wolfTarget || wolfTarget === '0') && !hasPoison) { html += info('今晚无人被刀，且无毒药可用'); }
             
             html += `</div>`;
             panel.innerHTML = html;
@@ -1715,24 +1722,32 @@ const App = {
   // 投票与死亡处理
   // ========================================
 
+  /**
+   * [已修复] 处理独警情况。
+   * 移除了自动调用 processNight 的逻辑。
+   */
   async hostEnterSheriffVote() {
     const cand = this.fullGameData.sheriff?.candidates || {}, drops = this.fullGameData.sheriff?.drops || {};
     const valid = Object.keys(cand).filter(id => cand[id] && !drops[id]);
-    if (valid.length === 1) { // 独狼直接当选
+    if (valid.length === 1) {
       const sheriffId = valid[0]; await db.ref(`games/${this.gameId}/players/${sheriffId}/badge`).set(1);
       await this.addGameLog(`👑 ${sheriffId}号独警，直接当选警长！`, false);
-      if (this.gameState.round === 1) await this.processNight(); else await this.updatePhase('DAY');
+      // [BUG修复] 移除自动流程推进
     } else {
       await this.updatePhase('SHERIFF_VOTE');
     }
   },
+  /**
+   * [已修复] 处理主持人强制选择独警的情况。
+   * 移除了自动调用 processNight 的逻辑。
+   */
   async hostSheriffElectSingle() {
     const cand = this.fullGameData.sheriff?.candidates || {}, drops = this.fullGameData.sheriff?.drops || {};
     const valid = Object.keys(cand).filter(id => cand[id] && !drops[id]);
     if (valid.length === 1) {
       const sheriffId = valid[0]; await db.ref(`games/${this.gameId}/players/${sheriffId}/badge`).set(1);
       await this.addGameLog(`👑 ${sheriffId}号独警，直接当选警长！`, false);
-      if (this.gameState.round === 1) await this.processNight(); else await this.updatePhase('DAY');
+      // [BUG修复] 移除自动流程推进
     } else this.showNotification('当前非独警，无法直接当选', 'error');
   },
 
@@ -1749,20 +1764,21 @@ const App = {
     if (winners.length === 1) {
       const sheriffId = winners[0]; await db.ref(`games/${this.gameId}/players/${sheriffId}/badge`).set(1);
       await this.addGameLog(`👑 ${sheriffId}号当选警长！`, false);
-      if (this.gameState.round === 1) await this.processNight(); else await this.updatePhase('DAY');
+      // [BUG修复] 移除自动流程推进，等待主持人手动操作。
+      // 游戏状态会自动刷新，主持人面板会显示正确的下一步按钮。
     } else {
       const isPKRound = this.fullGameData.sheriff?.isPKRound;
       if (isPKRound) {
           await this.addGameLog('⚖️ PK后再次平票，本轮无警长。', false);
           await db.ref(`games/${this.gameId}/sheriff`).set(null);
-          if (this.gameState.round === 1) await this.processNight(); else await this.updatePhase('DAY');
+          // [BUG修复] 移除自动流程推进
           return;
       }
       await this.addGameLog(winners.length > 1 ? `⚖️ 平票：${winners.join('、')}号，进入PK环节。` : '⚖️ 无人当选警长。', false);
       const newCandidates = {}; if (winners.length > 1) winners.forEach(id => newCandidates[id] = 1);
       await db.ref(`games/${this.gameId}/sheriff`).set({ candidates: newCandidates, drops: {}, votes: {}, isPKRound: true });
       if (winners.length > 1) await this.updatePhase('SHERIFF_SPEECH');
-      else if (this.gameState.round === 1) await this.processNight(); else await this.updatePhase('DAY');
+      // [BUG修复] 移除自动流程推进
     }
   },
 
@@ -1885,30 +1901,46 @@ const App = {
       return result;
   },
 
+  /**
+   * [已修复] 处理夜晚结算的核心函数。
+   * 逻辑本身正确，问题出在调用时机。此处增加日志以增强调试能力。
+   */
   async processNight() {
-    await this.addGameLog('🌙 天亮了。', false);
+    await this.addGameLog('🌙 天亮了，开始结算夜晚事件...', true);
     const nightActions = this.fullGameData.nightActions?.[this.gameState.round] || {};
     const deaths = [];
 
     const wolfAction = nightActions.wolf;
+    // [健壮性修复] 确保只查找当前存活的女巫
+    const witchPlayer = Object.values(this.allPlayers).find(p => p.isAlive && this.getActiveRole(p) === '女巫');
+    const witchAction = witchPlayer ? nightActions[witchPlayer.id] : undefined;
     const guardAction = Object.values(nightActions).find(a => a.target !== undefined && a.actorId && this.getActiveRole(this.allPlayers[a.actorId]) === '守卫');
-    const witchAction = Object.values(nightActions).find(a => (a.cure || a.poison) && a.actorId && this.getActiveRole(this.allPlayers[a.actorId]) === '女巫');
     
     const wolfTarget = wolfAction?.target;
     const guardTarget = guardAction?.target;
     const cureTarget = witchAction?.cure;
     const poisonTarget = witchAction?.poison;
 
+    await this.addGameLog(`[结算] 狼刀:${wolfTarget || '无'}, 守卫:${guardTarget || '无'}, 解药:${cureTarget || '无'}, 毒药:${poisonTarget || '无'}`, true);
+
     if (wolfTarget && wolfTarget !== '0') {
       const isGuarded = guardTarget === wolfTarget;
       const isCured = cureTarget === wolfTarget;
       if (isGuarded) await this.addGameLog(`🛡️ 守卫成功守护了 ${wolfTarget}号`, true);
       if (isCured) await this.addGameLog(`🧪 女巫使用解药救活了 ${wolfTarget}号`, true);
-      if (!isGuarded && !isCured) deaths.push({ pid: wolfTarget, cause: 'NIGHT' });
+      if (!isGuarded && !isCured) {
+        deaths.push({ pid: wolfTarget, cause: 'NIGHT' });
+        await this.addGameLog(`[结算] ${wolfTarget}号被狼人杀害（无守护和治疗）`, true);
+      }
     }
-    if (poisonTarget && !deaths.some(d => d.pid === poisonTarget)) {
-      deaths.push({ pid: poisonTarget, cause: 'POISON' });
-      await this.addGameLog(`🧪 女巫使用毒药杀害了 ${poisonTarget}号`, true);
+
+    if (poisonTarget) {
+      // 确保不会重复添加死亡（例如女巫毒了狼人刀的人）
+      if (!deaths.some(d => d.pid === poisonTarget)) {
+        deaths.push({ pid: poisonTarget, cause: 'POISON' });
+        await this.addGameLog(`[结算] ${poisonTarget}号被女巫毒杀`, true);
+      }
+      await this.addGameLog(`🧪 女巫使用毒药杀害了 ${poisonTarget}号`, true); // 公开日志
     }
 
     let anyHunterTriggered = false, anySheriffDied = false;

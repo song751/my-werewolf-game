@@ -18,18 +18,18 @@
 // 角色定义
 const ROLES = {
   // 好人阵营
-  平民:   { faction: 'good', icon: '👤', isGod: false },
-  守卫:   { faction: 'good', icon: '🛡️', isGod: true,  unique: true },
-  白痴:   { faction: 'good', icon: '🤪', isGod: true,  unique: true },
-  预言家: { faction: 'good', icon: '🔮', isGod: true,  unique: true },
-  骑士:   { faction: 'good', icon: '⚔️', isGod: true,  unique: true },
-  女巫:   { faction: 'good', icon: '🧪', isGod: true,  unique: true },
-  猎人:   { faction: 'good', icon: '🔫', isGod: true,  unique: true },
+  平民:   { faction: 'good', icon: '👤', isGod: false, key: 'CIVILIAN' },
+  守卫:   { faction: 'good', icon: '🛡️', isGod: true,  unique: true, key: 'GUARD' },
+  白痴:   { faction: 'good', icon: '🤪', isGod: true,  unique: true, key: 'IDIOT' },
+  预言家: { faction: 'good', icon: '🔮', isGod: true,  unique: true, key: 'SEER' },
+  骑士:   { faction: 'good', icon: '⚔️', isGod: true,  unique: true, key: 'KNIGHT' },
+  女巫:   { faction: 'good', icon: '🧪', isGod: true,  unique: true, key: 'WITCH' },
+  猎人:   { faction: 'good', icon: '🔫', isGod: true,  unique: true, key: 'HUNTER' },
   // 狼人阵营
-  狼人:   { faction: 'bad',  icon: '🐺', isGod: false },
-  隐狼:   { faction: 'bad',  icon: '🌑', isGod: false, unique: true, isInvisible: true },
+  狼人:   { faction: 'bad',  icon: '🐺', isGod: false, key: 'WOLF' },
+  隐狼:   { faction: 'bad',  icon: '🌑', isGod: false, unique: true, isInvisible: true, key: 'HIDDEN_WOLF' },
   // 中立/特殊
-  盗贼:   { faction: 'neu',  icon: '🎭', isGod: false, unique: true, isThief: true },
+  盗贼:   { faction: 'neu',  icon: '🎭', isGod: false, unique: true, isThief: true, key: 'THIEF' },
 };
 
 // 角色集合
@@ -97,6 +97,7 @@ class Engine {
     this.state = null;
     this.players = null;
     this.actions = null;
+    this.settings = null; // [FIX] 添加 settings 属性
   }
 
   // Firebase 数据库操作封装
@@ -115,7 +116,8 @@ class Engine {
     const state = await this.read('state') || {};
     const players = await this.read('players') || {};
     const actions = await this.read('actions') || {};
-    this.state = state; this.players = players; this.actions = actions;
+    const settings = await this.read('settings') || {}; // [FIX] 读取根节点的 settings
+    this.state = state; this.players = players; this.actions = actions; this.settings = settings; // [FIX] 存储 settings
 
     // 根据当前阶段执行对应的逻辑
     switch (state.phase) {
@@ -127,6 +129,7 @@ class Engine {
       case PHASE.HUNTER:       return this.checkHunterQueue();
       // 其他阶段为被动等待，由玩家或主持人操作触发状态变更
       case PHASE.SETUP:
+      case PHASE.LOBBY:
       case PHASE.SHERIFF_CAND:
       case PHASE.SHERIFF_SPEECH:
       case PHASE.DAY_TALK:
@@ -159,7 +162,8 @@ class Engine {
 
   /** 判断隐狼是否已激活 */
   isHiddenWolfActivated(players, state) {
-    const trigger = state?.settings?.hiddenTrigger || 'activeOnly';
+    // [FIX] 从 this.settings 读取规则，而不是 this.state.settings
+    const trigger = this.settings?.hiddenTrigger || 'activeOnly';
     if (trigger === 'activeOnly') {
       // 场上已无存活的、活跃身份为“狼人”的玩家
       const anyActiveWolf = Object.values(players).some(p => p.isAlive && this.activeRole(p) === '狼人');
@@ -427,11 +431,11 @@ class Engine {
 
   /* ========== 核心动作：立即进入夜晚 ========== */
   async startNight(round) {
+    // [FIX] 不再清空整个 actions 节点，以保留历史记录
     await this.update({
       'state/round': round,
       'state/phase': PHASE.NIGHT,
       'state/showWolf': round === 1, // 仅第一夜默认显示狼同伴
-      'actions': {} // 清空上一轮的所有动作
     });
     await this.log(`第 ${round} 夜来临...`, false);
   }
@@ -527,7 +531,7 @@ class Engine {
   async checkWin() {
     const alivePlayers = Object.values(this.players).filter(p => p.isAlive);
     const actingWolves = this.getAliveActingWolves(this.players, this.state);
-    const peaceNights = await this.read('state/peace') || 0;
+    const peaceNights = this.state.peace || 0;
 
     // 好人胜利条件
     if (actingWolves.length === 0 || peaceNights >= 3) {
@@ -538,7 +542,8 @@ class Engine {
     }
 
     // 狼人胜利条件
-    const winCondition = this.state.settings?.wolfWin || 'edge';
+    // [FIX] 从 this.settings 读取规则
+    const winCondition = this.settings?.wolfWin || 'edge';
     if (winCondition === 'exterminate') { // 屠城
       const goodAlive = alivePlayers.some(p => {
         const ar = this.activeRole(p);
@@ -583,13 +588,14 @@ const App = {
   me: null,       // 当前玩家ID
   gameId: null,   // 当前游戏ID
   engine: null,   // 引擎实例 (仅主持端)
-  unsub: [],      // Firebase订阅清理器
+  listener: { ref: null, cb: null }, // [FIX] 用于正确取消 Firebase 订阅
   full: null,     // 完整的游戏数据快照
   selection: null,// 当前选择的目标
   autorun: null,  // 主持端定时器
 
   /* ---------- 1. 初始化与路由 ---------- */
   init() {
+    this.destroy(); // 清理旧的监听器
     document.addEventListener('click', (e) => this.onClick(e));
     const p = new URLSearchParams(location.search);
     this.gameId = p.get('game') || '';
@@ -612,6 +618,8 @@ const App = {
   /** 渲染游戏设置界面 */
   renderSetup() {
     $('setup-view').classList.remove('hidden');
+    $('join-view').classList.add('hidden');
+    $('lobby-view').classList.add('hidden');
     $('game-view').classList.add('hidden');
     $('god-view').classList.add('hidden');
 
@@ -689,11 +697,11 @@ const App = {
       wolfWin: $('opt-wolf-win').value,
       hiddenTrigger: $('opt-wolf-visibility').value
     };
-    const config = { counts, settings }; // [新增] 将配置打包
+    const config = { counts, settings };
 
     const initData = {
       meta: { createdAt: now(), creator: 'FSM-v11' },
-      config, // [新增] 保存游戏配置
+      config,
       players, settings, actions: {}, logs: {},
       state: { phase: PHASE.LOBBY, round: 0, host: 1, peace: 0, winner: null, sheriff: null }
     };
@@ -704,19 +712,18 @@ const App = {
   },
 
   /**
-   * [新增] 重开一局新游戏。
+   * 重开一局新游戏。
    * 读取当前配置，创建一个新房间，并引导所有玩家跳转。
    */
   async restartGame() {
     this.toast('正在准备新对局...', 'info');
     const oldGameId = this.gameId;
-    const config = this.full.config; // 读取已保存的配置
+    const config = this.full.config;
     if (!config || !config.counts) {
       this.toast('无法找到游戏配置，无法重开。', 'error');
       return;
     }
 
-    // 复用发牌逻辑
     const pool = [];
     for (const [r, c] of Object.entries(config.counts)) {
       for (let i = 0; i < c; i++) pool.push(r);
@@ -724,14 +731,13 @@ const App = {
     const dealt = this.dealWithGolden(pool);
     if (!dealt) { this.toast('重新发牌失败，无法重开。', 'error'); return; }
 
-    // 创建新游戏
     const newGameId = db.ref('games').push().key;
     const players = {};
     const oldPlayers = Object.values(this.full.players);
     dealt.pairs.forEach((pair, i) => {
       players[i + 1] = {
         id: i + 1,
-        name: oldPlayers[i]?.name || `玩家${i + 1}`, // 沿用旧名字
+        name: oldPlayers[i]?.name || `玩家${i + 1}`,
         identities: pair,
         deaths: 0, isAlive: true, isReady: false,
         isExposedIdiot: false, badge: 0, skill: {}
@@ -740,7 +746,7 @@ const App = {
 
     const initData = {
       meta: { createdAt: now(), creator: 'FSM-v11', from: oldGameId },
-      config, // 继续传递配置
+      config,
       players,
       settings: config.settings,
       actions: {}, logs: {},
@@ -748,8 +754,6 @@ const App = {
     };
 
     await db.ref(`games/${newGameId}`).set(initData);
-
-    // 在旧房间写入新房间ID，触发所有客户端跳转
     await db.ref(`games/${oldGameId}/state/nextGameId`).set(newGameId);
   },
 
@@ -771,7 +775,6 @@ const App = {
           isCombinationOk = false;
           break;
         }
-        // 正确处理盗贼复制逻辑
         if (role1 === '盗贼') {
           pairs.push([{ role: role2, isCopy: true }, { role: role2 }]);
         } else if (role2 === '盗贼') {
@@ -782,29 +785,24 @@ const App = {
       }
       if (!isCombinationOk) continue;
 
-      // 检查是否存在金宝宝（双平民，非盗贼复制）
       const hasGolden = pairs.some(pr => pr[0].role === '平民' && pr[1].role === '平民' && !pr[0].isCopy && !pr[1].isCopy);
       if (hasGolden) return { pairs };
-
-      // 若无，尝试强制构造一个金宝宝（不推荐，但作为后备）
-      // 此处简化：如果随机5000次都无法自然产生，则认为配置有问题
+      
       if (t > 5000) {
-          // 找两个非唯一的非平民身份，换成平民
-          // 逻辑较复杂，为保证健壮性，此处返回失败，让用户调整配置
+          // 随机多次无法产生，认为配置有问题
       }
     }
-    return null; // 8000次尝试失败
+    return null; // 尝试失败
   },
 
   /* ---------- 3. 进入游戏与渲染 ---------- */
 
-  /* ---------- (新增) 渲染Lobby和Join的函数 ---------- */
-
   /**
-   * [新增] 渲染加入游戏的提示框。
+   * 渲染加入游戏的提示框。
    */
   renderJoinPrompt() {
     $('setup-view').classList.add('hidden');
+    $('lobby-view').classList.add('hidden');
     $('game-view').classList.add('hidden');
     const joinView = $('join-view');
     joinView.classList.remove('hidden');
@@ -819,12 +817,15 @@ const App = {
   },
 
   /**
-   * [新增] 渲染游戏大厅界面。
+   * 渲染游戏大厅界面。
    */
   renderLobby(data) {
+    // [FIX] 确保所有其他主视图都隐藏
+    $('setup-view').classList.add('hidden');
+    $('join-view').classList.add('hidden');
+    $('game-view').classList.add('hidden');
     const lobbyView = $('lobby-view');
     lobbyView.classList.remove('hidden');
-    $('game-view').classList.add('hidden'); // 确保游戏主界面是隐藏的
 
     const isHost = String(data.state.host) === this.me;
     const players = Object.values(data.players || {});
@@ -874,43 +875,55 @@ const App = {
 
   /** 进入游戏房间，启动监听 */
   async enterGame() {
-    $('setup-view').classList.add('hidden');
-    $('game-view').classList.remove('hidden');
-
     this.engine = new Engine(this.gameId);
 
     const rootRef = db.ref(`games/${this.gameId}`);
-    // [新增] 设置在线状态
     const onlineRef = db.ref(`games/${this.gameId}/players/${this.me}/online`);
     await onlineRef.set(true);
     onlineRef.onDisconnect().set(false);
-    this.unsub.push(rootRef.on('value', snap => {
+
+    // [FIX] 修正 Firebase 监听和引擎启动逻辑
+    const onValueChange = snap => {
       const data = snap.val();
       if (!data) {
         this.toast('游戏数据不存在或已被删除。', 'error');
-        // location.href = location.pathname; // 可以选择返回首页
+        this.destroy();
         return;
       }
-      // [新增] 检查是否有新游戏ID，如有则跳转
+      
       if (data.state?.nextGameId) {
         this.toast('即将开始新对局，页面跳转中...', 'success');
         const newUrl = `${location.pathname}?game=${data.state.nextGameId}&player=${this.me}`;
-        // 延迟跳转，让玩家看到提示
         setTimeout(() => { location.href = newUrl; }, 1500);
         return;
       }
       
       this.full = data;
-      this.renderAll(data);
-    }));
 
-    // 仅主持端（1号玩家）启动引擎循环
-    if (this.me === '1') {
-      this.autorun && clearInterval(this.autorun);
-      // 每 400ms 检查一次状态，足够灵敏且不会造成太大负担
-      this.autorun = setInterval(() => this.engine.tick().catch(console.error), 400);
-      console.log("主持端引擎已启动。");
-    }
+      // [FIX] 动态启动/停止引擎
+      const isHost = String(data.state.host) === this.me;
+      if (isHost && !this.autorun) {
+        this.autorun = setInterval(() => this.engine.tick().catch(console.error), 400);
+        console.log("主持端引擎已启动。");
+      } else if (!isHost && this.autorun) {
+        clearInterval(this.autorun);
+        this.autorun = null;
+        console.log("非主持端，引擎已停止。");
+      }
+
+      // [FIX] 根据游戏阶段渲染正确的视图
+      if (data.state.phase === PHASE.LOBBY) {
+        this.renderLobby(data);
+      } else {
+        $('lobby-view').classList.add('hidden');
+        $('game-view').classList.remove('hidden');
+        this.renderAll(data);
+      }
+    };
+    
+    rootRef.on('value', onValueChange);
+    // [FIX] 保存引用和回调以便正确取消订阅
+    this.listener = { ref: rootRef, cb: onValueChange };
   },
 
   /** 渲染所有UI组件的主函数 */
@@ -927,6 +940,7 @@ const App = {
   renderStatus(st) {
     const phaseMap = {
       [PHASE.SETUP]: '等待所有玩家确认身份',
+      [PHASE.LOBBY]: '游戏大厅 - 等待开始', // [FIX] 增加 LOBBY 状态文本
       [PHASE.NIGHT]: `第 ${st.round} 夜晚 - 行动中`,
       [PHASE.NIGHT_WITCH]: `第 ${st.round} 夜晚 - 等待女巫行动`,
       [PHASE.DAWN]: '黎明结算中...',
@@ -947,7 +961,6 @@ const App = {
     const fmt = id => `<span class="identity-item"><span class="identity-icon">${ROLES[id.role].icon}</span><span class="identity-name${id.isCopy ? ' thief-copy-text' : ''}">${id.role}</span></span>`;
     const canSwap = data.state.phase === PHASE.SETUP && !me.isReady;
     
-    // 处理死亡遮罩
     const id1Html = me.deaths >= 1 ? `<span class="identity-dead">${fmt(me.identities[0])}</span>` : fmt(me.identities[0]);
     const id2Html = me.deaths >= 2 ? `<span class="identity-dead">${fmt(me.identities[1])}</span>` : fmt(me.identities[1]);
 
@@ -963,9 +976,8 @@ const App = {
         </div>` : ''}
     `;
 
-    // 渲染持久化信息（如女巫药瓶状态、查验结果等）
     const persist = [];
-    const ar = this.engine.activeRole(me); // 使用引擎的帮助函数
+    const ar = this.engine.activeRole(me);
     if (ar === '女巫') {
       const usedCure = !!me.skill?.cureUsed;
       const usedPoison = !!me.skill?.poisonUsed;
@@ -977,7 +989,6 @@ const App = {
     if (ar === '守卫') {
       if (me.skill?.lastGuard) persist.push(`上夜守护：${me.skill.lastGuard}号`);
     }
-    // 显示预言家查验结果
     const seerResults = this.getSeerResultsForMe(data);
     if (seerResults.length > 0) {
         persist.push('查验历史：' + seerResults.map(r => `[N${r.round}] ${r.target}号 -> ${r.result}`).join('; '));
@@ -1000,12 +1011,10 @@ const App = {
     const myPlayer = data.players?.[this.me];
     const wolfVisRule = data.settings?.hiddenTrigger || 'activeOnly';
 
-    // 判断我是否能看到狼同伴
     const meIsActingWolf = myPlayer ? this.isPlayerActingWolf(myPlayer, activatedHidden) : false;
     const meHasWolfCard = myPlayer ? myPlayer.identities.some(i => i.role === '狼人' || i.role === '隐狼') : false;
     const meCanSeeWolves = wolfVisRule === 'allWolves' ? meHasWolfCard : meIsActingWolf;
     
-    // 获取狼人投票信息
     const wolfVotes = data.actions?.[data.state.round]?.NIGHT?.WOLF || {};
     const wolfFinalTarget = wolfVotes?.final;
 
@@ -1030,7 +1039,6 @@ const App = {
     const hostIcon = (String(data.state.host) === String(p.id)) ? '👑' : '';
     const numberHtml = `<span class="player-number">${p.id}${sheriffIcon ? ` <span class="sheriff-icon">${sheriffIcon}</span>` : ''}${hostIcon ? ` <span class="host-mark">${hostIcon}</span>` : ''}</span>`;
 
-    // 标签：狼队标、白痴翻牌
     let tags = [];
     if (this.shouldShowWolfTag(p, ctx)) {
       tags.push('<span class="tag tag-team">狼</span>');
@@ -1050,7 +1058,6 @@ const App = {
       </div>
     `);
     
-    // 狼人投票角标
     const myVote = ctx.wolfVotes?.[p.id]?.target;
     if (ctx.meCanSeeWolves && myVote !== undefined) {
         const voteDisplay = myVote === '0' ? '🔪' : myVote;
@@ -1060,16 +1067,13 @@ const App = {
         card.classList.add('wolf-final-target');
     }
 
-    // 选中效果
     if (this.selection && this.selection.pid === String(p.id)) {
       card.classList.add('selected');
     }
 
-    // 绑定点击事件
     card.addEventListener('click', () => {
-      if (!p.isAlive && this.full.state.phase !== PHASE.BADGE) return; // 死人不能被选，除非是移交警徽
+      if (!p.isAlive && this.full.state.phase !== PHASE.BADGE) return;
       this.selection = { pid: String(p.id) };
-      // 重新渲染以更新选中效果
       this.renderAll(this.full);
     });
 
@@ -1103,7 +1107,6 @@ const App = {
     const me = data.players?.[this.me];
     if (!me) return;
 
-    // 统一的信息提示框函数
     const infoBox = (text) => `<div class="action-feedback">${text}</div>`;
 
     if (st.phase === PHASE.SETUP) {
@@ -1120,9 +1123,10 @@ const App = {
     const ar = this.engine.activeRole(me);
     const sel = this.selection?.pid;
 
-    // 夜晚
     if (st.phase === PHASE.NIGHT) {
-      const myAction = data.actions?.[st.round]?.NIGHT?.[ar.toUpperCase()]?.[me.id];
+      // [FIX] 使用 ROLES[ar].key 来获取正确的英文键名
+      const roleKey = ar ? ROLES[ar].key : null;
+      const myAction = roleKey ? data.actions?.[st.round]?.NIGHT?.[roleKey]?.[me.id] : null;
       if (myAction) { panel.innerHTML = infoBox('操作已提交，等待其他玩家...'); return; }
 
       let html = '';
@@ -1161,10 +1165,10 @@ const App = {
       return;
     }
 
-    // 女巫
     if (st.phase === PHASE.NIGHT_WITCH) {
       if (ar !== '女巫') { panel.innerHTML = infoBox('等待女巫行动...'); return; }
-      if (this.isWitchActionDone()) { panel.innerHTML = infoBox('操作已完成，等待天亮。'); return; }
+      // [FIX] 调用 engine 上的方法，而不是 App 上的
+      if (this.engine.isWitchActionDone()) { panel.innerHTML = infoBox('操作已完成，等待天亮。'); return; }
 
       const wolfTarget = this.engine.getWolfFinalTarget();
       const usedCure = !!me.skill?.cureUsed;
@@ -1194,7 +1198,6 @@ const App = {
       return;
     }
     
-    // 警长竞选
     if (st.phase === PHASE.SHERIFF_CAND) {
         const myCandStatus = st.sheriff?.candidates?.[me.id];
         panel.innerHTML = `
@@ -1226,7 +1229,6 @@ const App = {
         return;
     }
 
-    // 白天发言 + 骑士
     if (st.phase === PHASE.DAY_TALK) {
         const knightReady = (ar === '骑士') && !me.skill?.knightUsed;
         if (knightReady) {
@@ -1241,7 +1243,6 @@ const App = {
         return;
     }
 
-    // 放逐投票
     if (st.phase === PHASE.DAY_VOTE) {
         if (me.isExposedIdiot) { panel.innerHTML = infoBox('你是已翻牌白痴，失去投票权。'); return; }
         panel.innerHTML = `
@@ -1253,7 +1254,6 @@ const App = {
         return;
     }
 
-    // 猎人开枪
     if (st.phase === PHASE.HUNTER) {
         const q = st.hunters || {};
         const myTurn = q[me.id];
@@ -1269,7 +1269,6 @@ const App = {
         return;
     }
 
-    // 警徽移交
     if (st.phase === PHASE.BADGE) {
         const isDeadSheriff = String(st.postBadge?.dead) === String(me.id);
         if (isDeadSheriff) {
@@ -1300,17 +1299,12 @@ const App = {
     const st = data.state;
     let html = `<div class="host-panel">`;
 
-    // 1. 渲染状态监控面板
     html += this.renderHostStatusDashboard();
-
-    // 2. 渲染控制按钮
     html += `<div class="host-actions-wrapper">`;
     html += `<div class="host-status-title">主持控制台</div><div class="host-actions">`;
 
     if (st.phase === PHASE.SETUP) {
-      const allReady = Object.values(data.players || {}).every(p => p.isReady);
-      html += `<button class="btn-primary" data-action="host-start" ${allReady ? '' : 'disabled'}>开始游戏</button>`;
-      html += `<button class="action-btn" data-action="host-start">强制开始</button>`;
+      // This part is unreachable now, but kept for structure.
     }
     if (st.phase === PHASE.SHERIFF_CAND) {
       html += `<button class="btn-primary" data-action="host-speech">进入发言</button>`;
@@ -1347,24 +1341,8 @@ const App = {
     }
     html += `</div></div>`;
 
-    // 3. 仅在 SETUP 阶段显示主持人移交和链接复制
-    if (st.phase === PHASE.SETUP) {
-      html += `<div class="host-extra-controls">`;
-      // 主持人移交
-      const players = Object.values(data.players || {});
-      html += `<div class="host-transfer">
-                 <select id="host-transfer-select">
-                   ${players.map(p => `<option value="${p.id}" ${String(p.id) === String(st.host) ? 'selected' : ''}>玩家 ${p.id}</option>`).join('')}
-                 </select>
-                 <button class="control-btn" data-action="host-transfer">移交主持</button>
-               </div>`;
-      // 链接复制
-      html += `<div class="host-links-section">
-                 <div class="section-title" style="font-size:14px; margin-bottom:8px;">游戏链接</div>
-                 ${this.generateGameLinks()}
-               </div>`;
-      html += `</div>`;
-    }
+    // [FIX] 移除 SETUP 阶段的主持人控件，因为它们已在 Lobby 中处理或不再需要
+    // The host transfer and link copy are now part of the Lobby or Game Over screen.
 
     html += `</div>`;
     host.innerHTML = html;
@@ -1375,26 +1353,45 @@ const App = {
     if (!a || a.disabled) return;
     const act = a.dataset.action;
     const sel = this.selection?.pid;
-    const r = this.full?.state?.round;
-
-    // 通用
+    
+    // 通用 (在 this.full 检查之前)
     if (act === 'create-game') return this.createGame();
     if (act === 'open-logs') return this.openLogs();
     if (act === 'close-modal') return this.closeModal(a.dataset.target);
-    if (act === 'join-game') { // [新增]
-    const playerNum = $('player-number-input').value;
-    if (playerNum) {
-      location.href = `${location.pathname}?game=${this.gameId}&player=${playerNum}`;
-    } else {
-      this.toast('请输入你的座位号', 'error');
+    if (act === 'join-game') {
+      const playerNum = $('player-number-input').value;
+      if (playerNum) {
+        location.href = `${location.pathname}?game=${this.gameId}&player=${playerNum}`;
+      } else {
+        this.toast('请输入你的座位号', 'error');
+      }
+      return;
     }
-    return;
-  }
-  if (act === 'host-start-from-lobby') { // [新增]
-    await this.engine.log('游戏开始，进入第一夜。');
-    return this.engine.startNight(1);
-  }
+    if (act === 'copy-link') {
+        const link = a.dataset.link;
+        try {
+            await navigator.clipboard.writeText(link);
+            this.toast('链接已复制到剪贴板', 'success');
+        } catch (err) {
+            this.toast('复制失败', 'error');
+        }
+        return;
+    }
+    
     if (!this.full) return;
+    const r = this.full.state.round;
+
+    // Lobby 主持人控制
+    if (act === 'host-start-from-lobby') {
+      await this.engine.log('游戏开始，进入第一夜。');
+      return this.engine.startNight(1);
+    }
+    if (act === 'host-transfer') {
+        const newHostId = $('host-transfer-select').value;
+        await db.ref(`games/${this.gameId}/state/host`).set(Number(newHostId));
+        this.toast(`主持人已移交给玩家 ${newHostId}`, 'success');
+        return;
+    }
 
     // 身份确认
     if (act === 'swap') {
@@ -1405,42 +1402,26 @@ const App = {
     }
     if (act === 'ready') return db.ref(`games/${this.gameId}/players/${this.me}/isReady`).set(true);
 
-    // 主持控制
-    if (act === 'host-start') {
+    // 游戏内主持人控制
+    if (act === 'host-start') { // 强制开始
         await this.engine.log('游戏开始，进入第一夜。');
         return this.engine.startNight(1);
     }
     if (act === 'host-speech') return this.engine.to(PHASE.SHERIFF_SPEECH);
     if (act === 'host-sheriff-vote') return this.engine.to(PHASE.SHERIFF_VOTE);
-    if (act === 'host-force-sheriff-tally') { // [新增]
+    if (act === 'host-force-sheriff-tally') {
         this.toast('主持人强制结束警长投票', 'info');
         return this.engine.tallySheriff();
     }
     if (act === 'host-day-vote') return this.engine.to(PHASE.DAY_VOTE);
-    if (act === 'host-force-day-tally') { // [新增]
+    if (act === 'host-force-day-tally') {
         this.toast('主持人强制结束放逐投票', 'info');
         return this.engine.tallyDayVote();
     }
     if (act === 'host-skip-day') return this.engine.startNight(r + 1);
-    if (act === 'host-restart') { // [修改]
-        return this.restartGame(); // 调用新的重开函数
-        return;
-    }
-    if (act === 'host-transfer') { // [新增]
-        const newHostId = $('host-transfer-select').value;
-        await db.ref(`games/${this.gameId}/state/host`).set(Number(newHostId));
-        this.toast(`主持人已移交给玩家 ${newHostId}`, 'success');
-        return;
-    }
-    if (act === 'copy-link') { // [新增]
-        const link = a.dataset.link;
-        try {
-            await navigator.clipboard.writeText(link);
-            this.toast('链接已复制到剪贴板', 'success');
-        } catch (err) {
-            this.toast('复制失败', 'error');
-        }
-        return;
+    if (act === 'host-restart') {
+        // [FIX] 移除重复的 return
+        return this.restartGame();
     }
 
     // 玩家行动
@@ -1512,14 +1493,12 @@ const App = {
 
     if (mode === 'identity') {
       const role = this.engine.activeRole(target);
-      // 如果是未激活的隐狼，查验结果为好人身份
       if (role === '隐狼' && !this.engine.isHiddenWolfActivated(data.players, data.state)) {
-        // 找到隐狼的另一张牌
         const otherIdentity = target.identities.find(id => id.role !== '隐狼');
-        return otherIdentity ? otherIdentity.role : '好人'; // 理论上总有另一张牌
+        return otherIdentity ? otherIdentity.role : '好人';
       }
       return role;
-    } else { // 查阵营
+    } else {
       const hasWolfCard = target.identities.some(i => i.role === '狼人');
       const hasInvisibleWolf = target.identities.some(i => i.role === '隐狼');
       const isWolfFaction = hasWolfCard || (hasInvisibleWolf && this.engine.isHiddenWolfActivated(data.players, data.state));
@@ -1549,11 +1528,12 @@ const App = {
 
   /** 打开日志模态框 */
   openLogs() {
+    if (!this.full) return;
     const logs = Object.values(this.full.logs || {}).sort((a, b) => a.ts - b.ts);
     const box = $('game-log-content');
     const isHost = String(this.full.state.host) === this.me;
     box.innerHTML = logs
-      .filter(l => !l.secret || isHost) // 主持人可见所有日志
+      .filter(l => !l.secret || isHost)
       .map(l => `<div class="log-item ${l.secret ? 'log-secret' : ''}"><span class="log-round">[N${l.round || 0}]</span> ${escapeHtml(l.msg)}</div>`)
       .join('') || '<div class="log-item">暂无日志</div>';
     $('logs-modal').classList.add('open');
@@ -1572,7 +1552,7 @@ const App = {
     setTimeout(() => n.remove(), 3000);
   },
    /**
-   * [新增] 生成游戏链接，用于主持人分享给其他玩家。
+   * 生成游戏链接，用于主持人分享给其他玩家。
    * @returns {string} - 包含所有玩家链接的HTML字符串。
    */
   generateGameLinks() {
@@ -1597,7 +1577,7 @@ const App = {
   },
 
   /**
-   * [新增] 渲染主持人专用的状态监控面板。
+   * 渲染主持人专用的状态监控面板。
    * @returns {string} - 包含当前阶段完成情况的HTML字符串。
    */
   renderHostStatusDashboard() {
@@ -1613,13 +1593,12 @@ const App = {
         break;
       }
       case PHASE.NIGHT: {
-        // 计算夜晚需要行动的总人数和已行动人数
         const activatedHidden = this.engine.isHiddenWolfActivated(this.full.players, st);
         const actingWolves = this.engine.getAliveActingWolves(this.full.players, st);
         const seer = alivePlayers.find(p => this.engine.activeRole(p) === '预言家');
         const guard = alivePlayers.find(p => this.engine.activeRole(p) === '守卫');
         
-        let total = actingWolves.length > 0 ? 1 : 0; // 狼人算一个集体行动
+        let total = actingWolves.length > 0 ? 1 : 0;
         if (seer) total++;
         if (guard) total++;
 
@@ -1653,7 +1632,7 @@ const App = {
         break;
       }
       default:
-        return ''; // 其他阶段不显示状态
+        return '';
     }
     
     return `<div class="host-status-dashboard">${statusText}</div>`;
@@ -1661,8 +1640,17 @@ const App = {
 
   /* ---------- 9. 清理工作 ---------- */
   destroy() {
-    this.unsub.forEach(u => u && typeof u === 'function' && u());
-    if (this.autorun) clearInterval(this.autorun);
+    // [FIX] 正确地取消 Firebase 监听
+    if (this.listener.ref && this.listener.cb) {
+      this.listener.ref.off('value', this.listener.cb);
+      this.listener = { ref: null, cb: null };
+      console.log('Firebase listener removed.');
+    }
+    if (this.autorun) {
+      clearInterval(this.autorun);
+      this.autorun = null;
+      console.log('Engine timer cleared.');
+    }
   }
 };
 
@@ -1670,4 +1658,5 @@ const App = {
  *  5. 启动应用
  * ================================================================== */
 
+window.addEventListener('beforeunload', () => App.destroy());
 document.addEventListener('DOMContentLoaded', () => App.init());

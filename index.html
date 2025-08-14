@@ -2,181 +2,137 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>双身份狼人杀 - 电子法官</title>
-  <!-- [V11.2] 路径已恢复为原始结构 -->
-  <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>双身份狼人杀 · 电子法官</title>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+  <link href="assets/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-  <div class="app">
-    <!-- 顶部信息栏 -->
-    <header class="top-bar">
-      <div class="top-bar-content">
-        <div class="logo-section">
-          <span class="logo-icon">🌙</span>
-          <h1>双身份狼人杀</h1>
-        </div>
-        <div class="top-actions">
-          <button class="btn-icon" data-action="open-logs" title="游戏日志" style="gap: 6px; width: auto; padding: 0 12px;">
-            <span class="btn-icon-emoji">📜</span>
-            <span>日志</span>
-          </button>
-        </div>
-      </div>
+  <div id="notification-container" class="notification-container"></div>
+
+  <!-- 创建游戏（设置面板） -->
+  <section id="setup-view" class="view">
+    <header class="app-header">
+      <h1 class="app-title">双身份狼人杀 · 电子法官</h1>
+      <p class="app-subtitle">创建房间并配置本局规则</p>
     </header>
 
-    <main>
-      <!-- 游戏设置与创建界面 -->
-      <div id="setup-view" class="view-container">
-        <div class="setup-container">
-          <div class="setup-header">
-            <h2>游戏设置</h2>
-            <p class="setup-subtitle">配置身份和规则，创建精彩对局</p>
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h2 class="section-title">身份配置</h2>
+        <p class="section-desc">每增加 2 张身份牌，即产生 1 名玩家。请确保总数为偶数。</p>
+        <div id="role-grid" class="role-grid">
+          <!-- 动态填充：各身份计数器 -->
+        </div>
+
+        <div class="setup-summary">
+          <div class="summary-item">
+            <span>总身份数</span>
+            <strong id="total-roles">0</strong>
           </div>
-
-          <!-- 身份配置区 -->
-          <section id="role-setup-section" class="setup-section">
-            <h3 class="section-title">
-              <span class="section-icon">👥</span>
-              身份配置
-            </h3>
-            <div id="role-grid" class="role-grid"></div>
-          </section>
-
-          <!-- 游戏规则 -->
-          <section class="setup-section">
-            <h3 class="section-title">
-              <span class="section-icon">⚙️</span>
-              游戏规则
-            </h3>
-            <div class="rule-options">
-              <div class="rule-item">
-                <label for="opt-witch-selfsave">
-                  <span class="rule-label">女巫自救</span>
-                  <span class="rule-hint">决定女巫能否自救的时机</span>
-                </label>
-                <select id="opt-witch-selfsave" class="rule-select">
-                  <option value="noFirstNightSelfSave">首夜不能自救</option>
-                  <option value="onlyFirstNightSelfSave">仅首夜可以自救</option>
-                </select>
-              </div>
-              <div class="rule-item">
-                <label for="opt-seer-mode">
-                  <span class="rule-label">预言家模式</span>
-                  <span class="rule-hint">查验结果的显示方式</span>
-                </label>
-                <select id="opt-seer-mode" class="rule-select">
-                  <option value="faction">查阵营</option>
-                  <option value="identity">查身份</option>
-                </select>
-              </div>
-              <div class="rule-item">
-                <label for="opt-wolf-win">
-                  <span class="rule-label">狼人获胜</span>
-                  <span class="rule-hint">狼人阵营的胜利条件</span>
-                </label>
-                <select id="opt-wolf-win" class="rule-select">
-                  <option value="edge">屠边</option>
-                  <option value="exterminate">屠城</option>
-                </select>
-              </div>
-              <div class="rule-item">
-                <label for="opt-wolf-visibility">
-                  <span class="rule-label">狼人可见策略</span>
-                  <span class="rule-hint">选择狼人之间的可见范围</span>
-                </label>
-                <select id="opt-wolf-visibility" class="rule-select">
-                  <option value="activeOnly">仅可行动狼人互见</option>
-                  <option value="allWolves">所有携带狼身份互见</option>
-                </select>
-              </div>
-            </div>
-          </section>
-
-          <!-- 统计信息 -->
-          <div class="setup-stats">
-            <div class="stat-item">
-              <span class="stat-label">总身份数</span>
-              <span class="stat-value" id="total-roles">0</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-              <span class="stat-label">玩家数</span>
-              <span class="stat-value" id="player-cnt">0</span>
-            </div>
+          <div class="summary-item">
+            <span>玩家人数</span>
+            <strong id="player-cnt">0</strong>
           </div>
-          <div id="player-count-warning" class="warning-text"></div>
+        </div>
+        <div id="player-count-warning" class="warning-text"></div>
+      </div>
 
-          <!-- 创建按钮 -->
-          <button id="btn-create" class="btn-primary btn-large" data-action="create-game">
-            创建游戏
-          </button>
+      <div class="setup-card">
+        <h2 class="section-title">规则选项</h2>
+
+        <div class="form-row">
+          <label for="opt-witch-selfsave">女巫自救规则</label>
+          <select id="opt-witch-selfsave" class="fancy-select">
+            <option value="noFirstNightSelfSave">首夜不可自救</option>
+            <option value="onlyFirstNightSelfSave">仅首夜可自救</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="opt-seer-mode">预言家查验模式</label>
+          <select id="opt-seer-mode" class="fancy-select">
+            <option value="faction">阵营查验（好人阵营 / 狼人阵营）</option>
+            <option value="identity">身份查验（显示当前活跃身份）</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="opt-wolf-win">狼人胜利条件</label>
+          <select id="opt-wolf-win" class="fancy-select">
+            <option value="edge">屠边（屠神/屠民任一达成）</option>
+            <option value="exterminate">屠城（全灭好人）</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="opt-wolf-visibility">狼人互见策略</label>
+          <select id="opt-wolf-visibility" class="fancy-select">
+            <option value="activeOnly">仅互见“可行动的狼”</option>
+            <option value="allWolves">互见所有“有狼牌”的玩家</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="opt-hidden-activation">隐狼激活方式</label>
+          <select id="opt-hidden-activation" class="fancy-select">
+            <option value="noActiveWolf">无活跃狼人（如狼在第二张则未活跃）</option>
+            <option value="noWolfCardAlive">无狼人（场上不存在任何活着的狼牌/隐狼牌）</option>
+          </select>
+        </div>
+
+        <div class="setup-actions">
+          <button id="btn-create" class="btn-primary btn-large" data-action="create-game">创建房间</button>
         </div>
       </div>
+    </div>
+  </section>
 
-       <!-- 加入游戏提示界面 -->
-      <div id="join-view" class="view-container hidden"></div>
+  <!-- 加入房间 -->
+  <section id="join-view" class="view hidden">
+    <!-- 由 JS 动态填充 -->
+  </section>
 
-      <!-- 游戏大厅界面 -->
-      <div id="lobby-view" class="view-container hidden"></div>
+  <!-- 大厅 -->
+  <section id="lobby-view" class="view hidden">
+    <!-- 由 JS 动态填充 -->
+  </section>
 
-      <!-- 游戏主界面 -->
-      <div id="game-view" class="hidden">
-        <div id="game-layout">
-          <!-- 左侧玩家列表 -->
-          <div id="player-grid-left" class="player-grid"></div>
+  <!-- 游戏主界面 -->
+  <section id="game-view" class="view hidden">
+    <div class="loading-prompt">正在加入游戏房间...</div>
+  </section>
 
-          <!-- 中央面板 -->
-          <div class="center-panel">
-            <div id="status-bar" class="status-bar"></div>
-            <div id="identity-card" class="identity-card"></div>
-            <div id="persist" class="persist-info hidden"></div>
-            <div id="action-panel" class="action-panel"></div>
-            <div id="host-controls" class="host-controls hidden"></div>
-          </div>
+  <!-- 预留（上帝视角/GM扩展） -->
+  <section id="god-view" class="view hidden"></section>
 
-          <!-- 右侧玩家列表 -->
-          <div id="player-grid-right" class="player-grid"></div>
-        </div>
-      </div>
+  <!-- 浮动日志按钮（全局可用） -->
+  <button class="floating-logs" data-action="open-logs" title="查看日志">日志</button>
 
-      <!-- 上帝视角 (此版本暂未实现，保留结构) -->
-      <div id="god-view" class="hidden">
-        <h2>上帝视角</h2>
-        <div id="god-player-list"></div>
-        <div id="god-log-content"></div>
-      </div>
-    </main>
-  </div>
-
-  <!-- 浮动通知容器 -->
-  <div id="notification-container"></div>
-
-  <!-- 游戏日志模态框 -->
+  <!-- 日志 Modal -->
   <div id="logs-modal" class="modal">
-    <div class="modal-overlay" data-action="close-modal"></div>
+    <div class="modal-backdrop" data-action="close-modal" data-target="logs-modal"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">
-          <span class="modal-icon">📜</span>
-          游戏日志
-        </h3>
-        <button class="modal-close" data-action="close-modal" data-target="logs-modal">
-          <span>×</span>
-        </button>
+        <h3>对局日志</h3>
+        <button class="modal-close" data-action="close-modal" data-target="logs-modal" aria-label="关闭日志">✕</button>
       </div>
-      <div class="modal-body">
-        <div id="game-log-content" class="log-content"></div>
+      <div id="game-log-content" class="modal-body">
+        <!-- JS 填充日志，展示非 secret -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" data-action="close-modal" data-target="logs-modal">关闭</button>
       </div>
     </div>
   </div>
 
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK v8（与 app.js 兼容） -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  <!-- App -->
-  <!-- [V11.2] 路径已恢复为原始结构 -->
+  <!-- App 脚本 -->
   <script src="assets/js/app.js"></script>
 </body>
 </html>

@@ -505,48 +505,60 @@ class Engine {
     }
   }
 
-  async checkHunterQueue() {
-    const r = this.state.round;
-    const q = (await this.read('state/hunters')) || {};
-    let shooters = Object.keys(q).filter(pid => q[pid]);
+// Engine 内，替换原有的 checkHunterQueue 方法
+async checkHunterQueue() {
+  const r = this.state.round;
+  const q = (await this.read('state/hunters')) || {};
+  let shooters = Object.keys(q).filter(pid => q[pid]);
 
-    if (shooters.length === 0) {
-      const nextPhase = (await this.read('state/nextPhaseAfterHunter')) || PHASE.DAY_TALK;
-      await this.update({ 'state/hunters': null, 'state/nextPhaseAfterHunter': null, 'state/phase': nextPhase });
-      return;
-    }
+  // 没有待处理的猎人，直接结束猎人阶段
+  if (shooters.length === 0) {
+    const nextPhase = (await this.read('state/nextPhaseAfterHunter')) || PHASE.DAY_TALK;
+    await this.update({ 'state/hunters': null, 'state/nextPhaseAfterHunter': null, 'state/phase': nextPhase });
+    return;
+  }
 
-    const hunterActs = (await this.read(`actions/${r}/HUNTER`)) || {};
-    // 循环处理队列中所有已提交目标的射手；遇到 BADGE/胜负判定立即中断（下个tick继续）
-    for (const pid of shooters) {
-      const act = hunterActs[pid];
-      if (act && !act.processed && act.target) {
-        const targetPid = act.target;
-        await this.log(`🔫 ${pid}号猎人开枪，指向 ${targetPid}号。`, false);
-        const deathResult = await this.kill(targetPid, 'SHOT');
-        await this.update({
-          [`actions/${r}/HUNTER/${pid}/processed`]: true,
-          [`state/hunters/${pid}`]: null
-        });
+  const hunterActs = (await this.read(`actions/${r}/HUNTER`)) || {};
 
-        if (await this.checkWin()) return;
+  // 依次处理已提交动作的射手
+  for (const pid of shooters) {
+    const act = hunterActs[pid];
+    if (act && !act.processed && act.target) {
+      const targetPid = act.target;
 
-        if (deathResult.sheriffDied) {
-          const next = (await this.read('state/nextPhaseAfterHunter')) || PHASE.DAY_TALK;
-          await this.to(PHASE.BADGE, { postBadge: { dead: targetPid, next } });
-          return; // 进入警徽移交，暂停后续射手处理
-        }
-        // 继续处理下一位射手
+      await this.log(`🔫 ${pid}号猎人开枪，指向 ${targetPid}号。`, false);
+
+      const deathResult = await this.kill(targetPid, 'SHOT');
+
+      // 标记该猎人已处理 + 移出队列
+      await this.update({
+        [`actions/${r}/HUNTER/${pid}/processed`]: true,
+        [`state/hunters/${pid}`]: null
+      });
+
+      // 胜负判定
+      if (await this.checkWin()) return;
+
+      // 若被射中者为警长且真正出局 -> 进入警徽移交阶段，立即中断，等待下一次 tick
+      if (deathResult.sheriffDied) {
+        const next = (await this.read('state/nextPhaseAfterHunter')) || PHASE.DAY_TALK;
+        await this.to(PHASE.BADGE, { postBadge: { dead: targetPid, next } });
+        return;
       }
-    }
-
-    // 处理完所有已提交的射手后，再检查队列是否清空
-    shooters = Object.keys((await this.read('state/hunters')) || {}).filter(pid => (await this.read('state/hunters'))[pid]);
-    if (shooters.length === 0) {
-      const nextPhase = (await this.read('state/nextPhaseAfterHunter')) || PHASE.DAY_TALK;
-      await this.update({ 'state/hunters': null, 'state/nextPhaseAfterHunter': null, 'state/phase': nextPhase });
+      // 否则继续处理下一位射手
     }
   }
+
+  // 本轮已尽力处理完有提交目标的射手；复查队列
+  const q2 = (await this.read('state/hunters')) || {};
+  shooters = Object.keys(q2).filter(pid => q2[pid]);
+
+  // 若队列已空，退出猎人阶段
+  if (shooters.length === 0) {
+    const nextPhase = (await this.read('state/nextPhaseAfterHunter')) || PHASE.DAY_TALK;
+    await this.update({ 'state/hunters': null, 'state/nextPhaseAfterHunter': null, 'state/phase': nextPhase });
+  }
+}
 
   async duel(fromPid, targetPid) {
     const from = this.players[fromPid], target = this.players[targetPid];

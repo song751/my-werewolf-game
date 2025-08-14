@@ -873,7 +873,7 @@ const App = {
   },
 
   /** 进入游戏房间，启动监听 */
-  enterGame() {
+  async enterGame() {
     $('setup-view').classList.add('hidden');
     $('game-view').classList.remove('hidden');
 

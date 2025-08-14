@@ -41,16 +41,14 @@ html { color-scheme: dark; }
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
   --shadow-glow-selected: 0 0 25px rgba(16, 185, 129, 0.5);
   --shadow-glow-target: 0 0 25px rgba(239, 68, 68, 0.45);
-  /* [FIX] 增加缺失的 shadow-xl 变量 */
-  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.4);
 
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  /* [FIX] 增加缺失的 radius-xl 变量 */
   --radius-xl: 24px;
   --radius-full: 9999px;
 
@@ -155,7 +153,7 @@ button:focus-visible { outline:none; box-shadow: 0 0 0 3px rgba(99,102,241,0.35)
 .rule-item { background: var(--bg-tertiary); border:1px solid var(--border-primary); border-radius: var(--radius-md); padding: var(--spacing-md); display:flex; align-items:center; justify-content:space-between; }
 .rule-label { font-size:14px; font-weight:600; }
 .rule-hint { font-size:12px; color: var(--text-tertiary); }
-select, input[type=number] {
+select {
   -webkit-appearance: none; -moz-appearance: none; appearance: none;
   padding: 10px 14px; font-size:14px;
   background-color: var(--input-bg); color: var(--text-primary);
@@ -164,6 +162,28 @@ select, input[type=number] {
 }
 select:focus, input:focus { outline:none; border-color: var(--accent-primary); background-color: var(--input-bg-focus); box-shadow: 0 0 0 3px rgba(99,102,241,0.35); }
 select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.8rem center; background-size: 1em; cursor: pointer; }
+
+/* [NEW] 自定义数字输入框样式 */
+.custom-number-input { display: flex; align-items: center; gap: 6px; }
+.custom-number-input .num-btn {
+  width: 32px; height: 32px; font-size: 18px;
+  background: var(--bg-primary); border: 1px solid var(--border-secondary);
+  color: var(--text-secondary); border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+.custom-number-input .num-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.custom-number-input input {
+  width: 50px; text-align: center; font-weight: bold;
+  -moz-appearance: textfield; /* Firefox */
+  padding: 8px; font-size: 14px;
+  background-color: var(--input-bg); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: var(--radius-sm);
+}
+.custom-number-input input::-webkit-outer-spin-button,
+.custom-number-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0; /* Chrome, Safari, Edge, Opera */
+}
+
 .setup-stats { display:flex; align-items:center; justify-content:center; gap: var(--spacing-lg); padding: var(--spacing-md); background: rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius: var(--radius-md); margin: var(--spacing-lg) 0; }
 .stat-item { display:flex; flex-direction:column; align-items:center; }
 .stat-label { font-size:12px; color: var(--text-secondary); }
@@ -171,7 +191,7 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
 .stat-divider { width:1px; height:30px; background: var(--border-secondary); }
 .warning-text { text-align:center; color: var(--color-warning); font-size:13px; margin-top: var(--spacing-sm); min-height: 18px; }
 
-/* 新增的 Join 和 Lobby 样式 */
+/* Join 和 Lobby 样式 */
 .join-container,
 .lobby-container {
   background: var(--bg-secondary);
@@ -181,8 +201,8 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
   box-shadow: var(--shadow-xl);
   max-width: 600px;
   margin: 40px auto;
-  text-align: center;
 }
+.join-container { text-align: center; }
 
 .join-container h2,
 .lobby-header h2 {
@@ -193,6 +213,7 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+.lobby-header { text-align: center; }
 
 .join-container p,
 .lobby-header p {
@@ -264,19 +285,11 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
   border-radius: 50%;
   transition: all var(--transition-base);
 }
-
-.player-status-item.online {
-  color: var(--text-primary);
-}
-.player-status-item.online .player-status-dot {
+.player-status-item.ready .player-status-dot {
   background-color: var(--color-success);
   box-shadow: 0 0 8px var(--color-success);
 }
-
-.player-status-item.offline {
-  color: var(--text-tertiary);
-}
-.player-status-item.offline .player-status-dot {
+.player-status-item.waiting .player-status-dot {
   background-color: var(--text-tertiary);
 }
 
@@ -285,6 +298,13 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
   flex-direction: column;
   gap: var(--spacing-lg);
   align-items: center;
+}
+
+/* [NEW] Lobby Identity Section */
+#lobby-identity-section {
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-primary);
 }
 
 /* 游戏布局 */
@@ -363,7 +383,7 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
 .notification.error { border-left-color: var(--color-danger); }
 .notification.info { border-left-color: var(--color-info); }
 
-/* 新增的主持人控件样式 */
+/* 主持人控件样式 */
 .host-actions-wrapper {
   padding: var(--spacing-md) 0;
   border-bottom: 1px solid var(--border-primary);
@@ -416,18 +436,6 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
   text-align: right;
   font-size: 13px;
   color: var(--text-secondary);
-}
-
-.fancy-input {
-  flex-grow: 1;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--input-bg);
-  border: 1px solid var(--border-secondary);
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-  min-width: 0;
 }
 
 /* 工具 & 动画 */

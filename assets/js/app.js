@@ -43,6 +43,7 @@ const DEFAULT_SETUP = { 平民: 6, 守卫: 1, 白痴: 1, 预言家: 1, 骑士: 1
 // 游戏阶段（有限状态机状态）
 const PHASE = {
   SETUP: 'SETUP',             // 0. 游戏设置
+  LOBBY: 'LOBBY',             // [新增] 游戏大厅，等待玩家加入
   NIGHT: 'NIGHT',             // 1. 夜晚行动（狼/神）
   NIGHT_WITCH: 'NIGHT_WITCH', // 2. 女巫行动（单独阶段，以看到刀口）
   DAWN: 'DAWN',               // 3. 黎明结算（处理死亡）
@@ -594,10 +595,15 @@ const App = {
     this.gameId = p.get('game') || '';
     this.me = p.get('player') || '';
 
-    if (!this.gameId || !this.me) {
-      this.renderSetup();
-    } else {
+    if (this.gameId && !this.me) {
+      // 有游戏ID，但没有玩家ID -> 显示加入提示
+      this.renderJoinPrompt();
+    } else if (this.gameId && this.me) {
+      // 信息完整 -> 进入游戏
       this.enterGame();
+    } else {
+      // 无信息 -> 显示设置页面
+      this.renderSetup();
     }
   },
 
@@ -683,16 +689,68 @@ const App = {
       wolfWin: $('opt-wolf-win').value,
       hiddenTrigger: $('opt-wolf-visibility').value
     };
+    const config = { counts, settings }; // [新增] 将配置打包
 
     const initData = {
       meta: { createdAt: now(), creator: 'FSM-v11' },
+      config, // [新增] 保存游戏配置
       players, settings, actions: {}, logs: {},
-      state: { phase: PHASE.SETUP, round: 0, host: 1, peace: 0, winner: null, sheriff: null }
+      state: { phase: PHASE.LOBBY, round: 0, host: 1, peace: 0, winner: null, sheriff: null }
     };
 
     await db.ref(`games/${id}`).set(initData);
     this.toast('游戏房间创建成功！', 'success');
     location.href = `${location.pathname}?game=${id}&player=1`;
+  },
+
+  /**
+   * [新增] 重开一局新游戏。
+   * 读取当前配置，创建一个新房间，并引导所有玩家跳转。
+   */
+  async restartGame() {
+    this.toast('正在准备新对局...', 'info');
+    const oldGameId = this.gameId;
+    const config = this.full.config; // 读取已保存的配置
+    if (!config || !config.counts) {
+      this.toast('无法找到游戏配置，无法重开。', 'error');
+      return;
+    }
+
+    // 复用发牌逻辑
+    const pool = [];
+    for (const [r, c] of Object.entries(config.counts)) {
+      for (let i = 0; i < c; i++) pool.push(r);
+    }
+    const dealt = this.dealWithGolden(pool);
+    if (!dealt) { this.toast('重新发牌失败，无法重开。', 'error'); return; }
+
+    // 创建新游戏
+    const newGameId = db.ref('games').push().key;
+    const players = {};
+    const oldPlayers = Object.values(this.full.players);
+    dealt.pairs.forEach((pair, i) => {
+      players[i + 1] = {
+        id: i + 1,
+        name: oldPlayers[i]?.name || `玩家${i + 1}`, // 沿用旧名字
+        identities: pair,
+        deaths: 0, isAlive: true, isReady: false,
+        isExposedIdiot: false, badge: 0, skill: {}
+      };
+    });
+
+    const initData = {
+      meta: { createdAt: now(), creator: 'FSM-v11', from: oldGameId },
+      config, // 继续传递配置
+      players,
+      settings: config.settings,
+      actions: {}, logs: {},
+      state: { phase: PHASE.LOBBY, round: 0, host: this.full.state.host, peace: 0, winner: null, sheriff: null }
+    };
+
+    await db.ref(`games/${newGameId}`).set(initData);
+
+    // 在旧房间写入新房间ID，触发所有客户端跳转
+    await db.ref(`games/${oldGameId}/state/nextGameId`).set(newGameId);
   },
 
   /**
@@ -740,6 +798,80 @@ const App = {
 
   /* ---------- 3. 进入游戏与渲染 ---------- */
 
+  /* ---------- (新增) 渲染Lobby和Join的函数 ---------- */
+
+  /**
+   * [新增] 渲染加入游戏的提示框。
+   */
+  renderJoinPrompt() {
+    $('setup-view').classList.add('hidden');
+    $('game-view').classList.add('hidden');
+    const joinView = $('join-view');
+    joinView.classList.remove('hidden');
+    joinView.innerHTML = `
+      <div class="join-container">
+        <h2>进入游戏房间</h2>
+        <p>请输入你的座位号</p>
+        <input type="number" id="player-number-input" placeholder="例如: 1" />
+        <button class="btn-primary" data-action="join-game">确认进入</button>
+      </div>
+    `;
+  },
+
+  /**
+   * [新增] 渲染游戏大厅界面。
+   */
+  renderLobby(data) {
+    const lobbyView = $('lobby-view');
+    lobbyView.classList.remove('hidden');
+    $('game-view').classList.add('hidden'); // 确保游戏主界面是隐藏的
+
+    const isHost = String(data.state.host) === this.me;
+    const players = Object.values(data.players || {});
+    const genericLink = `${location.origin}${location.pathname}?game=${this.gameId}`;
+
+    let hostControls = '';
+    if (isHost) {
+      hostControls = `
+        <div class="host-lobby-controls">
+          <div class="host-transfer">
+            <span>移交主持给:</span>
+            <select id="host-transfer-select">
+              ${players.map(p => `<option value="${p.id}" ${String(p.id) === String(data.state.host) ? 'selected' : ''}>玩家 ${p.id}</option>`).join('')}
+            </select>
+            <button class="control-btn" data-action="host-transfer">确认移交</button>
+          </div>
+          <button class="btn-primary btn-large" data-action="host-start-from-lobby">开始游戏</button>
+        </div>
+      `;
+    }
+
+    lobbyView.innerHTML = `
+      <div class="lobby-container">
+        <div class="lobby-header">
+          <h2>游戏大厅</h2>
+          <p>等待所有玩家加入...</p>
+        </div>
+        <div class="lobby-link-section">
+          <p>分享此链接给所有玩家:</p>
+          <div class="game-link-item">
+            <input type="text" class="fancy-input" value="${genericLink}" readonly />
+            <button class="control-btn" data-action="copy-link" data-link="${genericLink}">复制</button>
+          </div>
+        </div>
+        <div class="player-status-grid">
+          ${players.map(p => `
+            <div class="player-status-item ${p.online ? 'online' : 'offline'}">
+              <span class="player-status-dot"></span>
+              玩家 ${p.id} ${String(p.id) === String(data.state.host) ? '(👑)' : ''}
+            </div>
+          `).join('')}
+        </div>
+        ${hostControls}
+      </div>
+    `;
+  },
+
   /** 进入游戏房间，启动监听 */
   enterGame() {
     $('setup-view').classList.add('hidden');
@@ -748,6 +880,10 @@ const App = {
     this.engine = new Engine(this.gameId);
 
     const rootRef = db.ref(`games/${this.gameId}`);
+    // [新增] 设置在线状态
+    const onlineRef = db.ref(`games/${this.gameId}/players/${this.me}/online`);
+    await onlineRef.set(true);
+    onlineRef.onDisconnect().set(false);
     this.unsub.push(rootRef.on('value', snap => {
       const data = snap.val();
       if (!data) {
@@ -755,6 +891,15 @@ const App = {
         // location.href = location.pathname; // 可以选择返回首页
         return;
       }
+      // [新增] 检查是否有新游戏ID，如有则跳转
+      if (data.state?.nextGameId) {
+        this.toast('即将开始新对局，页面跳转中...', 'success');
+        const newUrl = `${location.pathname}?game=${data.state.nextGameId}&player=${this.me}`;
+        // 延迟跳转，让玩家看到提示
+        setTimeout(() => { location.href = newUrl; }, 1500);
+        return;
+      }
+      
       this.full = data;
       this.renderAll(data);
     }));
@@ -888,10 +1033,10 @@ const App = {
     // 标签：狼队标、白痴翻牌
     let tags = [];
     if (this.shouldShowWolfTag(p, ctx)) {
-      tags.push('<span class="tag tag-team">狼阵营</span>');
+      tags.push('<span class="tag tag-team">狼</span>');
     }
     if (p.isExposedIdiot) {
-      tags.push('<span class="tag tag-idiot">白痴翻牌</span>');
+      tags.push('<span class="tag tag-idiot">白痴</span>');
     }
 
     const card = el(`
@@ -1184,7 +1329,21 @@ const App = {
         html += `<button class="action-btn" data-action="host-force-day-tally">强制计票</button>`;
     }
     if (st.phase === PHASE.GAME_OVER) {
-      html += `<button class="btn-primary" data-action="host-restart">返回设置</button>`;
+      html = `
+        <div class="host-panel">
+          <div class="host-status-title">游戏已结束</div>
+          <div class="host-actions">
+            <button class="btn-primary" data-action="host-restart">重开一局</button>
+          </div>
+          <div class="host-transfer" style="margin-top: 16px;">
+            <span>移交主持给:</span>
+            <select id="host-transfer-select">
+              ${Object.values(data.players).map(p => `<option value="${p.id}" ${String(p.id) === String(st.host) ? 'selected' : ''}>玩家 ${p.id}</option>`).join('')}
+            </select>
+            <button class="control-btn" data-action="host-transfer">确认移交</button>
+          </div>
+        </div>
+      `;
     }
     html += `</div></div>`;
 
@@ -1222,6 +1381,19 @@ const App = {
     if (act === 'create-game') return this.createGame();
     if (act === 'open-logs') return this.openLogs();
     if (act === 'close-modal') return this.closeModal(a.dataset.target);
+    if (act === 'join-game') { // [新增]
+    const playerNum = $('player-number-input').value;
+    if (playerNum) {
+      location.href = `${location.pathname}?game=${this.gameId}&player=${playerNum}`;
+    } else {
+      this.toast('请输入你的座位号', 'error');
+    }
+    return;
+  }
+  if (act === 'host-start-from-lobby') { // [新增]
+    await this.engine.log('游戏开始，进入第一夜。');
+    return this.engine.startNight(1);
+  }
     if (!this.full) return;
 
     // 身份确认
@@ -1251,7 +1423,7 @@ const App = {
     }
     if (act === 'host-skip-day') return this.engine.startNight(r + 1);
     if (act === 'host-restart') { // [修改]
-        location.href = location.pathname; // 重启最简单的方式是返回首页
+        return this.restartGame(); // 调用新的重开函数
         return;
     }
     if (act === 'host-transfer') { // [新增]

@@ -152,11 +152,11 @@ class Engine {
   computeHiddenActive(players = this.players, settings = this.settings) {
     const mode = settings?.hiddenActivation || 'noActiveWolf';
     if (mode === 'noWolfCardAlive') {
-      // 口径（维持原实现）：是否存在“活着的”狼牌/隐狼牌
-      const anyWolfCardAlive = Object.values(players).some(p => 
-        p.isAlive && p.identities.some(id => id.role === '狼人' || id.role === '隐狼')
+      // 修正：只检查“狼人”牌是否仍在存活玩家的两张身份中；隐狼不计入
+      const anyPureWolfCardAlive = Object.values(players).some(p => 
+        p.isAlive && p.identities.some(id => id.role === '狼人')
       );
-      return !anyWolfCardAlive;
+      return !anyPureWolfCardAlive;
     } else {
       // 无活跃狼人（活跃身份为“狼人”的存活玩家不存在）
       return !Object.values(players).some(p => 
@@ -167,7 +167,7 @@ class Engine {
   isHiddenWolfActivated(players = this.players) { return this.computeHiddenActive(players, this.settings); }
 
   getAliveActingWolves(players = this.players) {
-    const activated = this.isHiddenWolfActivated(players, this.state);
+    const activated = this.isHiddenWolfActivated(players);
     return Object.values(players).filter(p => {
       if (!p.isAlive) return false;
       const ar = this.activeRole(p);
@@ -215,7 +215,7 @@ class Engine {
    *  夜晚与女巫阶段（首夜上警：女巫后直接上警，未天亮）
    * ============================ */
   async checkNightEnd() {
-    const actingWolves = this.getAliveActingWolves(this.players, this.state);
+    const actingWolves = this.getAliveActingWolves(this.players);
     const finalTarget = this.getWolfFinalTarget();
     if (actingWolves.length > 0 && finalTarget === undefined) return;
     
@@ -361,10 +361,17 @@ class Engine {
         const cured = allowedCures.has(String(wolfTarget));
         if (guarded) await this.log(`🛡️ ${wolfTarget}号玩家被守卫成功守护。`, true);
         if (cured) await this.log(`🧪 女巫解药救活了 ${wolfTarget}号玩家。`, true);
-        if (!guarded && !cured) {
+
+        // 修复：守+救同时发生 → 仍判定为死亡（扣一条命）
+        if (guarded && cured) {
+          await this.log(`⚠️ ${wolfTarget}号同时被守与被解，按规则仍然死亡。`, true);
+          deaths.push({ pid: String(wolfTarget), cause: 'WOLF' });
+          await this.log(`🔪 ${wolfTarget}号玩家被狼人杀害。`, true);
+        } else if (!guarded && !cured) {
           deaths.push({ pid: String(wolfTarget), cause: 'WOLF' });
           await this.log(`🔪 ${wolfTarget}号玩家被狼人杀害。`, true);
         }
+        // XOR（只守或只救）时免死，无需追加日志（公开日志仍只公布死亡名单/平安夜）
       }
 
       // 毒药结算（可多名；避免重复扣命）
@@ -843,6 +850,11 @@ const App = {
   selection: null, 
   autorun: null,
 
+  // 本地 UI 锁：在当前 (round, phase) 锁定操作面板
+  lockedAction: null,
+  _lobbyStructSig: null,
+  _myIdentitySig: null,
+
   init() {
     this.applyAppleTheme(); // 注入稍亮的“果味深色”主题变量
     this.initButtonEffects(); // 增强按钮按压效果
@@ -956,6 +968,48 @@ toast(txt, type = 'info', duration = 3000) {
 
   infoBox(text) {
     return `<div class="action-feedback">${escapeHtml(text)}</div>`;
+  },
+
+  // ——— 新增：面板锁定/应用 ———
+  lockActionPanel() {
+    const st = this.full?.state;
+    if (!st) return;
+    this.lockedAction = { phase: st.phase, round: st.round };
+    const panel = $('action-panel');
+    if (panel) {
+      panel.setAttribute('aria-busy', 'true');
+      panel.dataset.locked = '1';
+      panel.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    }
+  },
+
+  unlockActionPanel() {
+    const panel = $('action-panel');
+    if (panel) {
+      panel.removeAttribute('aria-busy');
+      delete panel.dataset.locked;
+      panel.querySelectorAll('button').forEach(b => { b.disabled = false; });
+    }
+    this.lockedAction = null;
+  },
+
+  isActionLockedForState(st) {
+    return !!(this.lockedAction && this.lockedAction.phase === st.phase && this.lockedAction.round === st.round);
+  },
+
+  applyActionPanelLock(panel, st) {
+    if (this.isActionLockedForState(st)) {
+      panel.setAttribute('aria-busy', 'true');
+      panel.dataset.locked = '1';
+      panel.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    }
+  },
+
+  lockLobbyIdentity() {
+    const box = $('lobby-identity-section');
+    if (!box) return;
+    box.querySelectorAll('button').forEach(b => b.disabled = true);
+    box.setAttribute('aria-busy', 'true');
   },
 
   initEventListeners() {
@@ -1102,6 +1156,41 @@ toast(txt, type = 'info', duration = 3000) {
     setTimeout(() => { $('player-number-input')?.focus(); }, 100);
   },
 
+  // 新增：大厅差分渲染，避免频繁整卡刷新
+  buildLobbyStructSig(data) {
+    const host = data.state?.host;
+    const arr = Object.values(data.players || {}).map(p => [p.id, !!p.isReady]);
+    arr.sort((a,b)=>a[0]-b[0]);
+    return JSON.stringify({ host, arr });
+  },
+  buildMyIdentitySig(me) {
+    if (!me) return 'null';
+    const ids = (me.identities || []).map(id => `${id.role}${id.isCopy ? '*' : ''}`);
+    return JSON.stringify({ ids });
+  },
+  renderLobbyDiff(data) {
+    $('setup-view').classList.add('hidden');
+    $('join-view').classList.add('hidden');
+    const needFull = $('lobby-view').classList.contains('hidden')
+      || !this._lobbyStructSig
+      || this._lobbyStructSig !== this.buildLobbyStructSig(data);
+
+    if (needFull) {
+      this.renderLobby(data);
+    } else {
+      const me = data.players?.[this.me];
+      const mySig = this.buildMyIdentitySig(me);
+      if (this._myIdentitySig !== mySig) {
+        const box = $('lobby-identity-section');
+        if (box) box.innerHTML = this.generateIdentityHtml(me, data.state.phase);
+      }
+      $('lobby-view').classList.remove('hidden');
+      $('game-view').classList.add('hidden');
+    }
+    this._lobbyStructSig = this.buildLobbyStructSig(data);
+    this._myIdentitySig = this.buildMyIdentitySig(data.players?.[this.me]);
+  },
+
   renderLobby(data) {
     $('setup-view').classList.add('hidden');
     $('join-view').classList.add('hidden');
@@ -1165,6 +1254,10 @@ toast(txt, type = 'info', duration = 3000) {
         ${hostControls}
       </div>
     `;
+
+    // 更新签名基线
+    this._lobbyStructSig = this.buildLobbyStructSig(data);
+    this._myIdentitySig = this.buildMyIdentitySig(me);
   },
 
   initGameLayout() {
@@ -1274,10 +1367,11 @@ toast(txt, type = 'info', duration = 3000) {
     if (typeof data.state?.hiddenActive === 'boolean') return data.state.hiddenActive;
     const mode = data.settings?.hiddenActivation || 'noActiveWolf';
     if (mode === 'noWolfCardAlive') {
-      const anyWolfCardAlive = Object.values(data.players || {}).some(p => 
-        p.isAlive && p.identities.some(id => id.role === '狼人' || id.role === '隐狼')
+      // 修正：只检查“狼人”牌；隐狼不计入
+      const anyPureWolfCardAlive = Object.values(data.players || {}).some(p => 
+        p.isAlive && p.identities.some(id => id.role === '狼人')
       );
-      return !anyWolfCardAlive;
+      return !anyPureWolfCardAlive;
     } else {
       return !Object.values(data.players || {}).some(p => 
         p.isAlive && this.getActiveRole(p, data.players, data.state, data.settings) === '狼人'
@@ -1430,18 +1524,21 @@ toast(txt, type = 'info', duration = 3000) {
     const sel = this.selection?.pid;
 
     switch(st.phase) {
-      case PHASE.NIGHT:        return this.renderNightActions(panel, data, me, ar, sel);
-      case PHASE.NIGHT_WITCH:  return this.renderWitchActions(panel, data, me, ar, sel);
-      case PHASE.SHERIFF_CAND: return this.renderSheriffCandActions(panel, data, me);
-      case PHASE.SHERIFF_SPEECH:return this.renderSheriffSpeechActions(panel, data, me);
-      case PHASE.SHERIFF_VOTE: return this.renderSheriffVoteActions(panel, data, sel);
-      case PHASE.DAY_TALK:     return this.renderDayTalkActions(panel, data, me, ar, sel);
-      case PHASE.DAY_VOTE:     return this.renderDayVoteActions(panel, data, me, sel);
-      case PHASE.HUNTER:       return this.renderHunterActions(panel, data, me, sel);
-      case PHASE.BADGE:        return this.renderBadgeActions(panel, data, me, sel);
-      case PHASE.GAME_OVER:    return this.renderGameOverActions(panel, data);
-      default:                 return panel.innerHTML = this.infoBox('等待中...');
+      case PHASE.NIGHT:        this.renderNightActions(panel, data, me, ar, sel); break;
+      case PHASE.NIGHT_WITCH:  this.renderWitchActions(panel, data, me, ar, sel); break;
+      case PHASE.SHERIFF_CAND: this.renderSheriffCandActions(panel, data, me); break;
+      case PHASE.SHERIFF_SPEECH:this.renderSheriffSpeechActions(panel, data, me); break;
+      case PHASE.SHERIFF_VOTE: this.renderSheriffVoteActions(panel, data, sel); break;
+      case PHASE.DAY_TALK:     this.renderDayTalkActions(panel, data, me, ar, sel); break;
+      case PHASE.DAY_VOTE:     this.renderDayVoteActions(panel, data, me, sel); break;
+      case PHASE.HUNTER:       this.renderHunterActions(panel, data, me, sel); break;
+      case PHASE.BADGE:        this.renderBadgeActions(panel, data, me, sel); break;
+      case PHASE.GAME_OVER:    this.renderGameOverActions(panel, data); break;
+      default:                 panel.innerHTML = this.infoBox('等待中...'); break;
     }
+
+    // 应用面板锁（若此前已被用户在本阶段锁定）
+    this.applyActionPanelLock(panel, st);
   },
 
   renderNightActions(panel, data, me, ar, sel) {
@@ -1482,7 +1579,6 @@ toast(txt, type = 'info', duration = 3000) {
 
   renderOtherNightActions(panel, data, me, ar, sel) {
     const st = data.state;
-    // 统一：后端判定预言家查验结果，前端只提交 target
     if (ar === '守卫') {
       const last = me.skill?.lastGuard;
       const canGuard = sel && String(sel) !== String(last);
@@ -1751,28 +1847,46 @@ toast(txt, type = 'info', duration = 3000) {
     const meId = this.me;
     const actionPath = `games/${this.gameId}/actions/${r}`;
 
-    // 主持人操作
+    // 主持人操作（不锁）
     if (act.startsWith('host-')) return this.handleHostAction(act);
 
     // 玩家操作
     switch(act) {
-      case 'swap':          return this.handleSwapIdentities(meId);
-      case 'ready':         return db.ref(`games/${this.gameId}/players/${meId}/isReady`).set(true);
+      case 'swap': {
+        return this.handleSwapIdentities(meId);
+      }
+      case 'ready': {
+        this.lockLobbyIdentity();
+        return db.ref(`games/${this.gameId}/players/${meId}/isReady`).set(true);
+      }
 
       // 狼人
-      case 'wolf-empty':    return db.ref(`${actionPath}/NIGHT/WOLF/${meId}`).set({ target: '0', ts: getHighPrecisionTimestamp() });
-      case 'wolf-final':    return this.handleWolfFinal(actionPath, meId);
+      case 'wolf-empty': {
+        // 不锁面板，仅提交空刀
+        return db.ref(`${actionPath}/NIGHT/WOLF/${meId}`).set({ target: '0', ts: getHighPrecisionTimestamp() });
+      }
+      case 'wolf-final': {
+        await this.handleWolfFinal(actionPath, meId);
+        this.lockActionPanel();
+        return;
+      }
 
       // 守卫
-      case 'guard-null':    return db.ref(`${actionPath}/NIGHT/GUARD/${meId}`).set({ target: null, ts: getHighPrecisionTimestamp() });
-      case 'guard-confirm':
+      case 'guard-null': {
+        await db.ref(`${actionPath}/NIGHT/GUARD/${meId}`).set({ target: null, ts: getHighPrecisionTimestamp() });
+        this.lockActionPanel();
+        return;
+      }
+      case 'guard-confirm': {
         if (!sel) return;
-        return db.ref(`${actionPath}/NIGHT/GUARD/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp() });
+        await db.ref(`${actionPath}/NIGHT/GUARD/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp() });
+        this.lockActionPanel();
+        return;
+      }
 
-      // 预言家（仅提交目标；结果由后端计算并写入 logs/persist）
-      case 'seer-confirm':
+      // 预言家（客户端计算并写入）
+      case 'seer-confirm': {
         if (!sel) return;
-        // 将查验结果计算交给后端引擎写入玩家持久信息（本实现直接写 actions，持久面板展示读取 actions）
         const serverResult = this.engine.computeSeerResultServer(sel);
         await db.ref(`${actionPath}/NIGHT/SEER/${meId}`).set({ 
           target: sel, 
@@ -1780,9 +1894,11 @@ toast(txt, type = 'info', duration = 3000) {
           ts: getHighPrecisionTimestamp()
         });
         this.toast(`已查验 ${sel}号`, 'success');
+        this.lockActionPanel();
         return;
+      }
 
-      // 女巫（多实例：分别写入 cures/<id> 或 poisons/<id>；结束动作写 done/<id>）
+      // 女巫（多实例）
       case 'witch-cure': {
         const wolfTarget = this.getWolfFinalTarget(this.full);
         if (!wolfTarget || wolfTarget === '0') { this.toast('本夜无可救目标', 'error'); return; }
@@ -1790,50 +1906,80 @@ toast(txt, type = 'info', duration = 3000) {
         if (witchAct.poisons?.[meId]) { this.toast('本夜已使用毒药，不能再用解药', 'error'); return; }
         await db.ref(`${actionPath}/NIGHT_WITCH/cures/${meId}`).set({ target: wolfTarget, ts: getHighPrecisionTimestamp() });
         this.toast(`已使用解药救 ${wolfTarget}号`, 'success');
+        this.lockActionPanel();
         return;
       }
-      case 'witch-poison':
+      case 'witch-poison': {
         if (!sel || sel === '0') return;
-        {
-          const witchAct = this.full.actions?.[this.full.state.round]?.NIGHT_WITCH || {};
-          if (witchAct.cures?.[meId]) { this.toast('本夜已使用解药，不能再用毒药', 'error'); return; }
-          await db.ref(`${actionPath}/NIGHT_WITCH/poisons/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp() });
-          this.toast(`已使用毒药毒杀 ${sel}号`, 'success');
-          return;
-        }
-      case 'witch-done':
-        return db.ref(`${actionPath}/NIGHT_WITCH/done/${meId}`).set(true);
+        const witchAct = this.full.actions?.[this.full.state.round]?.NIGHT_WITCH || {};
+        if (witchAct.cures?.[meId]) { this.toast('本夜已使用解药，不能再用毒药', 'error'); return; }
+        await db.ref(`${actionPath}/NIGHT_WITCH/poisons/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp() });
+        this.toast(`已使用毒药毒杀 ${sel}号`, 'success');
+        this.lockActionPanel();
+        return;
+      }
+      case 'witch-done': {
+        await db.ref(`${actionPath}/NIGHT_WITCH/done/${meId}`).set(true);
+        this.lockActionPanel();
+        return;
+      }
 
       // 警长
-      case 'sheriff-up':    return db.ref(`games/${this.gameId}/state/sheriff/candidates/${meId}`).set(true);
-      case 'sheriff-down':  return db.ref(`games/${this.gameId}/state/sheriff/candidates/${meId}`).set(false);
-      case 'sheriff-drop':  return db.ref(`games/${this.gameId}/state/sheriff/drops/${meId}`).set(true);
-      case 'sheriff-vote':
+      case 'sheriff-up':    await db.ref(`games/${this.gameId}/state/sheriff/candidates/${meId}`).set(true); this.lockActionPanel(); return;
+      case 'sheriff-down':  await db.ref(`games/${this.gameId}/state/sheriff/candidates/${meId}`).set(false); this.lockActionPanel(); return;
+      case 'sheriff-drop':  await db.ref(`games/${this.gameId}/state/sheriff/drops/${meId}`).set(true); this.lockActionPanel(); return;
+      case 'sheriff-vote': {
         if (!sel) return;
-        return db.ref(`games/${this.gameId}/state/sheriff/votes/${meId}`).set(sel);
-      case 'sheriff-vote-abstain':
-        return db.ref(`games/${this.gameId}/state/sheriff/votes/${meId}`).set('0');
+        await db.ref(`games/${this.gameId}/state/sheriff/votes/${meId}`).set(sel);
+        this.lockActionPanel();
+        return;
+      }
+      case 'sheriff-vote-abstain': {
+        await db.ref(`games/${this.gameId}/state/sheriff/votes/${meId}`).set('0');
+        this.lockActionPanel();
+        return;
+      }
 
       // 骑士
-      case 'knight-duel':
+      case 'knight-duel': {
         if (!sel) return;
-        return db.ref(`${actionPath}/DAY/KNIGHT/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp(), processed: false });
+        await db.ref(`${actionPath}/DAY/KNIGHT/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp(), processed: false });
+        this.lockActionPanel();
+        return;
+      }
 
       // 白天投票
-      case 'day-vote':
+      case 'day-vote': {
         if (!sel) return;
-        return db.ref(`${actionPath}/DAY_VOTE/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp() });
-      case 'day-vote-abstain':
-        return db.ref(`${actionPath}/DAY_VOTE/${meId}`).set({ target: '0', ts: getHighPrecisionTimestamp() });
+        await db.ref(`${actionPath}/DAY_VOTE/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp() });
+        this.lockActionPanel();
+        return;
+      }
+      case 'day-vote-abstain': {
+        await db.ref(`${actionPath}/DAY_VOTE/${meId}`).set({ target: '0', ts: getHighPrecisionTimestamp() });
+        this.lockActionPanel();
+        return;
+      }
 
       // 猎人
-      case 'hunter-shoot':
+      case 'hunter-shoot': {
         if (!sel) return;
-        return db.ref(`${actionPath}/HUNTER/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp(), processed: false });
+        await db.ref(`${actionPath}/HUNTER/${meId}`).set({ target: sel, ts: getHighPrecisionTimestamp(), processed: false });
+        this.lockActionPanel();
+        return;
+      }
 
       // 警徽
-      case 'badge-pass':    return this.handleBadgePass(sel);
-      case 'badge-destroy': return this.handleBadgeDestroy();
+      case 'badge-pass': {
+        await this.handleBadgePass(sel);
+        this.lockActionPanel();
+        return;
+      }
+      case 'badge-destroy': {
+        await this.handleBadgeDestroy();
+        this.lockActionPanel();
+        return;
+      }
     }
   },
 
@@ -1932,232 +2078,6 @@ toast(txt, type = 'info', duration = 3000) {
   },
 
   /* ============================
-   *  计算与辅助
-   * ============================ */
-
-  getActiveRole(player) {
-    if (!player || !player.isAlive) return null;
-    const idx = Math.min(player.deaths || 0, 1);
-    return player.identities?.[idx]?.role || null;
-  },
-
-  isPlayerActingWolf(player, data, hiddenActive) {
-    if (!player?.isAlive) return false;
-    const idx = Math.min(player.deaths || 0, 1);
-    const role = player.identities?.[idx]?.role || null;
-    return role === '狼人' || (role === '隐狼' && hiddenActive);
-  },
-
-  getWolfFinalTarget(data) { 
-    return (data || this.full)?.actions?.[(data || this.full)?.state?.round]?.NIGHT?.WOLF?.final || null; 
-  },
-
-  getAlphaWolfId(data) {
-    const hiddenActive = this.getHiddenActive(data || this.full);
-    const actingWolves = Object.values((data || this.full).players || {}).filter(p => this.isPlayerActingWolf(p, data || this.full, hiddenActive));
-    return actingWolves.length > 0 ? Math.min(...actingWolves.map(p => p.id)) : null;
-  },
-
-  getSeerResultsForMe(data) {
-    const results = [];
-    if (!data.actions) return results;
-    for (const round in data.actions) {
-      const seerAction = data.actions[round]?.NIGHT?.SEER?.[this.me];
-      if (seerAction) results.push({ round: parseInt(round, 10), ...seerAction });
-    }
-    return results.sort((a, b) => a.round - b.round);
-  },
-
-  openLogs() {
-    if (!this.full) return;
-    const logs = Object.values(this.full.logs || {})
-      .filter(l => !l.secret)
-      .sort((a, b) => (a.ts || 0) - (b.ts || 0));
-    const box = $('game-log-content');
-    box.innerHTML = logs.length
-      ? logs.map(l => `<div class="log-item"><span class="log-round">第${l.round || 0}轮</span> ${escapeHtml(l.msg)}</div>`).join('')
-      : '<div class="log-item">暂无日志</div>';
-    $('logs-modal').classList.add('open');
-
-    // 精简 UI：隐藏底部“关闭”按钮，保留右上角 ×
-    const footer = document.querySelector('#logs-modal .modal-footer');
-    if (footer) footer.style.display = 'none';
-
-    setTimeout(() => { $('logs-modal')?.querySelector('.modal-close')?.focus?.(); }, 50);
-  },
-
-  closeModal(id) {
-    const m = id ? document.getElementById(id) : document.querySelector('.modal.open');
-    if (m) m.classList.remove('open');
-  },
-
-  /* ============================
-   *  游戏创建/加入/重开
-   * ============================ */
-
-  _clampUniqueCounts(counts) { UNIQUE_ROLES.forEach(r => { if (counts[r] && counts[r] > 1) counts[r] = 1; }); return counts; },
-
-  async createGame(btn) {
-    const originalText = btn.textContent;
-    btn.disabled = true; btn.textContent = '创建中...';
-    try {
-      const counts = {};
-      $('role-grid').querySelectorAll('input').forEach(i => {
-        const r = i.id.replace('role-', ''); const v = +i.value || 0;
-        if (v) counts[r] = v;
-      });
-      this._clampUniqueCounts(counts);
-      const pool = [];
-      for (const [r, c] of Object.entries(counts)) for (let i = 0; i < c; i++) pool.push(r);
-      if (pool.length === 0 || pool.length % 2 !== 0) throw new Error('身份总数必须为偶数且大于0');
-
-      const dealt = this.dealWithGolden(pool);
-      if (!dealt) throw new Error(this._lastDealError || '无法生成合规的牌组，请检查配置。');
-
-      const id = db.ref('games').push().key;
-      const players = {};
-      dealt.pairs.forEach((pair, i) => {
-        players[i + 1] = {
-          id: i + 1, name: `玩家${i + 1}`, identities: pair,
-          deaths: 0, isAlive: true, isReady: false, isExposedIdiot: false, badge: 0, skill: {}
-        };
-      });
-
-      const hiddenActivation = $('opt-hidden-activation')?.value || 'noActiveWolf';
-      const settings = {
-        witchRule: $('opt-witch-selfsave')?.value || 'noFirstNightSelfSave',
-        seerMode: $('opt-seer-mode')?.value || 'faction',
-        wolfWin: $('opt-wolf-win')?.value || 'edge',
-        wolfVisibility: $('opt-wolf-visibility')?.value || 'activeOnly',
-        hiddenActivation
-      };
-
-      const initData = {
-        meta: { createdAt: now(), creator: 'FSM-simplified' },
-        config: { counts, settings }, 
-        players, 
-        settings, 
-        actions: {}, 
-        logs: {},
-        state: { phase: PHASE.LOBBY, round: 0, host: 1, peace: 0, winner: null, sheriff: null }
-      };
-
-      await db.ref(`games/${id}`).set(initData);
-      this.toast('游戏房间创建成功！', 'success');
-      location.href = `${location.pathname}?game=${id}&player=1`;
-    } catch (e) {
-      console.error(e);
-      this.toast(e.message || '创建失败', 'error');
-      btn.disabled = false; btn.textContent = originalText;
-    }
-  },
-
-  async restartGame() {
-    try {
-      this.toast('正在准备新对局...', 'info');
-      const oldGameId = this.gameId;
-      const config = this.full.config;
-      if (!config || !config.counts) throw new Error('无法找到游戏配置，无法重开。');
-
-      const counts = { ...config.counts };
-      this._clampUniqueCounts(counts);
-      const pool = [];
-      for (const [r, c] of Object.entries(counts)) for (let i = 0; i < c; i++) pool.push(r);
-      const dealt = this.dealWithGolden(pool);
-      if (!dealt) throw new Error(this._lastDealError || '重新发牌失败，无法重开。');
-
-      const newGameId = db.ref('games').push().key;
-      const players = {};
-      const oldPlayers = Object.values(this.full.players);
-      dealt.pairs.forEach((pair, i) => {
-        players[i + 1] = {
-          id: i + 1, 
-          name: oldPlayers[i]?.name || `玩家${i + 1}`, 
-          identities: pair,
-          deaths: 0, isAlive: true, isReady: false, isExposedIdiot: false, badge: 0, skill: {}
-        };
-      });
-
-      const initData = {
-        meta: { createdAt: now(), creator: 'FSM-simplified', from: oldGameId },
-        config: { counts, settings: config.settings }, 
-        players, settings: config.settings, actions: {}, logs: {},
-        state: { phase: PHASE.LOBBY, round: 0, host: this.full.state.host, peace: 0, winner: null, sheriff: null }
-      };
-      await db.ref(`games/${newGameId}`).set(initData);
-      await db.ref(`games/${oldGameId}/state/nextGameId`).set(newGameId);
-      this.toast('新对局已创建，即将跳转...', 'success');
-    } catch (e) {
-      console.error(e);
-      this.toast(e.message || '重开失败', 'error');
-    }
-  },
-
-  dealWithGolden(pool) {
-    let forbiddenHits = 0, doubleThiefHits = 0, noGoldenHits = 0;
-    for (let t = 0; t < 10000; t++) {
-      const d = shuffle([...pool]);
-      const pairs = [];
-      let ok = true, hasGolden = false;
-
-      for (let i = 0; i < d.length; i += 2) {
-        const role1 = d[i], role2 = d[i + 1];
-        const origKey = [role1, role2].sort().join('|');
-        if (FORBIDDEN_PAIRS.has(origKey)) { ok = false; forbiddenHits++; break; }
-        if (role1 === '盗贼' && role2 === '盗贼') { ok = false; doubleThiefHits++; break; }
-      }
-      if (!ok) continue;
-
-      // 展开盗贼复制（盗贼复制对牌，显示🎭）
-      for (let i = 0; i < d.length; i += 2) {
-        let role1 = d[i], role2 = d[i + 1];
-        if (role1 === '盗贼') pairs.push([{ role: role2, isCopy: true }, { role: role2 }]);
-        else if (role2 === '盗贼') pairs.push([{ role: role1 }, { role: role1, isCopy: true }]);
-        else pairs.push([{ role: role1 }, { role: role2 }]);
-      }
-
-      // 展开后禁配再校验
-      for (const pair of pairs) {
-        const key = [pair[0].role, pair[1].role].sort().join('|');
-        if (FORBIDDEN_PAIRS.has(key)) { ok = false; forbiddenHits++; break; }
-      }
-      if (!ok) continue;
-
-      hasGolden = pairs.some(pr => pr[0].role === '平民' && pr[1].role === '平民');
-      if (hasGolden) return { pairs };
-      noGoldenHits++;
-    }
-    this._lastDealError = `发牌失败：禁配命中${forbiddenHits}次，双盗${doubleThiefHits}次，无金宝宝${noGoldenHits}次。`;
-    return null;
-  },
-
-  async handleJoinGame(playerNum, btn) {
-    const original = btn.textContent;
-    btn.disabled = true; btn.textContent = '验证中...';
-    try {
-      const playerSnap = await db.ref(`games/${this.gameId}/players/${playerNum}`).once('value');
-      if (!playerSnap.exists()) throw new Error('该座位号不存在，请联系主持人或更换座位号');
-      const onlineSnap = await db.ref(`games/${this.gameId}/players/${playerNum}/online`).once('value');
-      if (onlineSnap.val()) throw new Error('该座位已被占用，请更换座位号');
-      location.href = `${location.pathname}?game=${this.gameId}&player=${playerNum}`;
-    } catch (e) {
-      console.error(e);
-      this.toast(e.message || '验证失败，请重试', 'error');
-      btn.disabled = false; btn.textContent = original;
-    }
-  },
-
-  async handleCopyLink(link) {
-    try { await navigator.clipboard.writeText(link); this.toast('📋 链接已复制', 'success'); }
-    catch {
-      const ta = document.createElement('textarea'); ta.value = link; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); this.toast('📋 链接已复制', 'success'); }
-      catch { this.toast('❌ 复制失败，请手动复制', 'error'); }
-      document.body.removeChild(ta);
-    }
-  },
-
-  /* ============================
    *  进入房间与监听
    * ============================ */
 
@@ -2185,7 +2105,13 @@ toast(txt, type = 'info', duration = 3000) {
       }
 
       const prevPhase = this.full?.state?.phase;
+      const prevRound = this.full?.state?.round;
       this.full = data;
+
+      // 阶段/回合变化时，解除上一轮的面板锁
+      if (this.lockedAction && (this.lockedAction.phase !== data.state.phase || this.lockedAction.round !== data.state.round)) {
+        this.unlockActionPanel();
+      }
 
       const isHost = String(data.state.host) === this.me;
       if (isHost && !this.autorun) {
@@ -2198,7 +2124,7 @@ toast(txt, type = 'info', duration = 3000) {
         this.initGameLayout();
       }
 
-      if (prevPhase && prevPhase !== data.state.phase) {
+      if (prevPhase && (prevPhase !== data.state.phase || prevRound !== data.state.round)) {
         const phaseMessages = {
           [PHASE.NIGHT]: '🌙 夜幕降临',
           [PHASE.NIGHT_WITCH]: '🧪 女巫行动',
@@ -2216,7 +2142,8 @@ toast(txt, type = 'info', duration = 3000) {
       }
 
       if (data.state.phase === PHASE.LOBBY) {
-        this.renderLobby(data);
+        // 差分渲染，避免整卡刷新带来的频繁闪烁
+        this.renderLobbyDiff(data);
       } else {
         $('lobby-view').classList.add('hidden');
         $('game-view').classList.remove('hidden');
@@ -2241,6 +2168,7 @@ toast(txt, type = 'info', duration = 3000) {
       }
       if (this.autorun) { clearInterval(this.autorun); this.autorun = null; }
       this.full = null; this.selection = null;
+      this.lockedAction = null;
     } catch (e) {
       console.warn('destroy error:', e);
     }

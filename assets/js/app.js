@@ -2525,55 +2525,22 @@ const UI = new UIManager();
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', () => {
-  UI.init();
+  console.log('DOM加载完成，开始初始化UI');
+  if (typeof UI.init === 'function') {
+    UI.init();
+  } else {
+    console.error('UI.init 不是函数', UI);
+  }
 });
 
 // 页面卸载时清理
 window.addEventListener('beforeunload', () => {
-  UI.destroy();
+  if (UI && typeof UI.destroy === 'function') {
+    UI.destroy();
+  }
 });
 
-// 导出给HTML使用的全局方法
-window.UI = {
-  // 设置页面
-  changeRoleCount: (role, delta) => UI.changeRoleCount(role, delta),
-  
-  // 大厅操作
-  swapIdentities: () => UI.swapIdentities(),
-  confirmReady: () => UI.confirmReady(),
-  startGame: () => UI.startGame(),
-  restartGame: () => UI.restartGame(),
-  
-  // 狼人行动
-  wolfVote: () => UI.wolfVote(),
-  wolfConfirm: () => UI.wolfConfirm(),
-  
-  // 预言家行动
-  seerCheck: () => UI.seerCheck(),
-  
-  // 守卫行动
-  guardProtect: () => UI.guardProtect(),
-  guardEmpty: () => UI.guardEmpty(),
-  
-  // 女巫行动
-  witchCure: (target) => UI.witchCure(target),
-  witchPoison: () => UI.witchPoison(),
-  witchPass: () => UI.witchPass(),
-  
-  // 警长相关
-  runForSheriff: (isRunning) => UI.runForSheriff(isRunning),
-  voteSheriff: (target) => UI.voteSheriff(target),
-  
-  // 白天行动
-  knightDuel: () => UI.knightDuel(),
-  dayVote: (target) => UI.dayVote(target),
-  
-  // 特殊行动
-  hunterShoot: (target) => UI.hunterShoot(target),
-  transferBadge: (target) => UI.transferBadge(target),
-  
-  // 其他
-  backToLobby: () => UI.backToLobby()
-};
+// 导出给HTML使用的全局对象
+window.UI = UI;
 
-console.log('🐺 双身份狼人杀系统已加载完成');
+console.log('🐺 双身份狼人杀系统已加载完成', UI);

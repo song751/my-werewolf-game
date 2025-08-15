@@ -3,45 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0b1020" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="狼人杀" />
   <meta name="description" content="双身份狼人杀在线电子法官 - 专业的狼人杀游戏工具" />
   <meta name="keywords" content="狼人杀,双身份,电子法官,在线游戏,桌游" />
   <meta name="author" content="狼人杀电子法官团队" />
-  
-  <!-- Open Graph / Facebook -->
+
   <meta property="og:type" content="website" />
   <meta property="og:title" content="双身份狼人杀 · 电子法官" />
   <meta property="og:description" content="专业的双身份狼人杀在线游戏工具，支持多种规则配置" />
-  <meta property="og:url" content="https://werewolf-game.example.com" />
-  
-  <!-- Twitter -->
+  <meta property="og:url" content="/" />
+
   <meta property="twitter:card" content="summary_large_image" />
   <meta property="twitter:title" content="双身份狼人杀 · 电子法官" />
   <meta property="twitter:description" content="专业的双身份狼人杀在线游戏工具" />
-  
+
   <title>双身份狼人杀 · 电子法官</title>
-  
-  <!-- 预连接优化 -->
+
+  <!-- 预连接 -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <!-- 已移除：未使用的 Google Analytics 预连接 -->
   <link rel="dns-prefetch" href="https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app">
-  
+
   <!-- 样式表 -->
   <link href="assets/css/styles.css" rel="stylesheet" />
-  
+
   <!-- 图标 -->
-  <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
-  
-  <!-- 性能优化 -->
+
+  <!-- 关键脚本预加载（Firebase） -->
   <script>
-    // 关键渲染路径优化
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => {
-        // 预加载 Firebase
         const link = document.createElement('link');
         link.rel = 'preload';
         link.href = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js';
@@ -49,18 +44,11 @@
         document.head.appendChild(link);
       });
     }
-    
-    // 错误追踪
-    window.addEventListener('error', (e) => {
-      console.error('Global error:', e.error);
-    });
-    
-    window.addEventListener('unhandledrejection', (e) => {
-      console.error('Unhandled promise rejection:', e.reason);
-    });
+    window.addEventListener('error', e => console.error('Global error:', e.error));
+    window.addEventListener('unhandledrejection', e => console.error('Unhandled promise rejection:', e.reason));
   </script>
 
-  <!-- PWA 清单（修复：使用标准 JSON，动态注入 manifest，避免 data: 单引号与编码问题） -->
+  <!-- PWA Manifest 注入 -->
   <script>
     (function injectManifest() {
       try {
@@ -70,8 +58,8 @@
           description: "专业的双身份狼人杀电子法官",
           start_url: "/",
           display: "standalone",
-          background_color: "#050812",
-          theme_color: "#6366f1",
+          background_color: "#0b1020",
+          theme_color: "#6c7ff7",
           icons: [
             {
               src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>",
@@ -96,10 +84,10 @@
   <!-- 通知容器 -->
   <div id="notification-container" class="notification-container" role="region" aria-label="通知消息" aria-live="polite"></div>
 
-  <!-- 无障碍跳转链接 -->
+  <!-- 无障碍跳转 -->
   <a href="#main-content" class="sr-only sr-only-focusable">跳转到主要内容</a>
 
-  <!-- 创建游戏（设置面板） -->
+  <!-- 创建/配置 -->
   <section id="setup-view" class="view" role="main" aria-labelledby="setup-title">
     <header class="app-header">
       <h1 id="setup-title" class="app-title">双身份狼人杀 · 电子法官</h1>
@@ -110,8 +98,9 @@
       <div class="setup-card">
         <h2 class="section-title">身份配置</h2>
         <p class="section-desc">每增加 2 张身份牌，即产生 1 名玩家。请确保总数为偶数。</p>
+
         <div id="role-grid" class="role-grid" role="group" aria-label="角色数量配置">
-          <!-- 动态填充：各身份计数器 -->
+          <!-- 动态填充 -->
         </div>
 
         <div class="setup-summary" role="region" aria-label="配置汇总">
@@ -130,54 +119,51 @@
       <div class="setup-card">
         <h2 class="section-title">规则选项</h2>
         <form role="form" aria-label="游戏规则配置">
-          <div class="form-row">
+          <div class="form-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
             <label for="opt-witch-selfsave">女巫自救规则</label>
-            <select id="opt-witch-selfsave" class="fancy-select" aria-describedby="witch-help">
+            <select id="opt-witch-selfsave" class="fancy-select">
               <option value="noFirstNightSelfSave">首夜不可自救</option>
               <option value="onlyFirstNightSelfSave">仅首夜可自救</option>
             </select>
-            <small id="witch-help" class="form-help">女巫在特定情况下是否可以对自己使用解药</small>
+            <small class="form-help">女巫是否可在首夜/仅首夜对自己使用解药</small>
           </div>
 
-          <div class="form-row">
+          <div class="form-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
             <label for="opt-seer-mode">预言家查验模式</label>
-            <select id="opt-seer-mode" class="fancy-select" aria-describedby="seer-help">
+            <select id="opt-seer-mode" class="fancy-select">
               <option value="faction">阵营查验（好人阵营 / 狼人阵营）</option>
               <option value="identity">身份查验（显示当前活跃身份）</option>
             </select>
-            <small id="seer-help" class="form-help">预言家查验结果的详细程度</small>
+            <small class="form-help">查身份：隐狼未激活显示好人身份；激活后显示“狼人”</small>
           </div>
 
-          <div class="form-row">
+          <div class="form-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
             <label for="opt-wolf-win">狼人胜利条件</label>
-            <select id="opt-wolf-win" class="fancy-select" aria-describedby="wolf-win-help">
-              <option value="edge">屠边（屠神/屠民任一达成）</option>
+            <select id="opt-wolf-win" class="fancy-select">
+              <option value="edge">屠边（屠神或屠金宝宝）</option>
               <option value="exterminate">屠城（全灭好人）</option>
             </select>
-            <small id="wolf-win-help" class="form-help">狼人阵营的获胜条件设定</small>
           </div>
 
-          <div class="form-row">
+          <div class="form-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
             <label for="opt-wolf-visibility">狼人互见策略</label>
-            <select id="opt-wolf-visibility" class="fancy-select" aria-describedby="wolf-vis-help">
-              <option value="activeOnly">仅互见"可行动的狼"</option>
-              <option value="allWolves">互见所有"有狼牌"的玩家</option>
+            <select id="opt-wolf-visibility" class="fancy-select">
+              <option value="activeOnly">仅互见“可行动的狼”</option>
+              <option value="allWolves">互见所有“有狼牌”的玩家（未激活隐狼本人仍看不到同伴）</option>
             </select>
-            <small id="wolf-vis-help" class="form-help">狼人之间的信息可见范围</small>
           </div>
 
-          <div class="form-row">
+          <div class="form-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
             <label for="opt-hidden-activation">隐狼激活方式</label>
-            <select id="opt-hidden-activation" class="fancy-select" aria-describedby="hidden-help">
+            <select id="opt-hidden-activation" class="fancy-select">
               <option value="noActiveWolf">无活跃狼人（如狼在第二张则未活跃）</option>
-              <option value="noWolfCardAlive">无狼人（场上不存在任何活着的狼牌/隐狼牌）</option>
+              <option value="noWolfCardAlive">无狼人（场上不存在任何活着的狼/隐狼牌）</option>
             </select>
-            <small id="hidden-help" class="form-help">隐狼何时激活并加入狼人阵营</small>
           </div>
         </form>
 
-        <div class="setup-actions">
-          <button id="btn-create" class="btn-primary btn-large" data-action="create-game" type="button">
+        <div class="setup-actions" style="margin-top:14px;">
+          <button id="btn-create" class="confirm-btn" data-action="create-game" type="button">
             🚀 创建房间
           </button>
         </div>
@@ -185,17 +171,17 @@
     </div>
   </section>
 
-  <!-- 加入房间（修复：不再使用 aria-labelledby 指向不存在的 id） -->
+  <!-- 加入房间 -->
   <section id="join-view" class="view hidden" role="main" aria-label="加入房间">
-    <!-- 由 JS 动态填充 -->
+    <!-- JS 动态填充 -->
   </section>
 
-  <!-- 大厅（修复：不再使用 aria-labelledby 指向不存在的 id） -->
+  <!-- 大厅 -->
   <section id="lobby-view" class="view hidden" role="main" aria-label="游戏大厅">
-    <!-- 由 JS 动态填充 -->
+    <!-- JS 动态填充 -->
   </section>
 
-  <!-- 游戏主界面（修复：不再使用 aria-labelledby 指向不存在的 id） -->
+  <!-- 游戏主界面 -->
   <section id="game-view" class="view hidden" role="main" aria-label="游戏主界面">
     <div class="loading-prompt" role="status" aria-live="polite">正在加载游戏...</div>
   </section>
@@ -203,54 +189,49 @@
   <!-- 预留（上帝视角/GM扩展） -->
   <section id="god-view" class="view hidden" role="complementary" aria-labelledby="god-title"></section>
 
-  <!-- 浮动日志按钮（全局可用） -->
+  <!-- 浮动日志按钮 -->
   <button class="floating-logs" data-action="open-logs" title="查看游戏日志" aria-label="打开游戏日志">
     📋 日志
   </button>
 
-  <!-- 日志 Modal -->
+  <!-- 日志 Modal（精简：仅保留右上角 ×） -->
   <div id="logs-modal" class="modal" role="dialog" aria-labelledby="logs-title" aria-modal="true">
     <div class="modal-backdrop" data-action="close-modal" data-target="logs-modal" aria-hidden="true"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="logs-title" class="modal-title">
-          📋 对局日志
-        </h3>
-        <button class="modal-close" data-action="close-modal" data-target="logs-modal" aria-label="关闭日志" type="button">
-          ✕
-        </button>
+        <h3 id="logs-title" class="modal-title">📋 对局日志</h3>
+        <button class="modal-close" data-action="close-modal" data-target="logs-modal" aria-label="关闭日志" type="button">✕</button>
       </div>
       <div class="modal-body">
         <div id="game-log-content" class="log-content" role="log" aria-live="polite" aria-label="游戏日志内容">
-          <!-- JS 填充日志，展示非 secret -->
+          <!-- JS 填充日志（仅非 secret） -->
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-primary" data-action="close-modal" data-target="logs-modal" type="button">
-          关闭
-        </button>
       </div>
     </div>
   </div>
 
-  <!-- 隐藏的表单帮助文本（无障碍支持） -->
-  <div class="sr-only">
-    <div id="role-count-help">使用加减按钮调整各角色的数量，总数必须为偶数</div>
-    <div id="game-phase-help">当前游戏阶段和状态信息</div>
-    <div id="player-list-help">所有玩家的状态和信息列表</div>
-    <div id="action-help">当前可执行的游戏操作</div>
-  </div>
+  <!-- 屏幕阅读器专用样式 -->
+  <style>
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .sr-only-focusable:focus {
+      position: static; width: auto; height: auto; padding: 8px;
+      background: var(--accent-primary); color: #fff; border-radius: 8px;
+    }
+    .form-help { display: block; font-size: 12px; color: var(--text-tertiary); }
+  </style>
 
-  <!-- Firebase SDK v8（与 app.js 兼容） -->
+  <!-- Firebase SDK v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <!-- 应用脚本 -->
   <script src="assets/js/app.js"></script>
 
-  <!-- 可选：分析脚本 -->
+  <!-- 可选：分析 / PWA 安装 -->
   <script>
-    // 简单的性能分析
     if ('performance' in window) {
       window.addEventListener('load', () => {
         setTimeout(() => {
@@ -268,7 +249,6 @@
       });
     }
 
-    // PWA 安装提示
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       deferredPrompt = e;
@@ -276,86 +256,12 @@
       console.log('PWA 可以安装');
     });
 
-    // Service Worker 注册（如果需要离线支持）
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        // 可以注册 service worker 实现离线缓存
+        // 可按需注册离线缓存
         // navigator.serviceWorker.register('/sw.js');
       });
     }
   </script>
-
-  <!-- 屏幕阅读器专用样式 -->
-  <style>
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-    
-    .sr-only-focusable:focus {
-      position: static;
-      width: auto;
-      height: auto;
-      padding: 0.5rem;
-      margin: 0;
-      overflow: visible;
-      clip: auto;
-      white-space: normal;
-      background: var(--accent-primary);
-      color: white;
-      text-decoration: none;
-      border-radius: var(--radius-sm);
-      z-index: 9999;
-    }
-    
-    .form-help {
-      display: block;
-      font-size: 12px;
-      color: var(--text-tertiary);
-      margin-top: 4px;
-      line-height: 1.4;
-    }
-    
-    .rules-content h4 {
-      color: var(--text-primary);
-      margin: 0 0 1rem 0;
-      font-size: 18px;
-    }
-    
-    .rules-content h5 {
-      color: var(--text-primary);
-      margin: 1.5rem 0 0.5rem 0;
-      font-size: 16px;
-    }
-    
-    .rules-content p {
-      color: var(--text-secondary);
-      line-height: 1.6;
-      margin: 0 0 1rem 0;
-    }
-    
-    .rules-content ul {
-      color: var(--text-secondary);
-      padding-left: 1.5rem;
-      margin: 0 0 1rem 0;
-    }
-    
-    .rules-content li {
-      margin-bottom: 0.5rem;
-      line-height: 1.5;
-    }
-    
-    .rules-content strong {
-      color: var(--text-primary);
-    }
-  </style>
 </body>
 </html>
-

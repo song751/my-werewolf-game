@@ -5,6 +5,8 @@
    - 强化响应式设计：移动优先、触摸优化
    - 可访问性完整支持：键盘导航、屏幕阅读器、高对比度
    - 性能优化：GPU加速、减少重绘、智能缓存
+   修复：
+   - 移除 @custom-media 声明（原生浏览器不支持）
    ======================================== */
 
 /* 强制深色原生控件 */
@@ -113,12 +115,6 @@ html {
   --z-tooltip: 1070;
   --z-toast: 1080;
 }
-
-/* 媒体查询断点 */
-@custom-media --mobile-up (min-width: 480px);
-@custom-media --tablet-up (min-width: 768px);
-@custom-media --desktop-up (min-width: 1024px);
-@custom-media --large-up (min-width: 1280px);
 
 /* 无障碍设置 */
 @media (prefers-reduced-motion: reduce) {
@@ -1974,7 +1970,7 @@ body.game-start-anim .center-panel {
 }
 
 /* ==========================================
-   响应式设计
+   响应式设计（不再使用 @custom-media）
    ========================================== */
 
 /* 平板设备 */
@@ -2224,7 +2220,7 @@ body.game-start-anim .center-panel {
   }
 }
 
-/* 无障碍支持 */
+/* 无障碍支持（重复声明保留兼容各段定义） */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

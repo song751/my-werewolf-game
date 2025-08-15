@@ -26,7 +26,7 @@
   
   <!-- 预连接优化 -->
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+  <!-- 已移除：未使用的 Google Analytics 预连接 -->
   <link rel="dns-prefetch" href="https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app">
   
   <!-- 样式表 -->
@@ -35,24 +35,6 @@
   <!-- 图标 -->
   <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
-  
-  <!-- PWA 支持 -->
-  <link rel="manifest" href="data:application/json,{
-    'name': '双身份狼人杀',
-    'short_name': '狼人杀',
-    'description': '专业的双身份狼人杀电子法官',
-    'start_url': '/',
-    'display': 'standalone',
-    'background_color': '#050812',
-    'theme_color': '#6366f1',
-    'icons': [
-      {
-        'src': 'data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><text y=\".9em\" font-size=\"90\">🐺</text></svg>',
-        'sizes': '192x192',
-        'type': 'image/svg+xml'
-      }
-    ]
-  }" />
   
   <!-- 性能优化 -->
   <script>
@@ -77,6 +59,38 @@
       console.error('Unhandled promise rejection:', e.reason);
     });
   </script>
+
+  <!-- PWA 清单（修复：使用标准 JSON，动态注入 manifest，避免 data: 单引号与编码问题） -->
+  <script>
+    (function injectManifest() {
+      try {
+        const manifest = {
+          name: "双身份狼人杀",
+          short_name: "狼人杀",
+          description: "专业的双身份狼人杀电子法官",
+          start_url: "/",
+          display: "standalone",
+          background_color: "#050812",
+          theme_color: "#6366f1",
+          icons: [
+            {
+              src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>",
+              sizes: "192x192",
+              type: "image/svg+xml"
+            }
+          ]
+        };
+        const blob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("link");
+        link.rel = "manifest";
+        link.href = url;
+        document.head.appendChild(link);
+      } catch (e) {
+        console.warn("Inject manifest failed:", e);
+      }
+    })();
+  </script>
 </head>
 <body>
   <!-- 通知容器 -->
@@ -92,7 +106,7 @@
       <p class="app-subtitle">创建房间并配置本局规则</p>
     </header>
 
-    <div class="setup-grid">
+    <div class="setup-grid" id="main-content">
       <div class="setup-card">
         <h2 class="section-title">身份配置</h2>
         <p class="section-desc">每增加 2 张身份牌，即产生 1 名玩家。请确保总数为偶数。</p>
@@ -171,18 +185,18 @@
     </div>
   </section>
 
-  <!-- 加入房间 -->
-  <section id="join-view" class="view hidden" role="main" aria-labelledby="join-title">
+  <!-- 加入房间（修复：不再使用 aria-labelledby 指向不存在的 id） -->
+  <section id="join-view" class="view hidden" role="main" aria-label="加入房间">
     <!-- 由 JS 动态填充 -->
   </section>
 
-  <!-- 大厅 -->
-  <section id="lobby-view" class="view hidden" role="main" aria-labelledby="lobby-title">
+  <!-- 大厅（修复：不再使用 aria-labelledby 指向不存在的 id） -->
+  <section id="lobby-view" class="view hidden" role="main" aria-label="游戏大厅">
     <!-- 由 JS 动态填充 -->
   </section>
 
-  <!-- 游戏主界面 -->
-  <section id="game-view" class="view hidden" role="main" aria-labelledby="game-status">
+  <!-- 游戏主界面（修复：不再使用 aria-labelledby 指向不存在的 id） -->
+  <section id="game-view" class="view hidden" role="main" aria-label="游戏主界面">
     <div class="loading-prompt" role="status" aria-live="polite">正在加载游戏...</div>
   </section>
 
@@ -300,8 +314,6 @@
     window.addEventListener('beforeinstallprompt', (e) => {
       deferredPrompt = e;
       e.preventDefault();
-      
-      // 可以在这里显示自定义的安装提示
       console.log('PWA 可以安装');
     });
 

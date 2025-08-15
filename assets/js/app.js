@@ -87,7 +87,6 @@ const db = firebase.database();
  * ================================================================== */
 
 const $ = id => document.getElementById(id);
-const $$ = selector => document.querySelectorAll(selector);
 
 function shuffle(array) {
   const arr = [...array];
@@ -1014,42 +1013,37 @@ class UIManager {
     }
   }
 
-  // 绑定初始事件
+  // 绑定初始事件（修复版本）
   bindInitialEvents() {
-    // 创建游戏按钮
-    const createBtn = $('create-game-btn');
-    if (createBtn) {
-      createBtn.addEventListener('click', () => this.createGame());
-    }
+    try {
+      // 创建游戏按钮
+      const createBtn = $('create-game-btn');
+      if (createBtn) {
+        createBtn.addEventListener('click', () => this.createGame());
+      }
 
-    // 加入游戏按钮
-    const joinBtn = $('join-game-btn');
-    if (joinBtn) {
-      joinBtn.addEventListener('click', () => this.joinGame());
-    }
+      // 加入游戏按钮
+      const joinBtn = $('join-game-btn');
+      if (joinBtn) {
+        joinBtn.addEventListener('click', () => this.joinGame());
+      }
 
-    // 复制链接按钮
-    const copyBtn = $('copy-link-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => this.copyGameLink());
-    }
+      // 复制链接按钮
+      const copyBtn = $('copy-link-btn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => this.copyGameLink());
+      }
 
-    // 日志按钮
-    const logsBtn = $('logs-btn');
-    if (logsBtn) {
-      logsBtn.addEventListener('click', () => this.showLogs());
-    }
-
-    // 模态框关闭按钮
-    const modalCloseBtn = document.querySelector('.modal-close');
-    if (modalCloseBtn) {
-      modalCloseBtn.addEventListener('click', () => this.closeModal());
-    }
-
-    // 点击背景关闭模态框
-    const modalBackdrop = document.querySelector('.modal-backdrop');
-    if (modalBackdrop) {
-      modalBackdrop.addEventListener('click', () => this.closeModal());
+      // 日志按钮
+      const logsBtn = $('logs-btn');
+      if (logsBtn) {
+        logsBtn.addEventListener('click', () => this.showLogs());
+      }
+      
+      // 不在这里绑定模态框关闭事件，因为会在HTML中使用onclick
+      
+    } catch (error) {
+      console.error('绑定事件错误:', error);
     }
   }
 
@@ -2613,11 +2607,44 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+/* ==================================================================
+ * 7. 全局初始化
+ * ================================================================== */
+
+// 创建全局UI实例
+const UI = new UIManager();
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM加载完成，开始初始化UI');
+  if (typeof UI.init === 'function') {
+    UI.init();
+  } else {
+    console.error('UI.init 不是函数', UI);
+  }
+});
+
+// 页面卸载时清理
+window.addEventListener('beforeunload', () => {
+  if (UI && typeof UI.destroy === 'function') {
+    UI.destroy();
+  }
+});
+
 // 导出给HTML使用的全局对象
 window.UI = UI;
 
-// 添加便捷方法供onclick使用
-window.closeModal = () => UI.closeModal();
-window.sendWolfChat = () => UI.sendWolfChat();
+// 为HTML onclick事件提供全局函数
+window.closeModal = function() {
+  if (UI && typeof UI.closeModal === 'function') {
+    UI.closeModal();
+  }
+};
+
+window.sendWolfChat = function() {
+  if (UI && typeof UI.sendWolfChat === 'function') {
+    UI.sendWolfChat();
+  }
+};
 
 console.log('🐺 双身份狼人杀系统已加载完成', UI);

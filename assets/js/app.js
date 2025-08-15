@@ -830,7 +830,7 @@ class GameEngine {
 }
 
 /* ==================================================================
- * 5. 发牌系统（修复：保证金宝宝）
+ * 5. 发牌系统（修复：保证金宝宝，禁止组合）
  * ================================================================== */
 
 function dealCards(rolePool) {
@@ -843,9 +843,22 @@ function dealCards(rolePool) {
     throw new Error('身份总数必须为偶数且大于0');
   }
   
+  // 修复：确保禁止组合正确判断
   const isForbiddenPair = (a, b) => {
-    const key = [a, b].sort().join('|');
-    return FORBIDDEN_PAIRS.has(key);
+    // 狼人相关禁止组合
+    if ((a === '狼人' && (b === '盗贼' || b === '隐狼' || b === '预言家')) ||
+        (b === '狼人' && (a === '盗贼' || a === '隐狼' || a === '预言家'))) {
+      return true;
+    }
+    // 预言家+隐狼
+    if ((a === '预言家' && b === '隐狼') || (b === '预言家' && a === '隐狼')) {
+      return true;
+    }
+    // 盗贼+隐狼
+    if ((a === '盗贼' && b === '隐狼') || (b === '盗贼' && a === '隐狼')) {
+      return true;
+    }
+    return false;
   };
   
   // 尝试生成合法配对
@@ -904,11 +917,13 @@ function dealCards(rolePool) {
     
     // 必须有金宝宝
     if (valid && hasGolden) {
+      // 验证最终结果
+      console.log('发牌结果:', pairs);
       return shuffle(pairs);
     }
   }
   
-  throw new Error('无法生成合法的牌组（需要至少一个金宝宝）');
+  throw new Error('无法生成合法的牌组（需要至少一个金宝宝且满足禁止组合规则）');
 }
 
 /* ==================================================================
@@ -1678,7 +1693,7 @@ class UIManager {
     }
   }
 
-  // 渲染狼人行动界面
+  // 渲染狼人行动界面（添加聊天功能）
   renderWolfAction() {
     const panel = $('action-panel');
     const round = this.gameData.state.round;
@@ -1688,12 +1703,34 @@ class UIManager {
     // 获取当前投票情况
     const votes = this.actions?.[round]?.NIGHT?.WOLF?.votes || {};
     const final = this.actions?.[round]?.NIGHT?.WOLF?.final;
+    const chats = this.actions?.[round]?.NIGHT?.WOLF?.chats || {};
     
     let html = `
       <div class="action-prompt">选择今晚的袭击目标</div>
       <div class="action-info">
         狼队友：${wolves.map(w => `${w.id}号`).join('、')}
         ${isAlpha ? '（你是拍板狼）' : ''}
+      </div>
+    `;
+    
+    // 狼人聊天区域
+    html += `
+      <div class="wolf-chat-area">
+        <div class="chat-messages" id="wolf-chat-messages" style="height: 100px; overflow-y: auto; border: 1px solid var(--color-border); padding: 8px; margin: 8px 0; border-radius: 8px; background: var(--color-surface);">
+    `;
+    
+    // 显示聊天消息
+    const chatArray = Object.entries(chats).sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
+    for (const [id, chat] of chatArray) {
+      html += `<div><strong>${chat.sender}号:</strong> ${escapeHtml(chat.msg)}</div>`;
+    }
+    
+    html += `
+        </div>
+        <div class="chat-input-area" style="display: flex; gap: 8px;">
+          <input type="text" id="wolf-chat-input" placeholder="输入消息..." style="flex: 1; padding: 8px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-primary);">
+          <button class="btn btn-sm" onclick="UI.sendWolfChat()">发送</button>
+        </div>
       </div>
     `;
     
@@ -1724,6 +1761,30 @@ class UIManager {
     }
     
     panel.innerHTML = html;
+    
+    // 自动滚动到底部
+    const chatMessages = $('wolf-chat-messages');
+    if (chatMessages) {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  }
+
+  // 发送狼人聊天消息
+  async sendWolfChat() {
+    const input = $('wolf-chat-input');
+    if (!input || !input.value.trim()) return;
+    
+    const message = input.value.trim();
+    const round = this.gameData.state.round;
+    const chatId = Date.now() + '_' + this.playerId;
+    
+    await db.ref(`games/${this.gameId}/actions/${round}/NIGHT/WOLF/chats/${chatId}`).set({
+      sender: this.playerId,
+      msg: message,
+      time: firebase.database.ServerValue.TIMESTAMP
+    });
+    
+    input.value = '';
   }
 
   // 渲染预言家行动界面
@@ -2000,7 +2061,7 @@ class UIManager {
     }
   }
 
-  // 渲染主持人面板
+  // 渲染主持人面板（修复：根据游戏状态控制显示）
   renderHostPanel() {
     const isHost = String(this.playerId) === String(this.gameData.state.host);
     const panel = $('host-panel');
@@ -2011,14 +2072,21 @@ class UIManager {
     }
     
     panel.classList.remove('hidden');
-    panel.innerHTML = `
-      <h3>主持人控制</h3>
-      <div class="host-controls">
-        <button class="btn btn-warning" onclick="UI.restartGame()">
-          重新发牌
-        </button>
-      </div>
-    `;
+    
+    // 只在游戏结束或大厅阶段显示重新发牌
+    const phase = this.gameData.state.phase;
+    if (phase === PHASE.GAME_OVER || phase === PHASE.LOBBY) {
+      panel.innerHTML = `
+        <h3>主持人控制</h3>
+        <div class="host-controls">
+          <button class="btn btn-warning" onclick="UI.restartGame()">
+            重新发牌
+          </button>
+        </div>
+      `;
+    } else {
+      panel.classList.add('hidden');
+    }
   }
 
   // 渲染游戏结束
@@ -2547,5 +2615,9 @@ window.addEventListener('beforeunload', () => {
 
 // 导出给HTML使用的全局对象
 window.UI = UI;
+
+// 添加便捷方法供onclick使用
+window.closeModal = () => UI.closeModal();
+window.sendWolfChat = () => UI.sendWolfChat();
 
 console.log('🐺 双身份狼人杀系统已加载完成', UI);

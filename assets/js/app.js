@@ -939,7 +939,7 @@ initButtonEffects() {
   document.addEventListener('pointerdown', onDown);
   document.addEventListener('pointerup', onUp);
   document.addEventListener('pointerleave', onUp);
-}
+},
 
 toast(txt, type = 'info', duration = 3000) {
   const icons = { 
@@ -977,7 +977,7 @@ toast(txt, type = 'info', duration = 3000) {
       setTimeout(() => n.remove(), 300);
     }
   }, duration);
-}
+},
 
   infoBox(text) {
     return `<div class="action-feedback">${escapeHtml(text)}</div>`;

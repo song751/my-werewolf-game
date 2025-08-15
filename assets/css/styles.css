@@ -734,20 +734,35 @@ select, .fancy-select {
   transform: none !important;
 }
 
+* 玩家编号行不换行，图标与数字同排 */
 .player-number {
   font-size: 22px;
   font-weight: 900;
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;           /* 数字与图标的间距 */
+  white-space: nowrap;/* 关键：避免换行 */
 }
 
+/* 缩小图标本身尺寸，保持发光效果 */
+.sheriff-icon,
+.host-mark {
+  font-size: 0.8em;          /* 图标比数字小一些（比如 80%） */
+  line-height: 1;
+  display: inline-block;
+  margin-left: 2px;          /* 轻微留白 */
+  transform: translateY(1px);/* 细调垂直对齐，可按需移除 */
+}
+
+/* 现有色彩和阴影可保留 */
 .sheriff-icon {
   color: #f59e0b;
-  filter: drop-shadow(0 0 8px currentColor);
+  filter: drop-shadow(0 0 6px currentColor); /* 稍微减小阴影，避免“显大” */
 }
-
 .host-mark {
   color: #f97316;
-  filter: drop-shadow(0 0 8px currentColor);
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 /* 标签系统现代化 */

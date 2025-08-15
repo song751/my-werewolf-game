@@ -928,43 +928,74 @@ class UIManager {
   }
 
   // 初始化
-  init() {
-    // 隐藏加载屏幕
-    setTimeout(() => {
-      const loading = $('loading-screen');
-      if (loading) {
-        loading.classList.add('hidden');
-      }
-    }, 1000);
-
-    // 绑定初始事件
-    this.bindInitialEvents();
-
-    // 检查URL参数
-    const params = new URLSearchParams(window.location.search);
-    const gameId = params.get('game');
-    const player = params.get('player');
-
-    if (gameId) {
-      this.gameId = gameId;
-      this.playerId = player || null;
+  async init() {
+    try {
+      console.log('开始初始化...');
       
-      if (player === '0') {
-        // 上帝视角
-        this.switchView('god-view');
-        this.initGodView();
-      } else if (player) {
-        // 玩家加入
-        this.switchView('game-view');
-        this.initGame();
+      // 绑定初始事件
+      this.bindInitialEvents();
+
+      // 检查URL参数
+      const params = new URLSearchParams(window.location.search);
+      const gameId = params.get('game');
+      const player = params.get('player');
+
+      console.log('URL参数:', { gameId, player });
+
+      if (gameId) {
+        this.gameId = gameId;
+        this.playerId = player || null;
+        
+        // 检查游戏是否存在
+        const gameSnap = await db.ref(`games/${gameId}`).once('value');
+        if (!gameSnap.exists()) {
+          this.showNotification('游戏不存在', 'error');
+          this.switchView('setup-view');
+          this.initSetup();
+          this.hideLoading();
+          return;
+        }
+        
+        if (player === '0') {
+          // 上帝视角
+          console.log('进入上帝视角');
+          this.switchView('god-view');
+          await this.initGodView();
+        } else if (player) {
+          // 玩家加入
+          console.log('玩家加入游戏');
+          this.switchView('game-view');
+          await this.initGame();
+        } else {
+          // 选择座位
+          console.log('选择座位');
+          this.switchView('join-view');
+        }
       } else {
-        // 选择座位
-        this.switchView('join-view');
+        // 显示创建界面
+        console.log('显示创建界面');
+        this.switchView('setup-view');
+        this.initSetup();
       }
-    } else {
-      // 显示创建界面
+      
+      // 隐藏加载屏幕
+      this.hideLoading();
+      
+    } catch (error) {
+      console.error('初始化错误:', error);
+      this.showNotification('初始化失败: ' + error.message, 'error');
+      this.hideLoading();
+      // 出错时显示创建界面
       this.switchView('setup-view');
       this.initSetup();
+    }
+  }
+
+  // 隐藏加载屏幕
+  hideLoading() {
+    const loading = $('loading-screen');
+    if (loading) {
+      loading.classList.add('hidden');
     }
   }
 
@@ -1189,6 +1220,8 @@ class UIManager {
   // 初始化游戏
   async initGame() {
     try {
+      console.log('初始化游戏, gameId:', this.gameId, 'playerId:', this.playerId);
+      
       this.engine = new GameEngine(this.gameId);
       
       // 设置数据监听
@@ -1197,19 +1230,26 @@ class UIManager {
       // 启动tick循环
       this.tickInterval = setInterval(() => {
         if (this.engine) {
-          this.engine.tick();
+          this.engine.tick().catch(error => {
+            console.error('Tick error:', error);
+          });
         }
       }, 1000);
 
+      console.log('游戏初始化完成');
+
     } catch (error) {
       console.error('Init game error:', error);
-      this.showNotification('游戏初始化失败', 'error');
+      this.showNotification('游戏初始化失败: ' + error.message, 'error');
+      throw error;
     }
   }
 
   // 初始化上帝视角
   async initGodView() {
     try {
+      console.log('初始化上帝视角, gameId:', this.gameId);
+      
       this.engine = new GameEngine(this.gameId);
       
       // 设置数据监听
@@ -1219,38 +1259,56 @@ class UIManager {
       gameRef.on('value', snapshot => {
         this.gameData = snapshot.val();
         if (this.gameData) {
+          console.log('上帝视角数据更新');
           this.renderGodView();
         }
+      }, error => {
+        console.error('上帝视角监听错误:', error);
+        this.showNotification('数据监听失败', 'error');
       });
 
       // 启动tick循环
       this.tickInterval = setInterval(() => {
         if (this.engine) {
-          this.engine.tick();
+          this.engine.tick().catch(error => {
+            console.error('Tick error:', error);
+          });
         }
       }, 1000);
 
+      console.log('上帝视角初始化完成');
+
     } catch (error) {
       console.error('Init god view error:', error);
-      this.showNotification('上帝视角初始化失败', 'error');
+      this.showNotification('上帝视角初始化失败: ' + error.message, 'error');
+      throw error;
     }
   }
 
   // 设置数据监听器
   setupListeners() {
+    console.log('设置数据监听器');
+    
     // 游戏状态监听
     const gameRef = db.ref(`games/${this.gameId}`);
     this.listeners.push(gameRef);
     
     gameRef.on('value', snapshot => {
       this.gameData = snapshot.val();
-      if (!this.gameData) return;
+      console.log('游戏数据更新:', this.gameData);
+      
+      if (!this.gameData) {
+        console.error('游戏数据为空');
+        this.showNotification('游戏数据不存在', 'error');
+        return;
+      }
 
       this.players = this.gameData.players;
       this.actions = this.gameData.actions;
       
       // 根据阶段切换视图
       const phase = this.gameData.state?.phase;
+      console.log('当前阶段:', phase);
       
       if (phase === PHASE.LOBBY) {
         this.switchView('lobby-view');
@@ -1261,6 +1319,9 @@ class UIManager {
         this.switchView('game-view');
         this.renderGameView();
       }
+    }, error => {
+      console.error('数据监听错误:', error);
+      this.showNotification('数据监听失败', 'error');
     });
   }
 
@@ -2058,8 +2119,13 @@ class UIManager {
 
   // 显示通知
   showNotification(message, type = 'info') {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
     const container = $('notification-container');
-    if (!container) return;
+    if (!container) {
+      console.error('通知容器不存在');
+      return;
+    }
 
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;

@@ -1101,6 +1101,144 @@ const App = {
     setTimeout(() => { $('player-number-input')?.focus(); }, 100);
   },
 
+  renderGodView(data) {
+  const root = $('god-view');
+  if (!root) return;
+
+  const players = Object.values(data.players || {}).sort((a, b) => a.id - b.id);
+
+  const fmtId = (idObj) => {
+    if (!idObj) return '-';
+    const icon = (ROLES[idObj.role]?.icon) || '';
+    return `${icon} ${idObj.role}${idObj.isCopy ? ' *' : ''}`;
+    // 说明：* 表示该身份是由盗贼复制而来
+  };
+
+  const identTable = `
+    <div class="setup-card" style="margin-bottom: 16px;">
+      <h2 class="section-title">全员身份（最终顺序）</h2>
+      <div class="section-desc">带 * 的身份表示盗贼复制</div>
+      <div style="overflow:auto;">
+        <table style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr style="text-align:left;">
+              <th style="padding:8px;">座位</th>
+              <th style="padding:8px;">身份1</th>
+              <th style="padding:8px;">身份2</th>
+              <th style="padding:8px;">当前活跃</th>
+              <th style="padding:8px;">状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${players.map(p => {
+              const id1 = fmtId(p.identities?.[0]);
+              const id2 = fmtId(p.identities?.[1]);
+              const active = this.getActiveRole(p) || '-';
+              const status = p.isAlive ? `存活(${2 - (p.deaths || 0)}❤)` : `出局(${p.deaths || 0}条命)`;
+              return `
+                <tr style="border-top:1px solid rgba(255,255,255,0.08);">
+                  <td style="padding:8px; font-weight:700;">${p.id}</td>
+                  <td style="padding:8px;">${id1}</td>
+                  <td style="padding:8px;">${id2}</td>
+                  <td style="padding:8px;">${active}</td>
+                  <td style="padding:8px;">${status}</td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // 夜间行动详情
+  const rounds = Object.keys(data.actions || {}).map(x => parseInt(x, 10)).filter(Number.isFinite).sort((a, b) => a - b);
+
+  const fmtTarget = (t) => {
+    if (t === null || t === undefined) return '未提交';
+    if (String(t) === '0') return '空刀/弃票';
+    return `${t}号`;
+  };
+
+  const nightBlocks = rounds.map(r => {
+    const R = data.actions[r] || {};
+    // 狼队
+    const wolf = (R.NIGHT && R.NIGHT.WOLF) || {};
+    const wolfFinal = (wolf && wolf.final !== undefined) ? wolf.final : undefined;
+    const wolfVotes = Object.keys(wolf).filter(k => k !== 'final').map(pid => {
+      const v = wolf[pid]; return `${pid}→${fmtTarget(v?.target)}`;
+    }).sort((a,b) => parseInt(a) - parseInt(b));
+    const wolfHtml = `
+      <div style="margin-bottom:8px;">
+        <div>• 狼队投票：${wolfVotes.length ? wolfVotes.join('，') : '——'}</div>
+        <div>• 狼队拍板：${wolfFinal === undefined ? '未拍板' : fmtTarget(wolfFinal)}</div>
+      </div>`;
+
+    // 守卫
+    const guards = (R.NIGHT && R.NIGHT.GUARD) || {};
+    const guardHtml = `
+      <div style="margin-bottom:8px;">
+        <div>• 守卫：${
+          Object.keys(guards).length
+            ? Object.keys(guards).sort((a,b)=>a-b).map(pid => `${pid}→${fmtTarget(guards[pid]?.target)}`).join('，')
+            : '——'
+        }</div>
+      </div>`;
+
+    // 预言家
+    const seers = (R.NIGHT && R.NIGHT.SEER) || {};
+    const seerHtml = `
+      <div style="margin-bottom:8px;">
+        <div>• 预言家：${
+          Object.keys(seers).length
+            ? Object.keys(seers).sort((a,b)=>a-b).map(pid => {
+                const s = seers[pid]; return `${pid}→${fmtTarget(s?.target)}（${s?.result || '无结果'}）`;
+              }).join('，')
+            : '——'
+        }</div>
+      </div>`;
+
+    // 女巫（解/毒）
+    const witch = R.NIGHT_WITCH || {};
+    const cures = witch.cures || {};
+    const poisons = witch.poisons || {};
+    const curesLine = Object.keys(cures).length
+      ? Object.keys(cures).sort((a,b)=>a-b).map(pid => `${pid}→${fmtTarget(cures[pid]?.target)}`).join('，')
+      : '——';
+    const poisonsLine = Object.keys(poisons).length
+      ? Object.keys(poisons).sort((a,b)=>a-b).map(pid => `${pid}→${fmtTarget(poisons[pid]?.target)}`).join('，')
+      : '——';
+    const witchHtml = `
+      <div style="margin-bottom:8px;">
+        <div>• 女巫解药：${curesLine}</div>
+        <div>• 女巫毒药：${poisonsLine}</div>
+      </div>`;
+
+    return `
+      <div class="setup-card" style="margin-bottom:12px;">
+        <h3 class="section-title">第 ${r} 夜 · 行动详情</h3>
+        ${wolfHtml}
+        ${guardHtml}
+        ${seerHtml}
+        ${witchHtml}
+      </div>
+    `;
+  }).join('');
+
+  root.innerHTML = `
+    <div class="view">
+      <header class="app-header">
+        <h1 class="app-title">后台视图（上帝视角）</h1>
+        <p class="app-subtitle">仅当 URL 中 player=0 时可见 · 实时同步</p>
+      </header>
+      ${identTable}
+      ${nightBlocks || '<div class="setup-card"><div class="section-desc">暂无夜间行动数据</div></div>'}
+    </div>
+  `;
+},
+
+  isGod() {
+    return String(this.me) === '0';
+  },
   // 大厅差分渲染
   buildLobbyStructSig(data) {
     const host = data.state?.host;
@@ -2177,222 +2315,77 @@ const App = {
     }
   },
 
-// 用“随机化回溯 + CSPRNG + 最终洗牌”生成合法配对：无禁配，含至少一个金宝宝
+// 暴力随机洗牌 + 拒绝采样（随机性好，简单可靠）
+// 返回 { pairs } 或 null；pairs 为 [[{role,isCopy?},{role,isCopy?}], ...]
 dealWithGolden(pool, opts = {}) {
-  const requireGolden = opts.requireGolden !== false;           // 是否要求至少一对“平民+平民”
-  const maxMsTotal = typeof opts.maxMsTotal === 'number' ? opts.maxMsTotal : 800; // 总耗时上限
-  const maxMsBacktrack = typeof opts.maxMsBacktrack === 'number' ? opts.maxMsBacktrack : Math.min(500, maxMsTotal - 100);
-  const fallbackTries = typeof opts.fallbackTries === 'number' ? opts.fallbackTries : 4000;
+  const tries = Number.isFinite(opts.tries) ? opts.tries : 20000;  // 最大尝试次数
+  const maxMs = Number.isFinite(opts.maxMs) ? opts.maxMs : 1200;   // 时间上限（毫秒）
+  const disallowThiefThief = opts.disallowThiefThief !== false;    // 默认禁“盗贼+盗贼”
+  const randomSwapInsidePair = opts.randomSwapInsidePair !== false; // 默认随机左右互换
+  const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-  // 1) RNG（默认 CSPRNG；可选 seed 复现）
-  const makeRNG = (seed) => {
-    if (seed === undefined || seed === null) {
-      // CSPRNG
-      const buf = new Uint32Array(1);
-      return () => {
-        if (window.crypto?.getRandomValues) {
-          window.crypto.getRandomValues(buf);
-          return (buf[0] >>> 0) / 2**32;
-        }
-        return Math.random();
-      };
-    }
-    // seedable（Mulberry32）
-    let s = (seed >>> 0) || 0x9e3779b9;
-    return function() {
-      s |= 0; s = (s + 0x6D2B79F5) | 0;
-      let t = Math.imul(s ^ (s >>> 15), 1 | s);
-      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  };
-  const rng = makeRNG(opts.seed);
-
-  const randInt = (n) => (n <= 1 ? 0 : Math.floor(rng() * n));
-  const shuffleArr = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = randInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
-
-  // 2) 统计
-  const counts = {};
-  for (const r of pool) counts[r] = (counts[r] || 0) + 1;
-  const total = pool.length;
-  if (total === 0 || total % 2 !== 0) {
+  const n = pool.length;
+  if (n === 0 || n % 2 !== 0) {
     this._lastDealError = '身份总数必须为偶数且大于0';
     return null;
   }
-  const targetPairs = total / 2;
 
-  // 3) 约束/工具
+  // 禁配表（严格按你的清单）
+  const BANNED = new Set([
+    '狼人|盗贼',
+    '狼人|隐狼',
+    '预言家|狼人',
+    '预言家|隐狼',
+    '盗贼|隐狼',
+  ]);
+
   const isForbiddenPair = (a, b) => {
-    if ((a === '盗贼' && (b === '狼人' || b === '隐狼')) ||
-        (b === '盗贼' && (a === '狼人' || a === '隐狼'))) return true;
-    if (a === '盗贼' && b === '盗贼') return true;
+    if (disallowThiefThief && a === '盗贼' && b === '盗贼') return true; // 额外安全（可关闭）
     const key = [a, b].sort().join('|');
-    return FORBIDDEN_PAIRS.has(key);
+    return BANNED.has(key);
   };
 
-  const effectivePair = (a, b) => {
-    if (a === '盗贼' && b !== '盗贼') return [b, b];
-    if (b === '盗贼' && a !== '盗贼') return [a, a];
-    return [a, b];
+  const shuffle = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   };
 
   const realizePairObjects = (a, b) => {
-    if (a === '盗贼' && b !== '盗贼') {
-      return [ { role: b, isCopy: true }, { role: b } ];
-    } else if (b === '盗贼' && a !== '盗贼') {
-      return [ { role: a }, { role: a, isCopy: true } ];
-    }
-    return [ { role: a }, { role: b } ];
+    // 盗贼复制其搭档（仅用于显示/后续逻辑，仍保持和你原代码一致的 isCopy 语义）
+    if (a === '盗贼' && b !== '盗贼') return [{ role: b, isCopy: true }, { role: b }];
+    if (b === '盗贼' && a !== '盗贼') return [{ role: a }, { role: a, isCopy: true }];
+    return [{ role: a }, { role: b }];
   };
 
-  const canStillAchieveGolden = (cnt) => {
-    const civ = cnt['平民'] || 0;
-    const thief = cnt['盗贼'] || 0;
-    return civ >= 2 || (civ >= 1 && thief >= 1);
-  };
+  const poolArr = [...pool];
+  for (let t = 0; t < tries; t++) {
+    if (((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - start > maxMs) break;
 
-  const rolePriority = (r) => {
-    switch (r) {
-      case '狼人': return 100;
-      case '隐狼': return 95;
-      case '预言家': return 90;
-      case '盗贼': return 80;
-      case '猎人': return 70;
-      case '女巫': return 60;
-      case '守卫': return 50;
-      case '骑士': return 40;
-      case '白痴': return 30;
-      case '平民': return 10;
-      default: return 10;
-    }
-  };
+    shuffle(poolArr);
+    let ok = true;
+    const pairs = [];
 
-  const rolesAvail = (cnt) => Object.keys(cnt).filter(k => cnt[k] > 0);
+    for (let i = 0; i < n; i += 2) {
+      const a = poolArr[i], b = poolArr[i + 1];
+      if (isForbiddenPair(a, b)) { ok = false; break; }
+      let pr = realizePairObjects(a, b);
 
-  // 带“轻偏好”的随机选 r1：优先级越高越可能被优先挑到，但加入随机噪声
-  const pickR1 = (cnt) => {
-    const list = rolesAvail(cnt);
-    if (list.length === 0) return null;
-    // 评分 = priority + 随机噪声 + 少量与数量相关的噪声
-    const scored = list.map(r => ({
-      r,
-      score: rolePriority(r) + (rng() - 0.5) * 30 + Math.log(cnt[r] + 1) * (rng() - 0.5) * 5
-    }));
-    scored.sort((a, b) => b.score - a.score);
-    // 在前 topK 中随机挑一个；偶尔从更靠后的元素挑一个，避免过拟合
-    const topK = Math.min(3, scored.length);
-    const coin = rng();
-    if (coin < 0.7) {
-      return scored[randInt(topK)].r;
-    } else {
-      return scored[randInt(scored.length)].r;
-    }
-  };
-
-  // 4) 随机化回溯
-  const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-  let nodes = 0;
-  const pairs = [];
-
-  const timeNow = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-
-  const backtrack = (cnt, goldenPlaced) => {
-    nodes++;
-    if (timeNow() - start > maxMsBacktrack) return false;
-
-    const left = Object.values(cnt).reduce((s, v) => s + v, 0);
-    if (left === 0) {
-      return !requireGolden || goldenPlaced;
+      // 可选：对内随机左右互换，提升“首发身份”随机性
+      if (randomSwapInsidePair && Math.random() < 0.5) pr = [pr[1], pr[0]];
+      pairs.push(pr);
     }
 
-    const r1 = pickR1(cnt);
-    if (!r1) return false;
-
-    // 构建搭档列表并随机打乱
-    const all = rolesAvail(cnt);
-    let partners = all.filter(r2 => (r2 !== r1 || cnt[r1] >= 2));
-    shuffleArr(partners);
-
-    // 轻偏好：若 r1 是“狼人/隐狼/预言家/盗贼”，将“平民/自身/平民相关”适度前置，再打乱
-    const preferScore = (r2) => {
-      if (r1 === '狼人' || r1 === '隐狼') return (r2 === '平民') ? 2 : (r2 === r1 ? 1 : 0);
-      if (r1 === '预言家') return (r2 === '平民') ? 2 : (r2 === '预言家' ? 1 : 0);
-      if (r1 === '盗贼') return (r2 === '平民') ? 2 : 0;
-      return 0;
-    };
-    partners.sort((a, b) => preferScore(b) - preferScore(a) || (rng() - 0.5)); // 同分随机
-
-    for (const r2 of partners) {
-      if (isForbiddenPair(r1, r2)) continue;
-
-      const [e1, e2] = effectivePair(r1, r2);
-      const effKey = [e1, e2].sort().join('|');
-      if (FORBIDDEN_PAIRS.has(effKey)) continue;
-
-      const thisIsGolden = (e1 === '平民' && e2 === '平民');
-
-      // 扣减并前瞻金宝宝可达性
-      cnt[r1]--; if (r2 !== r1) cnt[r2]--;
-      if (requireGolden && !thisIsGolden && !goldenPlaced) {
-        if (!canStillAchieveGolden(cnt)) {
-          cnt[r1]++; if (r2 !== r1) cnt[r2]++;
-          continue;
-        }
-      }
-
-      pairs.push(realizePairObjects(r1, r2));
-      if (backtrack(cnt, goldenPlaced || thisIsGolden)) return true;
-
-      pairs.pop();
-      cnt[r1]++; if (r2 !== r1) cnt[r2]++;
-    }
-    return false;
-  };
-
-  const ok = backtrack({ ...counts }, false);
-  const timeLeft = Math.max(0, maxMsTotal - (timeNow() - start));
-
-  const finalizeAndReturn = (pp) => {
-    // 终局随机化：打乱对的顺序 + 每对左右随机互换
-    shuffleArr(pp);
-    for (const pr of pp) {
-      if (rng() < 0.5) [pr[0], pr[1]] = [pr[1], pr[0]];
-    }
-    return { pairs: pp };
-  };
-
-  if (ok && pairs.length === targetPairs) {
-    return finalizeAndReturn(pairs.slice());
-  }
-
-  // 5) 兜底：纯随机洗牌 + 拒绝采样（多次尝试，保持随机性）
-  const deadline = timeNow() + timeLeft;
-  const tryRandomPermutation = () => {
-    const d = pool.slice();
-    shuffleArr(d);
-    const res = [];
-    let golden = false;
-    for (let i = 0; i < d.length; i += 2) {
-      const a = d[i], b = d[i + 1];
-      if (isForbiddenPair(a, b)) return null;
-      const [e1, e2] = effectivePair(a, b);
-      const effKey = [e1, e2].sort().join('|');
-      if (FORBIDDEN_PAIRS.has(effKey)) return null;
-      if (e1 === '平民' && e2 === '平民') golden = true;
-      res.push(realizePairObjects(a, b));
-    }
-    if (requireGolden && !golden) return null;
-    return res;
-  };
-
-  for (let t = 0; t < fallbackTries && timeNow() < deadline; t++) {
-    const res = tryRandomPermutation();
-    if (res && res.length === targetPairs) {
-      return finalizeAndReturn(res);
+    if (ok) {
+      // 再随机打乱“对”的顺序（决定座位分配）
+      shuffle(pairs);
+      return { pairs };
     }
   }
 
-  this._lastDealError = `发牌失败：在时限内未找到合法配对（回溯节点≈${nodes}）。请调整配置后重试。`;
+  this._lastDealError = '暴力随机发牌未在限制内找到合法方案，请稍后重试或调整配置。';
   return null;
 },
 
@@ -2429,15 +2422,26 @@ dealWithGolden(pool, opts = {}) {
   async enterGame() {
     this.engine = new Engine(this.gameId);
     const rootRef = db.ref(`games/${this.gameId}`);
-    const onlineRef = db.ref(`games/${this.gameId}/players/${this.me}/online`);
-    try {
-      await onlineRef.set(true);
-      onlineRef.onDisconnect().set(false);
-    } catch (e) {
-      console.warn('online status set failed:', e);
-    }
+const onlineRef = this.isGod() ? null : db.ref(`games/${this.gameId}/players/${this.me}/online`);
+try {
+  if (onlineRef) {
+    await onlineRef.set(true);
+    onlineRef.onDisconnect().set(false);
+  }
+} catch (e) {
+  console.warn('online status set failed:', e);
+}
 
     const onValueChange = (snap) => {
+    if (this.isGod()) {
+      $('setup-view')?.classList.add('hidden');
+      $('join-view')?.classList.add('hidden');
+      $('lobby-view')?.classList.add('hidden');
+      $('game-view')?.classList.add('hidden');
+      $('god-view')?.classList.remove('hidden');
+      this.renderGodView(data);
+      return;
+    }
       const data = snap.val();
       if (!data) { this.toast('游戏数据不存在或已被删除。', 'error'); this.destroy(); return; }
 

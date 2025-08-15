@@ -2607,44 +2607,112 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+// 安全的初始化方式 - 替换 app.js 文件的第7部分（全局初始化）
+
 /* ==================================================================
- * 7. 全局初始化
+ * 7. 全局初始化（安全版本）
  * ================================================================== */
 
-// 创建全局UI实例
-const UI = new UIManager();
-
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM加载完成，开始初始化UI');
-  if (typeof UI.init === 'function') {
-    UI.init();
+(function() {
+  'use strict';
+  
+  // 检查是否已经初始化
+  if (window.__WEREWOLF_INITIALIZED__) {
+    console.warn('狼人杀游戏已经初始化，跳过重复加载');
+    return;
+  }
+  
+  // 标记为已初始化
+  window.__WEREWOLF_INITIALIZED__ = true;
+  
+  // 清理旧的UI实例（如果存在）
+  if (window.UI && typeof window.UI.destroy === 'function') {
+    console.log('清理旧的UI实例');
+    window.UI.destroy();
+  }
+  
+  // 创建新的UI实例
+  try {
+    window.UI = new UIManager();
+    console.log('UI实例创建成功');
+  } catch (error) {
+    console.error('创建UI实例失败:', error);
+    return;
+  }
+  
+  // DOM加载完成后初始化
+  function initializeGame() {
+    console.log('开始初始化游戏...');
+    
+    if (!window.UI) {
+      console.error('UI实例不存在');
+      return;
+    }
+    
+    if (typeof window.UI.init !== 'function') {
+      console.error('UI.init 不是函数');
+      return;
+    }
+    
+    try {
+      window.UI.init();
+      console.log('游戏初始化成功');
+    } catch (error) {
+      console.error('游戏初始化失败:', error);
+    }
+  }
+  
+  // 确保只绑定一次事件
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeGame, { once: true });
   } else {
-    console.error('UI.init 不是函数', UI);
+    // DOM已经加载完成
+    initializeGame();
   }
-});
+  
+  // 页面卸载时清理
+  window.addEventListener('beforeunload', function() {
+    if (window.UI && typeof window.UI.destroy === 'function') {
+      window.UI.destroy();
+    }
+  }, { once: true });
+  
+  // 全局函数（供HTML onclick使用）
+  window.closeModal = function() {
+    if (window.UI && typeof window.UI.closeModal === 'function') {
+      window.UI.closeModal();
+    } else {
+      console.error('closeModal 方法不可用');
+    }
+  };
+  
+  window.sendWolfChat = function() {
+    if (window.UI && typeof window.UI.sendWolfChat === 'function') {
+      window.UI.sendWolfChat();
+    } else {
+      console.error('sendWolfChat 方法不可用');
+    }
+  };
+  
+  console.log('🐺 双身份狼人杀系统加载完成！');
+  
+})();
 
-// 页面卸载时清理
-window.addEventListener('beforeunload', () => {
-  if (UI && typeof UI.destroy === 'function') {
-    UI.destroy();
-  }
-});
-
-// 导出给HTML使用的全局对象
-window.UI = UI;
-
-// 为HTML onclick事件提供全局函数
-window.closeModal = function() {
-  if (UI && typeof UI.closeModal === 'function') {
-    UI.closeModal();
+// 调试命令（可在控制台使用）
+window.debugWerewolf = {
+  reset: function() {
+    delete window.__WEREWOLF_INITIALIZED__;
+    if (window.UI && typeof window.UI.destroy === 'function') {
+      window.UI.destroy();
+    }
+    delete window.UI;
+    console.log('游戏已重置，可以重新加载');
+  },
+  
+  status: function() {
+    console.log('初始化状态:', !!window.__WEREWOLF_INITIALIZED__);
+    console.log('UI实例:', !!window.UI);
+    console.log('当前游戏ID:', window.UI?.gameId);
+    console.log('当前玩家ID:', window.UI?.playerId);
   }
 };
-
-window.sendWolfChat = function() {
-  if (UI && typeof UI.sendWolfChat === 'function') {
-    UI.sendWolfChat();
-  }
-};
-
-console.log('🐺 双身份狼人杀系统已加载完成', UI);

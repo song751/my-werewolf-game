@@ -734,7 +734,7 @@ select, .fancy-select {
   transform: none !important;
 }
 
-* 玩家编号行不换行，图标与数字同排 */
+/* 玩家编号行不换行，图标与数字同排 */
 .player-number {
   font-size: 22px;
   font-weight: 900;
@@ -1179,4 +1179,3 @@ select, .fancy-select {
     transform: scale(1);
   }
 }
-

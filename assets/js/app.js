@@ -1025,15 +1025,17 @@ class UIManager {
       logsBtn.addEventListener('click', () => this.showLogs());
     }
 
-    // 模态框关闭
-    $$('[data-action="close-modal"]').forEach(btn => {
-      btn.addEventListener('click', () => this.closeModal());
-    });
+    // 模态框关闭按钮
+    const modalCloseBtn = document.querySelector('.modal-close');
+    if (modalCloseBtn) {
+      modalCloseBtn.addEventListener('click', () => this.closeModal());
+    }
 
     // 点击背景关闭模态框
-    $$('.modal-backdrop').forEach(backdrop => {
-      backdrop.addEventListener('click', () => this.closeModal());
-    });
+    const modalBackdrop = document.querySelector('.modal-backdrop');
+    if (modalBackdrop) {
+      modalBackdrop.addEventListener('click', () => this.closeModal());
+    }
   }
 
   // 初始化设置页面
@@ -1186,8 +1188,9 @@ class UIManager {
       // 保存到数据库
       await db.ref(`games/${gameId}`).set(gameData);
 
-      // 跳转到游戏大厅
-      window.location.href = `?game=${gameId}&player=1`;
+      // 跳转到游戏大厅（修复：使用正确的URL格式）
+      const baseUrl = window.location.origin + window.location.pathname;
+      window.location.href = `${baseUrl}?game=${gameId}&player=1`;
 
     } catch (error) {
       console.error('Create game error:', error);
@@ -1213,8 +1216,9 @@ class UIManager {
       return;
     }
 
-    // 跳转到游戏
-    window.location.href = `?game=${this.gameId}&player=${playerNum}`;
+    // 跳转到游戏（修复：使用正确的URL格式）
+    const baseUrl = window.location.origin + window.location.pathname;
+    window.location.href = `${baseUrl}?game=${this.gameId}&player=${playerNum}`;
   }
 
   // 初始化游戏
@@ -1340,10 +1344,11 @@ class UIManager {
 
   // 渲染大厅
   renderLobby() {
-    // 显示游戏链接
+    // 显示游戏链接（修复：使用正确的URL格式）
     const linkInput = $('game-link');
     if (linkInput) {
-      linkInput.value = window.location.origin + `?game=${this.gameId}`;
+      const baseUrl = window.location.origin + window.location.pathname;
+      linkInput.value = `${baseUrl}?game=${this.gameId}`;
     }
 
     // 显示玩家状态

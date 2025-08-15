@@ -1,11 +1,12 @@
 /**********************************************************************
- * 双身份狼人杀 - 电子法官 (简化稳定版)
- * 说明：
- * - 去除复杂的“网络抖动/防抖/节流/合帧”等逻辑，保持直观、可维护
- * - 修复拍板狼“空刀/拍板无效”问题
- * - 主持人可在大厅阶段“强制开始”，不再被“全部准备”限制卡死
- * - 精简 Toast/错误处理，避免频繁误报导致的“请刷新页面”提示
- * - 保持与 index.html/styles.css 的选择器、结构一致，替换本文件即可
+ * 双身份狼人杀 - 电子法官 (简化稳定+规则修正版)
+ * 变更重点：
+ * - 取消“主持人夜晚进度曝光”：主持面板不再显示夜晚任何进度细节
+ * - 角色唯一性：仅隐狼、盗贼为唯一，其余（如守卫、预言家等）不限制数量
+ * - 夜间统一结算：夜里不直接扣命，所有夜间行为在“黎明结算(dawnResolve)”统一处理
+ * - 首夜上警时机：首夜女巫阶段结束后，直接进入上警（未天亮），上警流程结束后再结算夜晚
+ * - 拍板狼允许“空刀”，并修正按钮禁用与显示逻辑
+ * - 修正狼投票可见性逻辑与若干小问题，保持稳定
  *********************************************************************/
 
 /* ==================================================================
@@ -25,8 +26,10 @@ const ROLES = {
   盗贼:   { faction: 'neu',  icon: '🎭', isGod: false, isThief: true, key: 'THIEF' },
 };
 
-const GOD_ROLES = new Set(Object.keys(ROLES).filter(k => ROLES[k].isGod));
-const UNIQUE_ROLES = new Set(['守卫','白痴','预言家','骑士','女巫','猎人','盗贼','隐狼']);
+// 仅隐狼与盗贼唯一（守卫/预言家/骑士/女巫/猎人等不作唯一限制）
+const UNIQUE_ROLES = new Set(['隐狼', '盗贼']);
+
+// 禁配列表：允许 狼人+狼人；禁止 狼人+盗贼、狼人+隐狼、预言家+狼人、预言家+隐狼、盗贼+隐狼
 const FORBIDDEN_PAIRS = new Set([
   '狼人|隐狼',
   '预言家|狼人',
@@ -34,6 +37,7 @@ const FORBIDDEN_PAIRS = new Set([
   '盗贼|狼人',
   '盗贼|隐狼'
 ]);
+
 const DEFAULT_SETUP = { 平民: 6, 守卫: 1, 白痴: 1, 预言家: 1, 骑士: 1, 女巫: 1, 猎人: 1, 狼人: 2, 隐狼: 1, 盗贼: 1 };
 
 const PHASE = {
@@ -84,7 +88,7 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 /* ==================================================================
- *  3. 规则引擎（保留稳定实现）
+ *  3. 规则引擎（保留稳定实现 + 首夜上警时机修正）
  * ================================================================== */
 
 class Engine {
@@ -205,21 +209,43 @@ class Engine {
   getWitchPoisonTarget() { return this.getWitchPoisonEntry()?.target || null; }
   isWitchActionDone() { return this.actions?.[this.state.round]?.NIGHT_WITCH?.done === true; }
 
+  /* ============================
+   *  夜晚与女巫阶段（首夜上警：女巫后直接上警，未天亮）
+   * ============================ */
   async checkNightEnd() {
     const actingWolves = this.getAliveActingWolves(this.players, this.state);
     const finalTarget = this.getWolfFinalTarget();
     if (actingWolves.length > 0 && finalTarget === undefined) return;
     
     const witchAlive = Object.values(this.players).some(p => p.isAlive && this.activeRole(p) === '女巫');
-    if (witchAlive) await this.to(PHASE.NIGHT_WITCH);
-    else await this.dawnResolve();
+    if (witchAlive) {
+      await this.to(PHASE.NIGHT_WITCH);
+    } else {
+      // 若首夜且无女巫，直接进入上警（未天亮）
+      if ((this.state.round || 1) === 1) {
+        await this.to(PHASE.SHERIFF_CAND, { sheriff: { candidates: {}, votes: {}, drops: {}, isPK: false } });
+      } else {
+        await this.dawnResolve();
+      }
+    }
   }
 
   async checkWitchEnd() {
     const witchAlive = Object.values(this.players).some(p => p.isAlive && this.activeRole(p) === '女巫');
-    if (!witchAlive || this.isWitchActionDone()) await this.dawnResolve();
+    if (!witchAlive || this.isWitchActionDone()) {
+      // 首夜：上警（未天亮）；其它夜晚：直接黎明结算
+      if ((this.state.round || 1) === 1) {
+        await this.to(PHASE.SHERIFF_CAND, { sheriff: { candidates: {}, votes: {}, drops: {}, isPK: false } });
+      } else {
+        await this.dawnResolve();
+      }
+    }
   }
 
+  /* ============================
+   *  黎明结算（统一结算夜间行为）
+   *  注意：首夜若已进入上警，需在上警流程完成后再调用本结算
+   * ============================ */
   async dawnResolve() {
     await this.refresh();
     if (this.state.resolving) return;
@@ -233,6 +259,7 @@ class Engine {
       const deaths = [];
       const wolfTarget = this.getWolfFinalTarget();
 
+      // 女巫互斥：时间戳择一
       const cureEntry = this.getWitchCureEntry();
       const poisonEntry = this.getWitchPoisonEntry();
       let cureTarget = cureEntry?.target || null;
@@ -254,6 +281,7 @@ class Engine {
         }
       }
 
+      // 守卫逻辑
       const alivePlayers = Object.values(this.players || {}).filter(p => p.isAlive);
       const guard = alivePlayers.find(p => this.activeRole(p) === '守卫');
       let guardTarget = null, guardValid = false, guardTriedSame = false;
@@ -274,6 +302,7 @@ class Engine {
         true
       );
 
+      // 女巫自救规则校验
       if (cureTarget && wolfTarget && String(cureTarget) === String(wolfTarget)) {
         const rule = this.settings?.witchRule || 'noFirstNightSelfSave';
         const firstNight = r === 1;
@@ -286,6 +315,7 @@ class Engine {
         }
       }
 
+      // 狼刀结算（仅在黎明扣命）
       if (wolfTarget && wolfTarget !== '0') {
         const isGuarded = guardValid && guardTarget !== null && String(guardTarget) === String(wolfTarget);
         const isCured = cureTarget === wolfTarget;
@@ -297,16 +327,19 @@ class Engine {
         }
       }
 
+      // 毒药结算（避免重复扣命）
       if (poisonTarget && !deaths.some(d => String(d.pid) === String(poisonTarget))) {
         deaths.push({ pid: poisonTarget, cause: 'POISON' });
         await this.log(`☠️ ${poisonTarget}号玩家被女巫毒杀。`, true);
       }
 
+      // 守卫 lastGuard 更新
       if (guard) {
-        if (guardTriedSame) { /* 不更新 lastGuard */ }
+        if (guardTriedSame) { /* 不更新 */ }
         else if (guardValid) await this.update({ [`players/${guard.id}/skill/lastGuard`]: guardTarget ?? null });
       }
 
+      // 统一执行“死亡”（一次只扣一条命，不会出现“狼刀扣两点”的问题）
       let anyHunterTriggered = false, sheriffDiedPid = null;
       if (deaths.length > 0) {
         const deadIds = [...new Set(deaths.map(d => d.pid))].sort((a, b) => a - b).join('号、');
@@ -329,12 +362,24 @@ class Engine {
 
       if (await this.checkWin()) return;
 
-      let nextPhase = r === 1 ? PHASE.SHERIFF_CAND : PHASE.DAY_TALK;
-      if (r === 1) await this.update({ 'state/sheriff': { candidates: {}, votes: {}, drops: {}, isPK: false } });
+      // 计算下个阶段：
+      // - 若从夜里直接结算（NIGHT/NIGHT_WITCH），首夜先进入上警
+      // - 若从上警流程后结算（当前 phase 为上警相关），直接进入白天发言
+      let nextPhase;
+      if (r === 1 && (this.state.phase === PHASE.NIGHT || this.state.phase === PHASE.NIGHT_WITCH)) {
+        nextPhase = PHASE.SHERIFF_CAND;
+        await this.update({ 'state/sheriff': { candidates: {}, votes: {}, drops: {}, isPK: false } });
+      } else {
+        nextPhase = PHASE.DAY_TALK;
+      }
 
-      if (sheriffDiedPid)      await this.to(PHASE.BADGE,  { postBadge: { dead: sheriffDiedPid, next: nextPhase } });
-      else if (anyHunterTriggered) await this.to(PHASE.HUNTER, { nextPhaseAfterHunter: nextPhase });
-      else await this.to(nextPhase);
+      if (sheriffDiedPid) {
+        await this.to(PHASE.BADGE, { postBadge: { dead: sheriffDiedPid, next: nextPhase } });
+      } else if (anyHunterTriggered) {
+        await this.to(PHASE.HUNTER, { nextPhaseAfterHunter: nextPhase });
+      } else {
+        await this.to(nextPhase);
+      }
     } finally {
       await this.write('state/resolving', null);
       this.isProcessing = false;
@@ -354,6 +399,7 @@ class Engine {
     let hunterTriggered = false;
     let sheriffDiedPid = (p.badge && isOut) ? pid : null;
 
+    // 白痴：仅“投票”时翻牌免死一次（不是最后一条命时）
     const currentRole = this.activeRole(p);
     const hasIdiotCard = p.identities.some(id => id.role === '白痴');
     if (hasIdiotCard && currentRole === '白痴' && cause === 'VOTE' && !p.isExposedIdiot) {
@@ -369,6 +415,7 @@ class Engine {
       }
     }
 
+    // 猎人：仅被狼刀或被票时触发（出局才入队列）
     const hasHunterCard = p.identities.some(id => id.role === '猎人');
     if (isOut && hasHunterCard && currentRole === '猎人' && ['WOLF', 'VOTE'].includes(cause)) {
       const q = (await this.read('state/hunters')) || {};
@@ -379,7 +426,6 @@ class Engine {
     }
 
     await this.update(updates);
-
     this.players[pid] = {
       ...p,
       deaths: updates[`players/${pid}/deaths`],
@@ -460,7 +506,9 @@ class Engine {
     await this.refresh();
     const voters = Object.values(this.players).filter(p => p.isAlive && !p.isExposedIdiot);
     const votes = this.state.sheriff?.votes || {};
-    if (voters.every(pl => votes[pl.id] !== undefined)) await this.tallySheriff();
+    if (voters.every(pl => votes[pl.id] !== undefined)) {
+      await this.tallySheriff();
+    }
   }
 
   async tallySheriff() {
@@ -471,15 +519,26 @@ class Engine {
       return candidates[id] && !(drops || {})[id] && alive;
     });
 
+    const afterSheriffGoNext = async () => {
+      // 首夜：上警后再统一结算夜间 → 结算结束后按结算逻辑进入白天/徽章/猎人
+      if ((this.state.round || 1) === 1) {
+        await this.dawnResolve();
+      } else {
+        await this.to(PHASE.DAY_TALK);
+      }
+    };
+
     if (!validCandidates.length) {
       await this.log('所有候选人退水或无人参选，本局无警长。', false);
-      await this.to(PHASE.DAY_TALK, { sheriff: null });
-      return;
+      await this.update({ 'state/sheriff': null });
+      return afterSheriffGoNext();
     }
 
     const counts = {};
     Object.values(votes || {}).forEach(target => {
-      if (target !== '0' && validCandidates.includes(target)) counts[target] = (counts[target] || 0) + 1;
+      if (target !== '0' && validCandidates.includes(target)) {
+        counts[target] = (counts[target] || 0) + 1;
+      }
     });
 
     const maxVotes = Math.max(0, ...Object.values(counts));
@@ -489,10 +548,11 @@ class Engine {
       const sheriffId = winners[0];
       await this.update({ [`players/${sheriffId}/badge`]: 1, 'state/sheriff': null });
       await this.log(`⭐ ${sheriffId}号玩家当选警长！`, false);
-      await this.to(PHASE.DAY_TALK);
+      return afterSheriffGoNext();
     } else if (isPK) {
       await this.log('PK后再次平票，本局无警长。', false);
-      await this.to(PHASE.DAY_TALK, { sheriff: null });
+      await this.update({ 'state/sheriff': null });
+      return afterSheriffGoNext();
     } else {
       const pkCandidates = {};
       winners.forEach(id => pkCandidates[id] = true);
@@ -501,7 +561,8 @@ class Engine {
         await this.update({ 'state/sheriff': { candidates: pkCandidates, votes: {}, drops: {}, isPK: true } });
         await this.to(PHASE.SHERIFF_SPEECH);
       } else {
-        await this.to(PHASE.DAY_TALK, { sheriff: null });
+        await this.update({ 'state/sheriff': null });
+        return afterSheriffGoNext();
       }
     }
   }
@@ -640,7 +701,9 @@ class Engine {
         return true;
       }
     } else {
-      const godAlive = alivePlayers.some(p => p.identities?.some(i => GOD_ROLES.has(i.role)));
+      // 神职是否仍在（任一玩家的两张身份中含神职即视为在场）
+      const godAlive = alivePlayers.some(p => p.identities?.some(i => ROLES[i.role]?.isGod));
+      // 金宝宝：两张平民（盗贼复制平民也算平民）
       const goldenAlive = alivePlayers.some(p => {
         const roles = (p.identities || []).map(i => i.role);
         return roles.length >= 2 && roles[0] === '平民' && roles[1] === '平民';
@@ -666,7 +729,7 @@ class Engine {
 }
 
 /* ==================================================================
- *  4. 前端应用（简化稳定版）
+ *  4. 前端应用（简化稳定版 + 要求修正）
  * ================================================================== */
 
 const App = {
@@ -711,7 +774,7 @@ const App = {
   },
 
   initEventListeners() {
-    // 所有 data-action 点击，直接处理（不做防抖/节流）
+    // data-action 点击，直接处理
     document.addEventListener('click', (e) => {
       const a = e.target.closest('[data-action]');
       if (!a || a.disabled) return;
@@ -788,6 +851,7 @@ const App = {
           let val = parseInt(input.value, 10);
           val += (btn.dataset.op === '+') ? 1 : -1;
           val = Math.max(0, val);
+          // 仅“隐狼”“盗贼”唯一
           if (UNIQUE_ROLES.has(btn.dataset.role) && val > 1) {
             val = 1;
             this.toast(`${btn.dataset.role}是唯一角色，最多只能有1个`, 'warning');
@@ -948,9 +1012,9 @@ const App = {
       [PHASE.NIGHT]: `第 ${st.round} 夜晚 - 行动中`,
       [PHASE.NIGHT_WITCH]: `第 ${st.round} 夜晚 - 女巫行动`,
       [PHASE.DAWN]: '黎明结算中...',
-      [PHASE.SHERIFF_CAND]: '警长竞选 - 上警意向',
-      [PHASE.SHERIFF_SPEECH]: '警长竞选 - 发言阶段',
-      [PHASE.SHERIFF_VOTE]: '警长竞选 - 投票阶段',
+      [PHASE.SHERIFF_CAND]: '警长竞选 - 上警意向（首夜）',
+      [PHASE.SHERIFF_SPEECH]: '警长竞选 - 发言阶段（首夜）',
+      [PHASE.SHERIFF_VOTE]: '警长竞选 - 投票阶段（首夜）',
       [PHASE.DAY_TALK]: `第 ${st.round} 白天 - 发言阶段`,
       [PHASE.DAY_VOTE]: `第 ${st.round} 白天 - 放逐投票`,
       [PHASE.HUNTER]: '猎人开枪中...',
@@ -1049,15 +1113,14 @@ const App = {
     const meHasWolfCard = myPlayer ? myPlayer.identities.some(i => i.role === '狼人' || i.role === '隐狼') : false;
     const meCanSeeWolves = (wolfVisRule === 'allWolves' ? meHasWolfCard : meIsActingWolf);
 
+    // 狼投票信息（仅狼人可见）
     const wolfVotes = data.actions?.[data.state.round]?.NIGHT?.WOLF || {};
     const voteMap = {};
     Object.entries(wolfVotes).forEach(([voterId, voteData]) => {
-      if (voterId === 'final' || !voteData?.target !== undefined) {/* noop */}
-      if (voterId !== 'final' && voteData && voteData.target !== undefined) {
-        const targetId = voteData.target === '0' ? voterId : voteData.target;
-        if (!voteMap[targetId]) voteMap[targetId] = [];
-        voteMap[targetId].push({ voter: voterId, isEmpty: voteData.target === '0' });
-      }
+      if (voterId === 'final' || voteData?.target === undefined) return;
+      const targetId = voteData.target === '0' ? voterId : voteData.target;
+      if (!voteMap[targetId]) voteMap[targetId] = [];
+      voteMap[targetId].push({ voter: voterId, isEmpty: voteData.target === '0' });
     });
     const wolfFinalTarget = wolfVotes?.final;
 
@@ -1316,7 +1379,7 @@ const App = {
     const optedUp = data.state.sheriff?.candidates?.[me.id] === true;
     panel.innerHTML = decided
       ? this.infoBox(`✅ 你的上警意向已提交：${optedUp ? '🏅 上警' : '🚫 不上警'}。等待其他玩家提交...`)
-      : `<div class="action-prompt">⭐ 是否参与警长竞选？</div>
+      : `<div class="action-prompt">⭐ 是否参与警长竞选？（首夜流程）</div>
          <div class="action-buttons">
            <button class="confirm-btn" data-action="sheriff-up" type="button">🏅 上警</button>
            <button class="control-btn" data-action="sheriff-down" type="button">🚫 不上警</button>
@@ -1326,18 +1389,18 @@ const App = {
   renderSheriffSpeechActions(panel, data, me) {
     const isCandidate = data.state.sheriff?.candidates?.[me.id] && !data.state.sheriff?.drops?.[me.id];
     panel.innerHTML = isCandidate 
-      ? `<div class="action-prompt">⭐ 你是警长候选人</div>
+      ? `<div class="action-prompt">⭐ 你是警长候选人（首夜流程）</div>
          <div class="action-buttons">
            <button class="action-btn" data-action="sheriff-drop" type="button">💧 退水</button>
          </div>`
-      : this.infoBox('🎤 警上候选人发言中...');
+      : this.infoBox('🎤 警上候选人发言中（首夜流程）...');
   },
 
   renderSheriffVoteActions(panel, data, sel) {
     const validCandidates = Object.keys(data.state.sheriff?.candidates || {})
       .filter(id => data.state.sheriff.candidates[id] && !data.state.sheriff.drops?.[id] && data.players?.[id]?.isAlive);
     panel.innerHTML = `
-      <div class="action-prompt">⭐ 为警长候选人投票</div>
+      <div class="action-prompt">⭐ 为警长候选人投票（首夜流程）</div>
       <div class="action-target">候选人: ${validCandidates.map(id => `${id}号`).join('、') || '无'}</div>
       <div class="action-buttons">
         <button class="control-btn" data-action="sheriff-vote-abstain" type="button">🚫 弃票</button>
@@ -1421,16 +1484,16 @@ const App = {
     switch(st.phase) {
       case PHASE.NIGHT:
       case PHASE.NIGHT_WITCH:
-        actionsHtml += `<button class="action-btn" data-action="host-force-dawn" type="button">${st.round === 1 ? '⏩ 强制进入警长竞选' : '☀️ 强制天亮'}</button>`;
+        actionsHtml += `<button class="action-btn" data-action="host-force-dawn" type="button">${st.round === 1 ? '⏩ 进入上警（首夜）' : '☀️ 强制天亮'}</button>`;
         break;
       case PHASE.SHERIFF_CAND:
-        actionsHtml += `<button class="btn-primary" data-action="host-speech" type="button">🎤 进入发言</button>`;
+        actionsHtml += `<button class="btn-primary" data-action="host-speech" type="button">🎤 进入发言（首夜）</button>`;
         break;
       case PHASE.SHERIFF_SPEECH:
-        actionsHtml += `<button class="btn-primary" data-action="host-sheriff-vote" type="button">🗳️ 进入投票</button>`;
+        actionsHtml += `<button class="btn-primary" data-action="host-sheriff-vote" type="button">🗳️ 进入投票（首夜）</button>`;
         break;
       case PHASE.SHERIFF_VOTE:
-        actionsHtml += `<button class="action-btn" data-action="host-force-sheriff-tally" type="button">📊 强制计票</button>`;
+        actionsHtml += `<button class="action-btn" data-action="host-force-sheriff-tally" type="button">📊 强制计票（首夜）</button>`;
         break;
       case PHASE.DAY_TALK:
         actionsHtml += `<button class="btn-primary" data-action="host-day-vote" type="button">🗳️ 开启放逐投票</button>`;
@@ -1471,6 +1534,7 @@ const App = {
     host.innerHTML = html;
   },
 
+  // 主机状态面板：夜晚不暴露任何进度/细节
   renderHostStatusDashboard(data) {
     const st = data.state;
     let statusText = '';
@@ -1478,19 +1542,9 @@ const App = {
     
     switch (st.phase) {
       case PHASE.NIGHT:
-      case PHASE.NIGHT_WITCH: {
-        const hiddenActive = this.getHiddenActive(data);
-        const actingWolves = Object.values(data.players || {}).filter(p => this.isPlayerActingWolf(p, data, hiddenActive));
-        const wolfVotes = data.actions?.[st.round]?.NIGHT?.WOLF || {};
-        const votedWolves = actingWolves.filter(w => wolfVotes[w.id]?.target !== undefined);
-        statusText = `夜晚进行中 - 狼人投票: ${votedWolves.length}/${actingWolves.length}`;
-        if (st.phase === PHASE.NIGHT_WITCH) {
-          const witchAlive = Object.values(data.players || {}).some(p => p.isAlive && this.getActiveRole(p, data.players, data.state, data.settings) === '女巫');
-          const witchDone = this.isWitchActionDone(data);
-          statusText += ` | 女巫: ${witchAlive ? (witchDone ? '已完成' : '行动中') : '不在场'}`;
-        }
+      case PHASE.NIGHT_WITCH:
+        statusText = '夜晚进行中（主持人不显示进度细节）';
         break;
-      }
       case PHASE.SHERIFF_CAND: {
         const players = Object.values(data.players || {});
         const alive = players.filter(p => p.isAlive);
@@ -1508,6 +1562,9 @@ const App = {
         progressInfo = { current: Object.keys(votes).length, total: voters.length };
         break;
       }
+      case PHASE.DAY_TALK:
+        statusText = '白天发言阶段';
+        break;
       default:
         return '';
     }
@@ -1634,7 +1691,13 @@ const App = {
         this.toast(`主持人已移交给玩家 ${newHostId}`, 'success');
         return;
       }
-      case 'host-force-dawn':           return this.engine.dawnResolve();
+      case 'host-force-dawn': {
+        if ((this.full.state.round || 1) === 1 && (this.full.state.phase === PHASE.NIGHT || this.full.state.phase === PHASE.NIGHT_WITCH)) {
+          // 首夜：允许直接进入上警，而不是结算
+          return this.engine.to(PHASE.SHERIFF_CAND, { sheriff: { candidates: {}, votes: {}, drops: {}, isPK: false } });
+        }
+        return this.engine.dawnResolve();
+      }
       case 'host-speech':               return this.engine.forceSheriffSpeech();
       case 'host-sheriff-vote':         return this.engine.to(PHASE.SHERIFF_VOTE);
       case 'host-force-sheriff-tally':  return this.engine.tallySheriff();
@@ -1734,8 +1797,9 @@ const App = {
 
   isPlayerActingWolf(player, data, hiddenActive) {
     if (!player?.isAlive) return false;
-    const ar = this.getActiveRole(player, data.players, data.state, data.settings);
-    return ar === '狼人' || (ar === '隐狼' && hiddenActive);
+    const idx = Math.min(player.deaths || 0, 1);
+    const role = player.identities?.[idx]?.role || null;
+    return role === '狼人' || (role === '隐狼' && hiddenActive);
   },
 
   getWolfFinalTarget(data) { 
@@ -1758,12 +1822,13 @@ const App = {
     const mode = data.settings?.seerMode || 'faction';
     const hiddenActive = this.getHiddenActive(data);
     if (mode === 'identity') {
-      const role = this.getActiveRole(target, data.players, data.state, data.settings);
+      const idx = Math.min(target.deaths || 0, 1);
+      let role = target.identities?.[idx]?.role || '未知身份';
       if (role === '隐狼' && !hiddenActive) {
         const otherRole = (target.identities || []).find(id => id.role !== '隐狼')?.role;
-        return otherRole || '平民';
+        role = otherRole || '平民';
       }
-      return role || '未知身份';
+      return role;
     } else {
       const isWolfFaction = (target.identities || []).some(i => i.role === '狼人' || (i.role === '隐狼' && hiddenActive));
       return isWolfFaction ? '狼人阵营' : '好人阵营';
@@ -1840,7 +1905,7 @@ const App = {
       };
 
       const initData = {
-        meta: { createdAt: now(), creator: 'FSM-slim' },
+        meta: { createdAt: now(), creator: 'FSM-simplified' },
         config: { counts, settings }, 
         players, 
         settings, 
@@ -1886,7 +1951,7 @@ const App = {
       });
 
       const initData = {
-        meta: { createdAt: now(), creator: 'FSM-slim', from: oldGameId },
+        meta: { createdAt: now(), creator: 'FSM-simplified', from: oldGameId },
         config: { counts, settings: config.settings }, 
         players, settings: config.settings, actions: {}, logs: {},
         state: { phase: PHASE.LOBBY, round: 0, host: this.full.state.host, peace: 0, winner: null, sheriff: null }
@@ -1907,6 +1972,7 @@ const App = {
       const pairs = [];
       let ok = true, hasGolden = false;
 
+      // 禁配：允许狼人+狼人
       for (let i = 0; i < d.length; i += 2) {
         const role1 = d[i], role2 = d[i + 1];
         const origKey = [role1, role2].sort().join('|');
@@ -1915,6 +1981,7 @@ const App = {
       }
       if (!ok) continue;
 
+      // 展开盗贼复制（盗贼复制对牌，显示🎭）
       for (let i = 0; i < d.length; i += 2) {
         let role1 = d[i], role2 = d[i + 1];
         if (role1 === '盗贼') pairs.push([{ role: role2, isCopy: true }, { role: role2 }]);
@@ -1922,6 +1989,7 @@ const App = {
         else pairs.push([{ role: role1 }, { role: role2 }]);
       }
 
+      // 展开后禁配再校验
       for (const pair of pairs) {
         const key = [pair[0].role, pair[1].role].sort().join('|');
         if (FORBIDDEN_PAIRS.has(key)) { ok = false; forbiddenHits++; break; }
@@ -2004,12 +2072,11 @@ const App = {
       }
 
       if (prevPhase && prevPhase !== data.state.phase) {
-        // 简单提示，不做复杂动画
         const phaseMessages = {
           [PHASE.NIGHT]: '🌙 夜幕降临',
           [PHASE.NIGHT_WITCH]: '🧪 女巫行动',
           [PHASE.DAWN]: '🌅 天亮了',
-          [PHASE.SHERIFF_CAND]: '⭐ 警长竞选开始',
+          [PHASE.SHERIFF_CAND]: '⭐ 警长竞选（首夜）',
           [PHASE.DAY_TALK]: '☀️ 白天发言',
           [PHASE.DAY_VOTE]: '🗳️ 放逐投票',
           [PHASE.HUNTER]: '🔫 猎人行动',
@@ -2063,7 +2130,7 @@ window.addEventListener('beforeunload', () => {
 document.addEventListener('DOMContentLoaded', () => {
   try {
     App.init();
-    console.log('狼人杀应用已启动 (简化稳定版)');
+    console.log('狼人杀应用已启动 (简化稳定+规则修正版)');
   } catch (e) {
     console.error('App init failed:', e);
     document.body.innerHTML = `

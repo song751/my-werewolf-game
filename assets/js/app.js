@@ -2177,41 +2177,224 @@ const App = {
     }
   },
 
-  dealWithGolden(pool) {
-    let forbiddenHits = 0, doubleThiefHits = 0, noGoldenHits = 0;
-    for (let t = 0; t < 10000; t++) {
-      const d = shuffle([...pool]);
-      const pairs = [];
-      let ok = true, hasGolden = false;
+// 用“随机化回溯 + CSPRNG + 最终洗牌”生成合法配对：无禁配，含至少一个金宝宝
+dealWithGolden(pool, opts = {}) {
+  const requireGolden = opts.requireGolden !== false;           // 是否要求至少一对“平民+平民”
+  const maxMsTotal = typeof opts.maxMsTotal === 'number' ? opts.maxMsTotal : 800; // 总耗时上限
+  const maxMsBacktrack = typeof opts.maxMsBacktrack === 'number' ? opts.maxMsBacktrack : Math.min(500, maxMsTotal - 100);
+  const fallbackTries = typeof opts.fallbackTries === 'number' ? opts.fallbackTries : 4000;
 
-      for (let i = 0; i < d.length; i += 2) {
-        const role1 = d[i], role2 = d[i + 1];
-        const origKey = [role1, role2].sort().join('|');
-        if (FORBIDDEN_PAIRS.has(origKey)) { ok = false; forbiddenHits++; break; }
-        if (role1 === '盗贼' && role2 === '盗贼') { ok = false; doubleThiefHits++; break; }
-      }
-      if (!ok) continue;
-
-      for (let i = 0; i < d.length; i += 2) {
-        let role1 = d[i], role2 = d[i + 1];
-        if (role1 === '盗贼') pairs.push([{ role: role2, isCopy: true }, { role: role2 }]);
-        else if (role2 === '盗贼') pairs.push([{ role: role1 }, { role: role1, isCopy: true }]);
-        else pairs.push([{ role: role1 }, { role: role2 }]);
-      }
-
-      for (const pair of pairs) {
-        const key = [pair[0].role, pair[1].role].sort().join('|');
-        if (FORBIDDEN_PAIRS.has(key)) { ok = false; forbiddenHits++; break; }
-      }
-      if (!ok) continue;
-
-      hasGolden = pairs.some(pr => pr[0].role === '平民' && pr[1].role === '平民');
-      if (hasGolden) return { pairs };
-      noGoldenHits++;
+  // 1) RNG（默认 CSPRNG；可选 seed 复现）
+  const makeRNG = (seed) => {
+    if (seed === undefined || seed === null) {
+      // CSPRNG
+      const buf = new Uint32Array(1);
+      return () => {
+        if (window.crypto?.getRandomValues) {
+          window.crypto.getRandomValues(buf);
+          return (buf[0] >>> 0) / 2**32;
+        }
+        return Math.random();
+      };
     }
-    this._lastDealError = `发牌失败：禁配命中${forbiddenHits}次，双盗${doubleThiefHits}次，无金宝宝${noGoldenHits}次。`;
+    // seedable（Mulberry32）
+    let s = (seed >>> 0) || 0x9e3779b9;
+    return function() {
+      s |= 0; s = (s + 0x6D2B79F5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+  const rng = makeRNG(opts.seed);
+
+  const randInt = (n) => (n <= 1 ? 0 : Math.floor(rng() * n));
+  const shuffleArr = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = randInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+
+  // 2) 统计
+  const counts = {};
+  for (const r of pool) counts[r] = (counts[r] || 0) + 1;
+  const total = pool.length;
+  if (total === 0 || total % 2 !== 0) {
+    this._lastDealError = '身份总数必须为偶数且大于0';
     return null;
-  },
+  }
+  const targetPairs = total / 2;
+
+  // 3) 约束/工具
+  const isForbiddenPair = (a, b) => {
+    if ((a === '盗贼' && (b === '狼人' || b === '隐狼')) ||
+        (b === '盗贼' && (a === '狼人' || a === '隐狼'))) return true;
+    if (a === '盗贼' && b === '盗贼') return true;
+    const key = [a, b].sort().join('|');
+    return FORBIDDEN_PAIRS.has(key);
+  };
+
+  const effectivePair = (a, b) => {
+    if (a === '盗贼' && b !== '盗贼') return [b, b];
+    if (b === '盗贼' && a !== '盗贼') return [a, a];
+    return [a, b];
+  };
+
+  const realizePairObjects = (a, b) => {
+    if (a === '盗贼' && b !== '盗贼') {
+      return [ { role: b, isCopy: true }, { role: b } ];
+    } else if (b === '盗贼' && a !== '盗贼') {
+      return [ { role: a }, { role: a, isCopy: true } ];
+    }
+    return [ { role: a }, { role: b } ];
+  };
+
+  const canStillAchieveGolden = (cnt) => {
+    const civ = cnt['平民'] || 0;
+    const thief = cnt['盗贼'] || 0;
+    return civ >= 2 || (civ >= 1 && thief >= 1);
+  };
+
+  const rolePriority = (r) => {
+    switch (r) {
+      case '狼人': return 100;
+      case '隐狼': return 95;
+      case '预言家': return 90;
+      case '盗贼': return 80;
+      case '猎人': return 70;
+      case '女巫': return 60;
+      case '守卫': return 50;
+      case '骑士': return 40;
+      case '白痴': return 30;
+      case '平民': return 10;
+      default: return 10;
+    }
+  };
+
+  const rolesAvail = (cnt) => Object.keys(cnt).filter(k => cnt[k] > 0);
+
+  // 带“轻偏好”的随机选 r1：优先级越高越可能被优先挑到，但加入随机噪声
+  const pickR1 = (cnt) => {
+    const list = rolesAvail(cnt);
+    if (list.length === 0) return null;
+    // 评分 = priority + 随机噪声 + 少量与数量相关的噪声
+    const scored = list.map(r => ({
+      r,
+      score: rolePriority(r) + (rng() - 0.5) * 30 + Math.log(cnt[r] + 1) * (rng() - 0.5) * 5
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    // 在前 topK 中随机挑一个；偶尔从更靠后的元素挑一个，避免过拟合
+    const topK = Math.min(3, scored.length);
+    const coin = rng();
+    if (coin < 0.7) {
+      return scored[randInt(topK)].r;
+    } else {
+      return scored[randInt(scored.length)].r;
+    }
+  };
+
+  // 4) 随机化回溯
+  const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  let nodes = 0;
+  const pairs = [];
+
+  const timeNow = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+  const backtrack = (cnt, goldenPlaced) => {
+    nodes++;
+    if (timeNow() - start > maxMsBacktrack) return false;
+
+    const left = Object.values(cnt).reduce((s, v) => s + v, 0);
+    if (left === 0) {
+      return !requireGolden || goldenPlaced;
+    }
+
+    const r1 = pickR1(cnt);
+    if (!r1) return false;
+
+    // 构建搭档列表并随机打乱
+    const all = rolesAvail(cnt);
+    let partners = all.filter(r2 => (r2 !== r1 || cnt[r1] >= 2));
+    shuffleArr(partners);
+
+    // 轻偏好：若 r1 是“狼人/隐狼/预言家/盗贼”，将“平民/自身/平民相关”适度前置，再打乱
+    const preferScore = (r2) => {
+      if (r1 === '狼人' || r1 === '隐狼') return (r2 === '平民') ? 2 : (r2 === r1 ? 1 : 0);
+      if (r1 === '预言家') return (r2 === '平民') ? 2 : (r2 === '预言家' ? 1 : 0);
+      if (r1 === '盗贼') return (r2 === '平民') ? 2 : 0;
+      return 0;
+    };
+    partners.sort((a, b) => preferScore(b) - preferScore(a) || (rng() - 0.5)); // 同分随机
+
+    for (const r2 of partners) {
+      if (isForbiddenPair(r1, r2)) continue;
+
+      const [e1, e2] = effectivePair(r1, r2);
+      const effKey = [e1, e2].sort().join('|');
+      if (FORBIDDEN_PAIRS.has(effKey)) continue;
+
+      const thisIsGolden = (e1 === '平民' && e2 === '平民');
+
+      // 扣减并前瞻金宝宝可达性
+      cnt[r1]--; if (r2 !== r1) cnt[r2]--;
+      if (requireGolden && !thisIsGolden && !goldenPlaced) {
+        if (!canStillAchieveGolden(cnt)) {
+          cnt[r1]++; if (r2 !== r1) cnt[r2]++;
+          continue;
+        }
+      }
+
+      pairs.push(realizePairObjects(r1, r2));
+      if (backtrack(cnt, goldenPlaced || thisIsGolden)) return true;
+
+      pairs.pop();
+      cnt[r1]++; if (r2 !== r1) cnt[r2]++;
+    }
+    return false;
+  };
+
+  const ok = backtrack({ ...counts }, false);
+  const timeLeft = Math.max(0, maxMsTotal - (timeNow() - start));
+
+  const finalizeAndReturn = (pp) => {
+    // 终局随机化：打乱对的顺序 + 每对左右随机互换
+    shuffleArr(pp);
+    for (const pr of pp) {
+      if (rng() < 0.5) [pr[0], pr[1]] = [pr[1], pr[0]];
+    }
+    return { pairs: pp };
+  };
+
+  if (ok && pairs.length === targetPairs) {
+    return finalizeAndReturn(pairs.slice());
+  }
+
+  // 5) 兜底：纯随机洗牌 + 拒绝采样（多次尝试，保持随机性）
+  const deadline = timeNow() + timeLeft;
+  const tryRandomPermutation = () => {
+    const d = pool.slice();
+    shuffleArr(d);
+    const res = [];
+    let golden = false;
+    for (let i = 0; i < d.length; i += 2) {
+      const a = d[i], b = d[i + 1];
+      if (isForbiddenPair(a, b)) return null;
+      const [e1, e2] = effectivePair(a, b);
+      const effKey = [e1, e2].sort().join('|');
+      if (FORBIDDEN_PAIRS.has(effKey)) return null;
+      if (e1 === '平民' && e2 === '平民') golden = true;
+      res.push(realizePairObjects(a, b));
+    }
+    if (requireGolden && !golden) return null;
+    return res;
+  };
+
+  for (let t = 0; t < fallbackTries && timeNow() < deadline; t++) {
+    const res = tryRandomPermutation();
+    if (res && res.length === targetPairs) {
+      return finalizeAndReturn(res);
+    }
+  }
+
+  this._lastDealError = `发牌失败：在时限内未找到合法配对（回溯节点≈${nodes}）。请调整配置后重试。`;
+  return null;
+},
 
   async handleJoinGame(playerNum, btn) {
     const original = btn.textContent;

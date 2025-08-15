@@ -941,15 +941,43 @@ initButtonEffects() {
   document.addEventListener('pointerleave', onUp);
 }
 
-  toast(txt, type = 'info', duration = 2200) {
-    const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-    const icon = icons[type] || icons.info;
-    const container = $('notification-container');
-    if (!container) return;
-    const n = el(`<div class="notification ${type}">${icon} ${escapeHtml(txt)}</div>`);
-    container.appendChild(n);
-    setTimeout(() => { if (n.parentNode) n.parentNode.removeChild(n); }, duration);
-  },
+toast(txt, type = 'info', duration = 3000) {
+  const icons = { 
+    success: '✅', 
+    error: '❌', 
+    warning: '⚠️', 
+    info: 'ℹ️',
+    magic: '✨' 
+  };
+  
+  const colors = {
+    success: 'rgba(16, 185, 129, 0.3)',
+    error: 'rgba(239, 68, 68, 0.3)',
+    warning: 'rgba(245, 158, 11, 0.3)',
+    info: 'rgba(59, 130, 246, 0.3)',
+    magic: 'rgba(139, 92, 246, 0.3)'
+  };
+  
+  const icon = icons[type] || icons.info;
+  const container = $('notification-container');
+  if (!container) return;
+  
+  const n = el(`
+    <div class="notification ${type}" style="border-left-color: ${colors[type]}">
+      ${icon} ${escapeHtml(txt)}
+    </div>
+  `);
+  
+  container.appendChild(n);
+  
+  // 自动移除
+  setTimeout(() => {
+    if (n.parentNode) {
+      n.style.animation = 'slideOutRight 0.3s ease-in-out';
+      setTimeout(() => n.remove(), 300);
+    }
+  }, duration);
+}
 
   infoBox(text) {
     return `<div class="action-feedback">${escapeHtml(text)}</div>`;

@@ -1,12 +1,10 @@
 /**
  * 双身份狼人杀 - 电子法官系统 (完整修复版)
  * 修复内容：
- * 1. 流程重复判定问题 - 添加完整的幂等性保护
- * 2. 金宝宝保证逻辑 - 确保至少有一个金宝宝
- * 3. 上帝视角修复
- * 4. 日志系统区分公开/秘密
- * 5. 女巫、猎人等角色技能修复
- * 6. 首夜流程顺序修复
+ * 1. 补充完整的UIManager类实现
+ * 2. 实现创建游戏功能
+ * 3. 完善上帝视角
+ * 4. 修复所有已知问题
  */
 
 /* ==================================================================
@@ -104,6 +102,10 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function generateGameId() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 /* ==================================================================
@@ -910,7 +912,7 @@ function dealCards(rolePool) {
 }
 
 /* ==================================================================
- * 6. UI管理器（续写部分）
+ * 6. UI管理器（完整版）
  * ================================================================== */
 
 class UIManager {
@@ -922,6 +924,692 @@ class UIManager {
     this.engine = null;
     this.listeners = [];
     this.selectedPlayer = null;
+    this.tickInterval = null;
+  }
+
+  // 初始化
+  init() {
+    // 隐藏加载屏幕
+    setTimeout(() => {
+      const loading = $('loading-screen');
+      if (loading) {
+        loading.classList.add('hidden');
+      }
+    }, 1000);
+
+    // 绑定初始事件
+    this.bindInitialEvents();
+
+    // 检查URL参数
+    const params = new URLSearchParams(window.location.search);
+    const gameId = params.get('game');
+    const player = params.get('player');
+
+    if (gameId) {
+      this.gameId = gameId;
+      this.playerId = player || null;
+      
+      if (player === '0') {
+        // 上帝视角
+        this.switchView('god-view');
+        this.initGodView();
+      } else if (player) {
+        // 玩家加入
+        this.switchView('game-view');
+        this.initGame();
+      } else {
+        // 选择座位
+        this.switchView('join-view');
+      }
+    } else {
+      // 显示创建界面
+      this.switchView('setup-view');
+      this.initSetup();
+    }
+  }
+
+  // 绑定初始事件
+  bindInitialEvents() {
+    // 创建游戏按钮
+    const createBtn = $('create-game-btn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => this.createGame());
+    }
+
+    // 加入游戏按钮
+    const joinBtn = $('join-game-btn');
+    if (joinBtn) {
+      joinBtn.addEventListener('click', () => this.joinGame());
+    }
+
+    // 复制链接按钮
+    const copyBtn = $('copy-link-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => this.copyGameLink());
+    }
+
+    // 日志按钮
+    const logsBtn = $('logs-btn');
+    if (logsBtn) {
+      logsBtn.addEventListener('click', () => this.showLogs());
+    }
+
+    // 模态框关闭
+    $$('[data-action="close-modal"]').forEach(btn => {
+      btn.addEventListener('click', () => this.closeModal());
+    });
+
+    // 点击背景关闭模态框
+    $$('.modal-backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', () => this.closeModal());
+    });
+  }
+
+  // 初始化设置页面
+  initSetup() {
+    const roleGrid = $('role-grid');
+    if (!roleGrid) return;
+
+    roleGrid.innerHTML = '';
+    
+    for (const [role, info] of Object.entries(ROLES)) {
+      const count = DEFAULT_SETUP[role] || 0;
+      const item = document.createElement('div');
+      item.className = 'role-item';
+      item.innerHTML = `
+        <div class="role-name">
+          <span class="role-icon">${info.icon}</span>
+          <span>${role}</span>
+        </div>
+        <div class="number-input">
+          <button onclick="UI.changeRoleCount('${role}', -1)">-</button>
+          <input type="number" id="role-${role}" value="${count}" readonly>
+          <button onclick="UI.changeRoleCount('${role}', 1)">+</button>
+        </div>
+      `;
+      roleGrid.appendChild(item);
+    }
+
+    this.updateSetupSummary();
+  }
+
+  // 改变角色数量
+  changeRoleCount(role, delta) {
+    const input = $(`role-${role}`);
+    if (!input) return;
+
+    let count = parseInt(input.value) || 0;
+    count = Math.max(0, count + delta);
+
+    // 唯一角色限制
+    if (UNIQUE_ROLES.has(role)) {
+      count = Math.min(1, count);
+    }
+
+    input.value = count;
+    this.updateSetupSummary();
+  }
+
+  // 更新设置摘要
+  updateSetupSummary() {
+    let total = 0;
+    
+    for (const role of Object.keys(ROLES)) {
+      const input = $(`role-${role}`);
+      if (input) {
+        total += parseInt(input.value) || 0;
+      }
+    }
+
+    const totalRoles = $('total-roles');
+    const playerCount = $('player-count');
+    const warning = $('setup-warning');
+
+    if (totalRoles) totalRoles.textContent = total;
+    if (playerCount) playerCount.textContent = Math.floor(total / 2);
+
+    if (warning) {
+      if (total === 0) {
+        warning.textContent = '请配置角色';
+      } else if (total % 2 !== 0) {
+        warning.textContent = '身份总数必须为偶数';
+      } else {
+        warning.textContent = '';
+      }
+    }
+  }
+
+  // 创建游戏
+  async createGame() {
+    try {
+      // 收集角色配置
+      const roleCount = {};
+      let rolePool = [];
+
+      for (const role of Object.keys(ROLES)) {
+        const input = $(`role-${role}`);
+        if (input) {
+          const count = parseInt(input.value) || 0;
+          if (count > 0) {
+            roleCount[role] = count;
+            for (let i = 0; i < count; i++) {
+              rolePool.push(role);
+            }
+          }
+        }
+      }
+
+      if (rolePool.length === 0 || rolePool.length % 2 !== 0) {
+        this.showNotification('身份配置不正确', 'error');
+        return;
+      }
+
+      // 发牌
+      const pairs = dealCards(rolePool);
+      
+      // 创建玩家数据
+      const players = {};
+      pairs.forEach((pair, index) => {
+        const pid = index + 1;
+        players[pid] = {
+          id: pid,
+          name: `玩家${pid}`,
+          identities: pair,
+          deaths: 0,
+          isAlive: true,
+          isReady: false,
+          badge: 0,
+          skill: {}
+        };
+      });
+
+      // 收集游戏设置
+      const settings = {
+        witchRule: $('witch-rule')?.value || 'noFirstNightSelfSave',
+        seerMode: $('seer-mode')?.value || 'faction',
+        wolfWin: $('wolf-win')?.value || 'edge',
+        wolfVisibility: $('wolf-visibility')?.value || 'activeOnly',
+        hiddenActivation: $('hidden-activation')?.value || 'noActiveWolf'
+      };
+
+      // 生成游戏ID
+      const gameId = generateGameId();
+
+      // 创建游戏数据
+      const gameData = {
+        id: gameId,
+        created: firebase.database.ServerValue.TIMESTAMP,
+        config: { roleCount },
+        settings,
+        players,
+        state: {
+          phase: PHASE.LOBBY,
+          round: 0,
+          host: 1,
+          peace: 0
+        },
+        actions: {},
+        logs: []
+      };
+
+      // 保存到数据库
+      await db.ref(`games/${gameId}`).set(gameData);
+
+      // 跳转到游戏大厅
+      window.location.href = `?game=${gameId}&player=1`;
+
+    } catch (error) {
+      console.error('Create game error:', error);
+      this.showNotification(error.message || '创建游戏失败', 'error');
+    }
+  }
+
+  // 加入游戏
+  async joinGame() {
+    const input = $('player-number-input');
+    if (!input) return;
+
+    const playerNum = parseInt(input.value);
+    if (!playerNum || playerNum < 1 || playerNum > 20) {
+      this.showNotification('请输入有效的座位号', 'error');
+      return;
+    }
+
+    // 检查座位是否已被占用
+    const playerSnap = await db.ref(`games/${this.gameId}/players/${playerNum}`).once('value');
+    if (!playerSnap.exists()) {
+      this.showNotification('该座位不存在', 'error');
+      return;
+    }
+
+    // 跳转到游戏
+    window.location.href = `?game=${this.gameId}&player=${playerNum}`;
+  }
+
+  // 初始化游戏
+  async initGame() {
+    try {
+      this.engine = new GameEngine(this.gameId);
+      
+      // 设置数据监听
+      this.setupListeners();
+
+      // 启动tick循环
+      this.tickInterval = setInterval(() => {
+        if (this.engine) {
+          this.engine.tick();
+        }
+      }, 1000);
+
+    } catch (error) {
+      console.error('Init game error:', error);
+      this.showNotification('游戏初始化失败', 'error');
+    }
+  }
+
+  // 初始化上帝视角
+  async initGodView() {
+    try {
+      this.engine = new GameEngine(this.gameId);
+      
+      // 设置数据监听
+      const gameRef = db.ref(`games/${this.gameId}`);
+      this.listeners.push(gameRef);
+      
+      gameRef.on('value', snapshot => {
+        this.gameData = snapshot.val();
+        if (this.gameData) {
+          this.renderGodView();
+        }
+      });
+
+      // 启动tick循环
+      this.tickInterval = setInterval(() => {
+        if (this.engine) {
+          this.engine.tick();
+        }
+      }, 1000);
+
+    } catch (error) {
+      console.error('Init god view error:', error);
+      this.showNotification('上帝视角初始化失败', 'error');
+    }
+  }
+
+  // 设置数据监听器
+  setupListeners() {
+    // 游戏状态监听
+    const gameRef = db.ref(`games/${this.gameId}`);
+    this.listeners.push(gameRef);
+    
+    gameRef.on('value', snapshot => {
+      this.gameData = snapshot.val();
+      if (!this.gameData) return;
+
+      this.players = this.gameData.players;
+      this.actions = this.gameData.actions;
+      
+      // 根据阶段切换视图
+      const phase = this.gameData.state?.phase;
+      
+      if (phase === PHASE.LOBBY) {
+        this.switchView('lobby-view');
+        this.renderLobby();
+      } else if (phase === PHASE.GAME_OVER) {
+        this.renderGameOver();
+      } else {
+        this.switchView('game-view');
+        this.renderGameView();
+      }
+    });
+  }
+
+  // 切换视图
+  switchView(viewId) {
+    $$('.view').forEach(view => {
+      view.classList.remove('active');
+    });
+    
+    const view = $(viewId);
+    if (view) {
+      view.classList.add('active');
+      this.currentView = viewId;
+    }
+  }
+
+  // 渲染大厅
+  renderLobby() {
+    // 显示游戏链接
+    const linkInput = $('game-link');
+    if (linkInput) {
+      linkInput.value = window.location.origin + `?game=${this.gameId}`;
+    }
+
+    // 显示玩家状态
+    const grid = $('player-status-grid');
+    if (grid) {
+      grid.innerHTML = '';
+      
+      const players = Object.values(this.players).sort((a, b) => a.id - b.id);
+      for (const player of players) {
+        const item = document.createElement('div');
+        item.className = `player-status-item ${player.isReady ? 'ready' : ''}`;
+        item.innerHTML = `
+          <div>${player.id}号</div>
+          <div>${player.isReady ? '✅ 已准备' : '⏳ 等待中'}</div>
+        `;
+        grid.appendChild(item);
+      }
+    }
+
+    // 显示身份
+    const identityDisplay = $('lobby-identity-display');
+    if (identityDisplay && this.playerId) {
+      const me = this.players[this.playerId];
+      if (me) {
+        identityDisplay.innerHTML = `
+          <div class="identity-card ${me.identities[0].isCopy ? 'thief-copy' : ''}">
+            <span>${me.identities[0].isCopy ? '🎭' : ROLES[me.identities[0].role].icon}</span>
+            <span>${me.identities[0].role}</span>
+          </div>
+          <div class="identity-card ${me.identities[1].isCopy ? 'thief-copy' : ''}">
+            <span>${me.identities[1].isCopy ? '🎭' : ROLES[me.identities[1].role].icon}</span>
+            <span>${me.identities[1].role}</span>
+          </div>
+        `;
+      }
+    }
+
+    // 显示操作按钮
+    const actions = $('lobby-actions');
+    if (actions && this.playerId) {
+      const me = this.players[this.playerId];
+      if (me) {
+        let html = '';
+        
+        if (!me.isReady) {
+          html += `
+            <button class="btn btn-secondary" onclick="UI.swapIdentities()">
+              交换身份
+            </button>
+            <button class="btn btn-primary" onclick="UI.confirmReady()">
+              确认准备
+            </button>
+          `;
+        }
+        
+        if (String(this.playerId) === '1') {
+          const allReady = Object.values(this.players).every(p => p.isReady);
+          if (allReady) {
+            html += `
+              <button class="btn btn-success" onclick="UI.startGame()">
+                开始游戏
+              </button>
+            `;
+          }
+        }
+        
+        actions.innerHTML = html;
+      }
+    }
+  }
+
+  // 渲染游戏视图
+  renderGameView() {
+    if (!this.gameData) return;
+
+    // 渲染头部状态
+    this.renderGameHeader();
+    
+    // 渲染玩家列表
+    this.renderPlayerLists();
+    
+    // 渲染身份面板
+    this.renderIdentityPanel();
+    
+    // 渲染持久信息
+    this.renderPersistInfo();
+    
+    // 渲染操作面板
+    this.renderActionPanel();
+    
+    // 渲染主持人面板
+    this.renderHostPanel();
+  }
+
+  // 渲染游戏头部
+  renderGameHeader() {
+    const status = $('game-status');
+    if (!status) return;
+
+    const phase = this.gameData.state.phase;
+    const round = this.gameData.state.round;
+    
+    status.innerHTML = `
+      <span>第 ${round} 轮</span>
+      <span>·</span>
+      <span>${this.getPhaseText()}</span>
+    `;
+  }
+
+  // 获取阶段文本
+  getPhaseText() {
+    const phase = this.gameData?.state?.phase;
+    const phaseTexts = {
+      [PHASE.SETUP]: '游戏设置',
+      [PHASE.LOBBY]: '游戏大厅',
+      [PHASE.NIGHT]: '夜晚',
+      [PHASE.NIGHT_WITCH]: '女巫行动',
+      [PHASE.DAWN]: '黎明',
+      [PHASE.SHERIFF_CAND]: '警长竞选',
+      [PHASE.SHERIFF_SPEECH]: '竞选发言',
+      [PHASE.SHERIFF_VOTE]: '警长投票',
+      [PHASE.DAY_TALK]: '白天发言',
+      [PHASE.DAY_VOTE]: '放逐投票',
+      [PHASE.HUNTER]: '猎人开枪',
+      [PHASE.BADGE]: '警徽移交',
+      [PHASE.GAME_OVER]: '游戏结束'
+    };
+    
+    return phaseTexts[phase] || '未知阶段';
+  }
+
+  // 渲染玩家列表
+  renderPlayerLists() {
+    const leftList = $('players-left');
+    const rightList = $('players-right');
+    
+    if (!leftList || !rightList) return;
+
+    leftList.innerHTML = '';
+    rightList.innerHTML = '';
+
+    const players = Object.values(this.players).sort((a, b) => a.id - b.id);
+    const half = Math.ceil(players.length / 2);
+
+    players.forEach((player, index) => {
+      const card = this.createPlayerCard(player);
+      if (index < half) {
+        leftList.appendChild(card);
+      } else {
+        rightList.appendChild(card);
+      }
+    });
+  }
+
+  // 创建玩家卡片
+  createPlayerCard(player) {
+    const card = document.createElement('div');
+    card.className = 'player-card';
+    card.dataset.playerId = player.id;
+    
+    if (!player.isAlive) {
+      card.classList.add('dead');
+    }
+    
+    if (String(player.id) === String(this.playerId)) {
+      card.classList.add('me');
+    }
+    
+    if (String(player.id) === String(this.selectedPlayer)) {
+      card.classList.add('selected');
+    }
+
+    const hearts = 2 - (player.deaths || 0);
+    const heartDisplay = '❤️'.repeat(hearts) + '🖤'.repeat(2 - hearts);
+
+    card.innerHTML = `
+      <div class="player-number">${player.id}号</div>
+      <div class="player-hearts">${heartDisplay}</div>
+      ${player.badge ? '<div class="player-badges">👑</div>' : ''}
+      ${player.isExposedIdiot ? '<div class="player-badges">🤪</div>' : ''}
+    `;
+
+    card.addEventListener('click', () => {
+      this.selectPlayer(player.id);
+    });
+
+    return card;
+  }
+
+  // 渲染身份面板
+  renderIdentityPanel() {
+    const panel = $('identity-panel');
+    if (!panel || !this.playerId) return;
+
+    const me = this.players[this.playerId];
+    if (!me) return;
+
+    const activeIdx = Math.min(me.deaths || 0, 1);
+    const activeRole = me.identities[activeIdx];
+    const roleInfo = ROLES[activeRole.role];
+
+    panel.innerHTML = `
+      <h3>你的身份</h3>
+      <div class="identity-display">
+        <div class="identity-card ${activeRole.isCopy ? 'thief-copy' : ''}">
+          <span class="role-icon">${activeRole.isCopy ? '🎭' : roleInfo.icon}</span>
+          <span>${activeRole.role}</span>
+        </div>
+      </div>
+      <div class="identity-info">
+        生命值：${2 - me.deaths}/2
+        ${me.badge ? ' · 警长' : ''}
+        ${me.isExposedIdiot ? ' · 已翻牌' : ''}
+      </div>
+    `;
+  }
+
+  // 渲染持久信息
+  renderPersistInfo() {
+    const panel = $('persist-info');
+    if (!panel || !this.playerId) return;
+
+    const me = this.players[this.playerId];
+    if (!me) return;
+
+    let info = [];
+
+    // 守卫连守限制
+    if (me.skill?.lastGuard) {
+      info.push(`上轮守护：${me.skill.lastGuard}号（不能连守）`);
+    }
+
+    // 女巫药水使用情况
+    if (me.skill?.cureUsed) {
+      info.push('解药已使用');
+    }
+    if (me.skill?.poisonUsed) {
+      info.push('毒药已使用');
+    }
+
+    // 骑士技能使用
+    if (me.skill?.knightUsed) {
+      info.push('决斗已使用');
+    }
+
+    panel.innerHTML = info.join(' · ');
+  }
+
+  // 渲染操作面板
+  renderActionPanel() {
+    const panel = $('action-panel');
+    if (!panel || !this.playerId) return;
+
+    const me = this.players[this.playerId];
+    if (!me || !me.isAlive) {
+      panel.innerHTML = '<div class="text-muted">你已出局</div>';
+      return;
+    }
+
+    const phase = this.gameData.state.phase;
+    const activeRole = this.engine.getActiveRole(me);
+
+    // 根据阶段和角色渲染不同操作
+    switch (phase) {
+      case PHASE.NIGHT:
+        if (activeRole === '狼人' || (activeRole === '隐狼' && this.gameData.state.hiddenActive)) {
+          this.renderWolfAction();
+        } else if (activeRole === '预言家') {
+          this.renderSeerAction();
+        } else if (activeRole === '守卫') {
+          this.renderGuardAction();
+        } else {
+          panel.innerHTML = '<div class="text-muted">夜深了，请闭眼</div>';
+        }
+        break;
+        
+      case PHASE.NIGHT_WITCH:
+        if (activeRole === '女巫') {
+          this.renderWitchActions();
+        } else {
+          panel.innerHTML = '<div class="text-muted">等待女巫行动</div>';
+        }
+        break;
+        
+      case PHASE.SHERIFF_CAND:
+        this.renderSheriffCandidates();
+        break;
+        
+      case PHASE.SHERIFF_VOTE:
+        this.renderSheriffVote();
+        break;
+        
+      case PHASE.DAY_TALK:
+        if (activeRole === '骑士' && !me.skill?.knightUsed) {
+          this.renderKnightAction();
+        } else {
+          panel.innerHTML = '<div class="text-muted">白天发言阶段</div>';
+        }
+        break;
+        
+      case PHASE.DAY_VOTE:
+        if (!me.isExposedIdiot) {
+          this.renderDayVote();
+        } else {
+          panel.innerHTML = '<div class="text-muted">你已失去投票权</div>';
+        }
+        break;
+        
+      case PHASE.HUNTER:
+        if (this.gameData.state.hunters?.[this.playerId]) {
+          this.renderHunterAction();
+        } else {
+          panel.innerHTML = '<div class="text-muted">等待猎人开枪</div>';
+        }
+        break;
+        
+      case PHASE.BADGE:
+        if (String(this.gameData.state.postBadge?.dead) === String(this.playerId)) {
+          this.renderBadgeTransfer();
+        } else {
+          panel.innerHTML = '<div class="text-muted">等待警徽移交</div>';
+        }
+        break;
+        
+      default:
+        panel.innerHTML = '<div class="text-muted">等待中...</div>';
+    }
   }
 
   // 渲染狼人行动界面
@@ -1267,6 +1955,23 @@ class UIManager {
     `;
   }
 
+  // 渲染游戏结束
+  renderGameOver() {
+    const panel = $('action-panel');
+    if (!panel) return;
+
+    const winner = this.gameData.state.winner;
+    panel.innerHTML = `
+      <div class="game-over">
+        <h2>游戏结束</h2>
+        <div class="winner">🎉 ${winner}获胜！</div>
+        <button class="btn btn-primary" onclick="UI.backToLobby()">
+          返回大厅
+        </button>
+      </div>
+    `;
+  }
+
   // 渲染上帝视角
   renderGodView() {
     const content = $('god-content');
@@ -1338,17 +2043,43 @@ class UIManager {
   // 选择玩家
   selectPlayer(playerId) {
     // 移除之前的选中状态
-    $$('.player-card').forEach(card => {
+    $('.player-card').forEach(card => {
       card.classList.remove('selected');
     });
     
     // 添加新的选中状态
-    const cards = $$(`[data-player-id="${playerId}"]`);
+    const cards = $(`[data-player-id="${playerId}"]`);
     cards.forEach(card => {
       card.classList.add('selected');
     });
     
     this.selectedPlayer = playerId;
+  }
+
+  // 显示通知
+  showNotification(message, type = 'info') {
+    const container = $('notification-container');
+    if (!container) return;
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    container.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.remove();
+    }, 3000);
+  }
+
+  // 复制游戏链接
+  copyGameLink() {
+    const input = $('game-link');
+    if (!input) return;
+
+    input.select();
+    document.execCommand('copy');
+    this.showNotification('链接已复制', 'success');
   }
 
   // 显示日志
@@ -1381,10 +2112,17 @@ class UIManager {
 
   // 关闭模态框
   closeModal() {
-    $$('.modal').forEach(modal => {
+    $('.modal').forEach(modal => {
       modal.classList.remove('active');
     });
   }
+
+  // 返回大厅
+  backToLobby() {
+    window.location.href = `?game=${this.gameId}&player=${this.playerId}`;
+  }
+
+  // === 游戏操作方法 ===
 
   // 交换身份
   async swapIdentities() {
@@ -1477,8 +2215,6 @@ class UIManager {
     }
   }
 
-  // === 游戏行动方法 ===
-  
   // 狼人投票
   async wolfVote() {
     if (!this.selectedPlayer) {
@@ -1733,6 +2469,9 @@ window.addEventListener('beforeunload', () => {
 
 // 导出给HTML使用的全局方法
 window.UI = {
+  // 设置页面
+  changeRoleCount: (role, delta) => UI.changeRoleCount(role, delta),
+  
   // 大厅操作
   swapIdentities: () => UI.swapIdentities(),
   confirmReady: () => UI.confirmReady(),
@@ -1765,18 +2504,10 @@ window.UI = {
   
   // 特殊行动
   hunterShoot: (target) => UI.hunterShoot(target),
-  transferBadge: (target) => UI.transferBadge(target)
+  transferBadge: (target) => UI.transferBadge(target),
+  
+  // 其他
+  backToLobby: () => UI.backToLobby()
 };
 
 console.log('🐺 双身份狼人杀系统已加载完成');
-
-/* ==================================================================
- * 修复说明：
- * 1. 流程重复判定：添加了processingPhases和processedActions集合防止重复
- * 2. 金宝宝保证：发牌时强制要求至少一个金宝宝
- * 3. 上帝视角：实现了完整的上帝视角界面
- * 4. 日志系统：区分公开和秘密日志
- * 5. 角色技能：修复了女巫自救规则、猎人触发条件、守卫连守限制等
- * 6. 游戏流程：修复了首夜警长竞选、黎明结算、死亡处理等
- * 7. 重开游戏：实现了主持人重新发牌功能
- * ================================================================== */

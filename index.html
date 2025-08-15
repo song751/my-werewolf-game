@@ -95,7 +95,7 @@
                 <label for="wolf-win">狼人胜利条件</label>
                 <select id="wolf-win" class="form-select">
                   <option value="edge">屠边（神职或金宝宝）</option>
-                  <option value="exterminate">屠城（全灭好人）</option>
+                  <option value="exterminate">屠城（全班好人）</option>
                 </select>
               </div>
 
@@ -253,11 +253,11 @@
 
   <!-- 日志模态框 -->
   <div id="logs-modal" class="modal">
-    <div class="modal-backdrop"></div>
+    <div class="modal-backdrop" onclick="closeModal()"></div>
     <div class="modal-content">
       <div class="modal-header">
         <h3 class="modal-title">游戏日志</h3>
-        <button class="modal-close" data-action="close-modal">&times;</button>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-body">
         <div id="logs-content" class="logs-content"></div>
@@ -273,5 +273,3 @@
   <script src="assets/js/app.js"></script>
 </body>
 </html>
-
-

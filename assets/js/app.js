@@ -910,20 +910,36 @@ const App = {
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
   },
 
-  initButtonEffects() {
-    // 统一控制“按压态”
-    const onDown = e => {
-      const btn = e.target.closest('button');
-      if (btn && !btn.disabled) btn.classList.add('is-pressed');
-    };
-    const onUp = e => {
-      document.querySelectorAll('button.is-pressed').forEach(b => b.classList.remove('is-pressed'));
-    };
-    document.addEventListener('pointerdown', onDown);
-    document.addEventListener('pointerup', onUp);
-    document.addEventListener('pointerleave', onUp);
-    document.addEventListener('dragend', onUp);
-  },
+initButtonEffects() {
+  // 按压态控制（保持原有逻辑）
+  const onDown = e => {
+    const btn = e.target.closest('button');
+    if (btn && !btn.disabled) btn.classList.add('is-pressed');
+  };
+  
+  const onUp = e => {
+    document.querySelectorAll('button.is-pressed').forEach(b => b.classList.remove('is-pressed'));
+  };
+  
+  // 新增：悬停光效
+  document.addEventListener('mouseover', e => {
+    const btn = e.target.closest('button.confirm-btn');
+    if (btn && !btn.disabled) {
+      btn.style.filter = 'brightness(1.1) drop-shadow(0 0 20px rgba(99, 102, 241, 0.4))';
+    }
+  });
+  
+  document.addEventListener('mouseout', e => {
+    const btn = e.target.closest('button.confirm-btn');
+    if (btn) {
+      btn.style.filter = '';
+    }
+  });
+  
+  document.addEventListener('pointerdown', onDown);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointerleave', onUp);
+}
 
   toast(txt, type = 'info', duration = 2200) {
     const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
@@ -1329,7 +1345,7 @@ const App = {
 
     if (ctx.meCanSeeWolves && ctx.voteMap[p.id]) {
       ctx.voteMap[p.id].forEach(vote => {
-        const voteDisplay = vote.isEmpty ? '🔪' : vote.voter;
+        const voteDisplay = vote.isEmpty ? '空刀' : vote.voter;
         card.appendChild(el(`<div class="wolf-corner">${voteDisplay}</div>`));
       });
     }

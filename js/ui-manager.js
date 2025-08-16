@@ -153,7 +153,7 @@ class UIManager {
     let count = parseInt(countEl.textContent) || 0;
     count = Math.max(0, count + delta);
     
-    // 唯一角色限制
+    // 唯一角色
     if (role === '隐狼' || role === '盗贼') {
       count = Math.min(1, count);
     }

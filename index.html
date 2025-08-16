@@ -1,275 +1,346 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#0a0e27">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>双身份狼人杀 · 电子法官</title>
-  <meta name="description" content="专业的双身份狼人杀在线游戏工具">
-  
-  <!-- 预连接优化 -->
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app">
-  
-  <!-- 图标 -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>">
-  
-  <!-- 样式表 -->
-  <link href="assets/css/styles.css" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#1a237e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>双身份狼人杀 - 在线游戏平台</title>
+    <meta name="description" content="创新的双身份狼人杀在线游戏，支持多人实时对战">
+    
+    <!-- 预连接优化 -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://werewolf-game-master-1f37f-default-rtdb.asia-southeast1.firebasedatabase.app">
+    
+    <!-- 图标 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>">
+    
+    <!-- 样式表 -->
+    <link href="css/styles.css" rel="stylesheet">
 </head>
-<body>
-  <!-- 加载动画 -->
-  <div id="loading-screen" class="loading-screen">
-    <div class="loading-content">
-      <div class="loading-logo">🐺</div>
-      <div class="loading-text">正在加载游戏资源...</div>
-      <div class="loading-bar"><div class="loading-progress"></div></div>
+<body data-theme="light">
+    <!-- 加载动画 -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <span class="wolf-icon">🐺</span>
+                <span class="moon-icon">🌙</span>
+            </div>
+            <div class="loading-text">正在加载游戏资源...</div>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- 通知容器 -->
-  <div id="notification-container" class="notification-container" role="region" aria-label="通知消息"></div>
+    <!-- 通知容器 -->
+    <div id="notification-container" class="notification-container"></div>
 
-  <!-- 主应用容器 -->
-  <div id="app" class="app">
-    <!-- 创建/配置页面 -->
-    <section id="setup-view" class="view active">
-      <div class="container">
-        <header class="page-header">
-          <h1 class="page-title">
-            <span class="title-icon">🐺</span>
-            <span class="title-text">双身份狼人杀</span>
-          </h1>
-          <p class="page-subtitle">创建房间并配置游戏规则</p>
-        </header>
+    <!-- 主应用容器 -->
+    <div id="app" class="app">
+        <!-- 游戏设置页面 -->
+        <section id="setup-view" class="view active">
+            <div class="container">
+                <header class="page-header">
+                    <div class="title-animation">
+                        <h1 class="page-title">
+                            <span class="title-icon">🐺</span>
+                            <span class="title-text">双身份狼人杀</span>
+                            <span class="title-badge">2.0</span>
+                        </h1>
+                    </div>
+                    <p class="page-subtitle">创建房间并配置游戏规则</p>
+                </header>
 
-        <div class="content-grid">
-          <!-- 身份配置 -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">身份配置</h2>
-              <p class="card-desc">每增加2张身份牌产生1名玩家，总数必须为偶数</p>
-            </div>
-            <div class="card-body">
-              <div id="role-grid" class="role-grid"></div>
-              <div class="setup-summary">
-                <div class="summary-item">
-                  <span class="summary-label">身份总数</span>
-                  <span class="summary-value" id="total-roles">0</span>
+                <div class="setup-grid">
+                    <!-- 身份配置卡片 -->
+                    <div class="card card-animated">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <span class="card-icon">👥</span>
+                                身份配置
+                            </h2>
+                            <p class="card-desc">每增加2张身份牌产生1名玩家，总数必须为偶数</p>
+                        </div>
+                        <div class="card-body">
+                            <div id="role-grid" class="role-grid"></div>
+                            <div class="setup-summary">
+                                <div class="summary-item">
+                                    <span class="summary-label">身份总数</span>
+                                    <span class="summary-value" id="total-roles">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">玩家人数</span>
+                                    <span class="summary-value" id="player-count">0</span>
+                                </div>
+                            </div>
+                            <div id="setup-warning" class="warning-message"></div>
+                        </div>
+                    </div>
+
+                    <!-- 游戏规则卡片 -->
+                    <div class="card card-animated">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <span class="card-icon">⚙️</span>
+                                游戏规则
+                            </h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="witch-rule">
+                                    <span class="label-icon">🧪</span>
+                                    女巫自救规则
+                                </label>
+                                <select id="witch-rule" class="form-select">
+                                    <option value="noFirstNightSelfSave">首夜不可自救</option>
+                                    <option value="onlyFirstNightSelfSave">仅首夜可自救</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="seer-mode">
+                                    <span class="label-icon">🔮</span>
+                                    预言家查验模式
+                                </label>
+                                <select id="seer-mode" class="form-select">
+                                    <option value="faction">查阵营（好人/狼人）</option>
+                                    <option value="identity">查身份（具体角色）</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="wolf-win">
+                                    <span class="label-icon">🏆</span>
+                                    狼人胜利条件
+                                </label>
+                                <select id="wolf-win" class="form-select">
+                                    <option value="edge">屠边（神职或金宝宝）</option>
+                                    <option value="exterminate">屠城（全部好人）</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hidden-activation">
+                                    <span class="label-icon">🌑</span>
+                                    隐狼激活时机
+                                </label>
+                                <select id="hidden-activation" class="form-select">
+                                    <option value="noActiveWolf">无活跃狼人时</option>
+                                    <option value="noWolfCardAlive">不存在狼人牌时</option>
+                                </select>
+                            </div>
+
+                            <button id="create-game-btn" class="btn btn-primary btn-large btn-glow">
+                                <span class="btn-icon">🚀</span>
+                                <span class="btn-text">创建房间</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="summary-item">
-                  <span class="summary-label">玩家人数</span>
-                  <span class="summary-value" id="player-count">0</span>
+            </div>
+        </section>
+
+        <!-- 准备大厅 -->
+        <section id="lobby-view" class="view">
+            <div class="container">
+                <header class="page-header">
+                    <h1 class="page-title">游戏大厅</h1>
+                    <p class="page-subtitle">等待所有玩家准备</p>
+                </header>
+
+                <div class="lobby-grid">
+                    <!-- 房间信息 -->
+                    <div class="card card-animated">
+                        <div class="card-header">
+                            <h3 class="card-title">房间信息</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="room-info">
+                                <div class="info-item">
+                                    <span class="info-label">房间号</span>
+                                    <span class="info-value" id="room-id">-</span>
+                                </div>
+                                <div class="link-box">
+                                    <input type="text" id="game-link" class="form-input" readonly>
+                                    <button id="copy-link-btn" class="btn btn-secondary">
+                                        <span class="btn-icon">📋</span>
+                                        复制链接
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 座位列表 -->
+                    <div class="card card-animated">
+                        <div class="card-header">
+                            <h3 class="card-title">座位状态</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="seat-grid" class="seat-grid"></div>
+                        </div>
+                    </div>
+
+                    <!-- 身份信息 -->
+                    <div id="identity-card" class="card card-animated hidden">
+                        <div class="card-header">
+                            <h3 class="card-title">你的身份</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="identity-display" class="identity-display"></div>
+                            <div id="identity-actions" class="identity-actions"></div>
+                        </div>
+                    </div>
+
+                    <!-- 主持人控制 -->
+                    <div id="host-controls" class="card card-animated hidden">
+                        <div class="card-header">
+                            <h3 class="card-title">主持人控制</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="host-actions" class="host-actions"></div>
+                        </div>
+                    </div>
                 </div>
-              </div>
-              <div id="setup-warning" class="warning-message"></div>
             </div>
-          </div>
+        </section>
 
-          <!-- 规则配置 -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">游戏规则</h2>
+        <!-- 游戏主界面 -->
+        <section id="game-view" class="view">
+            <div class="game-container">
+                <!-- 游戏头部 -->
+                <header class="game-header">
+                    <div class="game-status">
+                        <span id="game-phase" class="phase-text">准备中</span>
+                        <span id="game-round" class="round-text">第0轮</span>
+                        <span id="game-timer" class="timer hidden">00:00</span>
+                    </div>
+                </header>
+
+                <!-- 游戏主体 -->
+                <div class="game-layout">
+                    <!-- 左侧玩家列表 -->
+                    <aside class="player-sidebar player-sidebar-left">
+                        <div id="players-left" class="player-list"></div>
+                    </aside>
+
+                    <!-- 中央操作区 -->
+                    <main class="game-main">
+                        <!-- 身份信息面板 -->
+                        <div id="my-identity-panel" class="identity-panel card-animated"></div>
+                        
+                        <!-- 行动面板 -->
+                        <div id="action-panel" class="action-panel card-animated"></div>
+                        
+                        <!-- 狼人聊天区 -->
+                        <div id="wolf-chat-panel" class="wolf-chat-panel card-animated hidden"></div>
+                        
+                        <!-- 投票面板 -->
+                        <div id="vote-panel" class="vote-panel card-animated hidden"></div>
+                        
+                        <!-- 主持人面板 -->
+                        <div id="host-game-panel" class="host-panel card-animated hidden"></div>
+                    </main>
+
+                    <!-- 右侧玩家列表 -->
+                    <aside class="player-sidebar player-sidebar-right">
+                        <div id="players-right" class="player-list"></div>
+                    </aside>
+                </div>
             </div>
-            <div class="card-body">
-              <div class="form-group">
-                <label for="witch-rule">女巫自救规则</label>
-                <select id="witch-rule" class="form-select">
-                  <option value="noFirstNightSelfSave">首夜不可自救</option>
-                  <option value="onlyFirstNightSelfSave">仅首夜可自救</option>
-                </select>
-              </div>
+        </section>
 
-              <div class="form-group">
-                <label for="seer-mode">预言家查验模式</label>
-                <select id="seer-mode" class="form-select">
-                  <option value="faction">查阵营（好人/狼人）</option>
-                  <option value="identity">查身份（具体角色）</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="wolf-win">狼人胜利条件</label>
-                <select id="wolf-win" class="form-select">
-                  <option value="edge">屠边（神职或金宝宝）</option>
-                  <option value="exterminate">屠城（全班好人）</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="wolf-visibility">狼人互见策略</label>
-                <select id="wolf-visibility" class="form-select">
-                  <option value="activeOnly">仅互见活跃狼人</option>
-                  <option value="allWolves">互见所有狼牌玩家</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="hidden-activation">隐狼激活时机</label>
-                <select id="hidden-activation" class="form-select">
-                  <option value="noActiveWolf">无活跃狼人时</option>
-                  <option value="noWolfCardAlive">无狼人牌时</option>
-                </select>
-              </div>
-
-              <button id="create-game-btn" class="btn btn-primary btn-block">
-                <span class="btn-icon">🚀</span>
-                <span class="btn-text">创建房间</span>
-              </button>
+        <!-- 上帝视角 -->
+        <section id="god-view" class="view">
+            <div class="container">
+                <header class="page-header">
+                    <h1 class="page-title">上帝视角</h1>
+                    <p class="page-subtitle">游戏管理后台</p>
+                </header>
+                
+                <div class="god-grid">
+                    <!-- 玩家状态表 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">玩家状态</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="god-player-table" class="god-table-container"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 游戏控制 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">游戏控制</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="god-controls" class="god-controls"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 详细日志 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">详细日志</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="god-logs" class="god-logs"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 加入房间页面 -->
-    <section id="join-view" class="view">
-      <div class="container">
-        <div class="join-box">
-          <h2 class="join-title">加入游戏房间</h2>
-          <p class="join-desc">请输入你的座位号（1-20）</p>
-          <input type="number" id="player-number-input" class="form-input" placeholder="例如：1" min="1" max="20">
-          <button id="join-game-btn" class="btn btn-primary btn-block">
-            <span class="btn-icon">✅</span>
-            <span class="btn-text">确认加入</span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- 游戏大厅 -->
-    <section id="lobby-view" class="view">
-      <div class="container">
-        <header class="page-header">
-          <h1 class="page-title">游戏大厅</h1>
-          <p class="page-subtitle">等待所有玩家准备</p>
-        </header>
-
-        <div class="lobby-content">
-          <!-- 房间链接 -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">邀请链接</h3>
-            </div>
-            <div class="card-body">
-              <div class="link-box">
-                <input type="text" id="game-link" class="form-input" readonly>
-                <button id="copy-link-btn" class="btn btn-secondary">复制</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 玩家状态 -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">玩家状态</h3>
-            </div>
-            <div class="card-body">
-              <div id="player-status-grid" class="player-status-grid"></div>
-            </div>
-          </div>
-
-          <!-- 身份确认 -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">你的身份</h3>
-            </div>
-            <div class="card-body">
-              <div id="lobby-identity-display" class="identity-display"></div>
-              <div id="lobby-actions" class="lobby-actions"></div>
-            </div>
-          </div>
-
-          <!-- 主持人控制 -->
-          <div id="lobby-host-controls" class="card hidden">
-            <div class="card-header">
-              <h3 class="card-title">主持人控制</h3>
-            </div>
-            <div class="card-body">
-              <div class="host-controls"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 游戏主界面 -->
-    <section id="game-view" class="view">
-      <div class="game-container">
-        <!-- 状态栏 -->
-        <header id="game-header" class="game-header">
-          <div class="game-status"></div>
-        </header>
-
-        <!-- 游戏主体 -->
-        <div class="game-layout">
-          <!-- 左侧玩家列表 -->
-          <aside class="player-sidebar player-sidebar-left">
-            <div id="players-left" class="player-list"></div>
-          </aside>
-
-          <!-- 中央区域 -->
-          <main class="game-main">
-            <!-- 身份信息 -->
-            <div id="identity-panel" class="identity-panel"></div>
-            
-            <!-- 持久信息 -->
-            <div id="persist-info" class="persist-info"></div>
-            
-            <!-- 操作面板 -->
-            <div id="action-panel" class="action-panel"></div>
-            
-            <!-- 主持人控制 -->
-            <div id="host-panel" class="host-panel hidden"></div>
-          </main>
-
-          <!-- 右侧玩家列表 -->
-          <aside class="player-sidebar player-sidebar-right">
-            <div id="players-right" class="player-list"></div>
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <!-- 上帝视角 -->
-    <section id="god-view" class="view">
-      <div class="container">
-        <header class="page-header">
-          <h1 class="page-title">上帝视角</h1>
-          <p class="page-subtitle">仅当 player=0 时可见</p>
-        </header>
-        <div id="god-content" class="god-content"></div>
-      </div>
-    </section>
-  </div>
-
-  <!-- 浮动按钮 -->
-  <button id="logs-btn" class="fab fab-logs" title="查看日志">
-    <span class="fab-icon">📋</span>
-  </button>
-
-  <!-- 日志模态框 -->
-  <div id="logs-modal" class="modal">
-    <div class="modal-backdrop" onclick="closeModal()"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title">游戏日志</h3>
-        <button class="modal-close" onclick="closeModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div id="logs-content" class="logs-content"></div>
-      </div>
+        </section>
     </div>
-  </div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  
-  <!-- 应用脚本 -->
-  <script src="assets/js/app.js"></script>
+    <!-- 日志浮动按钮 -->
+    <button id="logs-btn" class="fab fab-logs" title="查看日志">
+        <span class="fab-icon">📋</span>
+    </button>
+
+    <!-- 日志模态框 -->
+    <div id="logs-modal" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">游戏日志</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="logs-content" class="logs-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认对话框 -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3 id="confirm-title" class="modal-title">确认</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message"></p>
+                <div class="modal-actions">
+                    <button id="confirm-yes" class="btn btn-primary">确认</button>
+                    <button id="confirm-no" class="btn btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <!-- 游戏脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/animations.js"></script>
+    <script src="js/game-engine.js"></script>
+    <script src="js/game-actions.js"></script>
+    <script src="js/ui-manager.js"></script>
 </body>
 </html>
